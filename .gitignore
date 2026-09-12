@@ -34,3 +34,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# next.js scaffold artifact
+AGENTS.md
+
+# local working docs (specs/plans) - exceptions are committed explicitly
+docs/
