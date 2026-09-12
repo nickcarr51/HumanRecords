@@ -59,7 +59,7 @@ Next.js Server Components can't use styled-components directly (it's a client-si
 Minimal branding placeholder — no nav, no forms, no auth gate (none exists yet):
 
 - Centered wordmark: **HUMAN SERVICES**
-- Subline: **Human Records** (label attribution)
+- Subline: **By Human Records** (label attribution)
 - Small status tag: **ACCESS BY INVITATION**
 - No logo yet — a slot is left for when one is supplied
 
@@ -84,11 +84,15 @@ One smoke test for this pass: home page renders the wordmark. Proves the Vitest/
 - Docs convention: `docs/` is gitignored except specs explicitly committed as historical record
 - Pointer to `.claude/skills/` for feature-specific skills
 
+## Workflow
+
+Branches merge via GitHub pull request, not direct git merge — `feature/* → develop` and `develop → main` both go through a PR reviewed and merged on GitHub.
+
 ## Deployment Verification
 
-1. Scaffold committed to `feature/init-next-js`, merged to `develop`
-2. Confirm Vercel auto-deploys `develop` to its Preview environment, serving the home page correctly
-3. Merge `develop` → `main`
+1. Scaffold pushed to `feature/init-next-js`, opens a PR into `develop` (Vercel gives the PR its own ephemeral preview)
+2. Merge the PR on GitHub; confirm Vercel auto-deploys `develop` to its Preview environment, serving the home page correctly
+3. Open a PR from `develop` into `main`, merge on GitHub
 4. Confirm Vercel Production deploy serves the home page correctly
 
 No new Vercel configuration needed — the project is already linked to the GitHub repo; pushing commits triggers the existing pipeline.
