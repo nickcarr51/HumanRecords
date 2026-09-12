@@ -83,10 +83,16 @@ One smoke test for this pass: home page renders the wordmark. Proves the Vitest/
 - Noted future constraint: 3-tier user model (listener/artist/label member), dashboard access varies by tier — not yet implemented, but shapes future routing/auth decisions
 - Docs convention: `docs/` is gitignored except specs explicitly committed as historical record
 - Pointer to `.claude/skills/` for feature-specific skills
+- Workflow convention: feature branches (worktrees allowed, merge back before PR) → PR into `develop` → user merges manually on GitHub; same for `develop` → `main`. CI/Copilot review to be added later. An agent never merges its own PR
 
 ## Workflow
 
-Branches merge via GitHub pull request, not direct git merge — `feature/* → develop` and `develop → main` both go through a PR reviewed and merged on GitHub.
+Standing convention for this project, not just this pass:
+
+- Work happens on feature branches, optionally in separate git worktrees (worktrees get merged back into one feature branch when the work converges)
+- Feature branch → PR into `develop` (CI and Copilot review to be added later; not part of this pass)
+- User manually merges the PR on GitHub — an agent never merges its own PR
+- `develop → main` also goes through a PR, merged manually the same way
 
 ## Deployment Verification
 
