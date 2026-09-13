@@ -36,10 +36,10 @@ export const StatusTag = styled.p`
 `;
 
 export const Wordmark = styled.h1`
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Courier New', ui-monospace, monospace;
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   margin: 0;
 `;
 
