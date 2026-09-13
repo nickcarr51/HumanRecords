@@ -14,7 +14,7 @@ export const Main = styled.main`
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: #0a0a0a;
+  background: #14141a;
   color: #f5f0e6;
   text-align: center;
   padding: 1.5rem;
