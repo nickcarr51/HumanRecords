@@ -9,5 +9,6 @@ describe('Home page', () => {
     expect(screen.getByText('HUMAN SERVICES')).toBeInTheDocument();
     expect(screen.getByText('By Human Records')).toBeInTheDocument();
     expect(screen.getByText(/ACCESS BY INVITATION/)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Human Records' })).toBeInTheDocument();
   });
 });

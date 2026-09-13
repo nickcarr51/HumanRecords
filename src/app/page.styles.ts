@@ -20,6 +20,12 @@ export const Main = styled.main`
   padding: 1.5rem;
 `;
 
+export const Logo = styled.img`
+  width: clamp(64px, 12vw, 96px);
+  height: auto;
+  margin-bottom: 0.5rem;
+`;
+
 export const StatusTag = styled.p`
   font-family: 'Courier New', ui-monospace, monospace;
   font-size: 0.75rem;
