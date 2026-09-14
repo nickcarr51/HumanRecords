@@ -14,6 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
     "next": "15.5.25",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -33,6 +35,7 @@
     "eslint-config-next": "15.5.25",
     "happy-dom": "^20.14.5",
     "jsdom": "24",
+    "supabase": "^2.117.0",
     "typescript": "^5",
     "vite": "7.0.0",
     "vite-tsconfig-paths": "^6.1.1",
