@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./vitest.setup.ts'],
+      exclude: ['node_modules', 'dist', '.claude/worktrees'],
     },
   };
 });
