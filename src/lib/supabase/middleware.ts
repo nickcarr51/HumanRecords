@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { authRedirectPath } from "@/lib/auth/route-guard";
 import type { Database } from "./database.types";
 
 /**
@@ -42,7 +43,14 @@ export async function updateSession(request: NextRequest) {
   //
   // IMPORTANT: if you remove getClaims() and use server-side rendering with
   // the Supabase client, users may be randomly logged out.
-  await supabase.auth.getClaims();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const redirectTo = authRedirectPath(request.nextUrl.pathname, Boolean(claimsData?.claims));
+  if (redirectTo) {
+    const url = request.nextUrl.clone();
+    url.pathname = redirectTo;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   // IMPORTANT: you *must* return the supabaseResponse object as it is. If
   // you're creating a new response object with NextResponse.next() make
