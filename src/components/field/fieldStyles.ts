@@ -25,4 +25,7 @@ export const fieldStyles = css<{ $invalid?: boolean }>`
     opacity: 0.5;
     cursor: not-allowed;
   }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
