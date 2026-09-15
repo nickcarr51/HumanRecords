@@ -40,3 +40,6 @@ AGENTS.md
 
 # local working docs (specs/plans) - exceptions are committed explicitly
 docs/
+
+# superpowers subagent-driven-development scratch workspace (ledgers, briefs, review packages)
+.superpowers/
