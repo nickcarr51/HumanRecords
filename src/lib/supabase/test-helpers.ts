@@ -6,7 +6,9 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const secretKey = process.env.SUPABASE_SECRET_KEY!;
 
 export function createAnonClient(): SupabaseClient {
-  return createClient(url, publishableKey);
+  return createClient(url, publishableKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 export function createAdminClient(): SupabaseClient {
