@@ -4,7 +4,7 @@
 **Status:** Approved
 **Scope:** Wire up Supabase (local dev + develop + production), establish the
 Auth model (invite + email OTP), and design the initial catalog schema
-(profiles, artists, albums, tracks, downloads). Dashboard UI, fine-grained
+(users, artists, albums, tracks, downloads). Dashboard UI, fine-grained
 write RLS policies, Cloudflare R2 client wiring, and the eventual
 request/approval invite flow are explicitly out of scope for this pass.
 
@@ -58,7 +58,7 @@ This is split into two execution phases with different rigor:
    (server components/route handlers), following current Supabase Next.js
    App Router SSR guidance
 6. Create `.env.example` entries and `.env.local` for local Supabase URL/keys
-7. Create `supabase/seed.sql` with a handful of sample profiles/artists/
+7. Create `supabase/seed.sql` with a handful of sample users/artists/
    tracks/albums for local development
 
 ## Part B — Schema (→ implementation plan)
@@ -67,14 +67,14 @@ This is split into two execution phases with different rigor:
 
 | Table | Purpose | Key fields |
 |---|---|---|
-| `profiles` | App-facing user; 1:1 extension of `auth.users` | `id` (PK, FK→`auth.users.id`), `first_name`, `last_name`, `role` (enum: `listener`, `artist`, `label_member`), `created_at` |
-| `artists` | Artist identity; exists independent of any login | `id` (PK), `name`, `bio` (nullable), `art_url` (nullable), `profile_id` (nullable FK→`profiles.id`, set once that artist has an account — **single source of truth for the profile↔artist link**), `created_at` |
+| `users` | App-facing user; 1:1 extension of `auth.users` | `id` (PK, FK→`auth.users.id`), `first_name`, `last_name`, `role` (enum: `listener`, `artist`, `label_member`), `created_at` |
+| `artists` | Artist identity; exists independent of any login | `id` (PK), `name`, `bio` (nullable), `profile_photo_url` (nullable), `profile_id` (nullable FK→`users.id`, set once that artist has an account — **single source of truth for the profile↔artist link**), `created_at` |
 | `albums` | Groups tracks | `id` (PK), `title`, `album_art_url` (nullable), `created_at` |
 | `tracks` | A song | `id` (PK), `title`, `track_art_url` (nullable), `audio_url`, `play_count` (int, default 0), `created_at` |
 | `track_artists` | Join: track↔artist (many-to-many, credits/collabs) | `track_id` (FK), `artist_id` (FK), composite PK |
 | `album_artists` | Join: album↔artist (many-to-many, compilations) | `album_id` (FK), `artist_id` (FK), composite PK |
 | `track_albums` | Join: track↔album (many-to-many — a track can be on 0, 1, or many albums) | `track_id` (FK), `album_id` (FK), composite PK |
-| `downloads` | Who downloaded what, so an artist can see their download list | `user_id` (FK→`profiles.id`), `track_id` (FK→`tracks.id`), `downloaded_at`, unique on (`user_id`, `track_id`) |
+| `downloads` | Who downloaded what, so an artist can see their download list | `user_id` (FK→`users.id`), `track_id` (FK→`tracks.id`), `downloaded_at`, unique on (`user_id`, `track_id`) |
 
 ### Notes
 
@@ -85,7 +85,7 @@ This is split into two execution phases with different rigor:
   or similar) rather than a client-side read-modify-write, to avoid races.
   Plays are anonymous — no event log, no user association.
 - A user *is* an artist whenever an `artists` row's `profile_id` points at
-  their `profiles.id` — independent of that profile's `role` value (a
+  their `users.id` — independent of that user's `role` value (a
   `label_member` can also have their own artist row).
 
 ### Row Level Security
