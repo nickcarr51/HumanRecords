@@ -7,7 +7,15 @@ export async function GET(request: NextRequest): Promise<Response> {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const rawNext = searchParams.get("next") ?? "/dashboard";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
+  let next = "/dashboard";
+  try {
+    const candidate = new URL(rawNext, request.url);
+    if (candidate.origin === new URL(request.url).origin) {
+      next = candidate.pathname + candidate.search + candidate.hash;
+    }
+  } catch {
+    // malformed next — keep the /dashboard default
+  }
 
   if (tokenHash && type) {
     const supabase = await createClient();

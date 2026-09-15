@@ -36,17 +36,41 @@ describe("GET /auth/confirm", () => {
 
   it("neutralizes malicious absolute URL in next param", async () => {
     verifyOtp.mockResolvedValue({ error: null });
-    const res = await GET(req("?token_hash=abc&type=invite&next=https://evil.example/phish"));
+    const request = req("?token_hash=abc&type=invite&next=https://evil.example/phish");
+    const requestOrigin = new URL(request.url).origin;
+    const res = await GET(request);
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/dashboard");
-    expect(res.headers.get("location")).not.toContain("evil.example");
+    expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
   });
 
   it("neutralizes malicious protocol-relative URL in next param", async () => {
     verifyOtp.mockResolvedValue({ error: null });
-    const res = await GET(req("?token_hash=abc&type=invite&next=//evil.example/phish"));
+    const request = req("?token_hash=abc&type=invite&next=//evil.example/phish");
+    const requestOrigin = new URL(request.url).origin;
+    const res = await GET(request);
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/dashboard");
-    expect(res.headers.get("location")).not.toContain("evil.example");
+    expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+  });
+
+  it("neutralizes malicious backslash bypass in next param", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    const request = req("?token_hash=abc&type=invite&next=/\\evil.example");
+    const requestOrigin = new URL(request.url).origin;
+    const res = await GET(request);
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+  });
+
+  it("accepts legitimate relative next param", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    const request = req("?token_hash=abc&type=invite&next=/profile");
+    const requestOrigin = new URL(request.url).origin;
+    const res = await GET(request);
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/profile");
   });
 });
