@@ -68,7 +68,7 @@ This is split into two execution phases with different rigor:
 | Table | Purpose | Key fields |
 |---|---|---|
 | `users` | App-facing user; 1:1 extension of `auth.users` | `id` (PK, FK→`auth.users.id`), `first_name`, `last_name`, `role` (enum: `listener`, `artist`, `label_member`), `created_at` |
-| `artists` | Artist identity; exists independent of any login | `id` (PK), `name`, `bio` (nullable), `profile_photo_url` (nullable), `profile_id` (nullable FK→`users.id`, set once that artist has an account — **single source of truth for the profile↔artist link**), `created_at` |
+| `artists` | Artist identity; exists independent of any login | `id` (PK), `name`, `bio` (nullable), `profile_photo_url` (nullable), `user_id` (nullable FK→`users.id`, set once that artist has an account — **single source of truth for the user↔artist link**), `created_at` |
 | `albums` | Groups tracks | `id` (PK), `title`, `album_art_url` (nullable), `created_at` |
 | `tracks` | A song | `id` (PK), `title`, `track_art_url` (nullable), `audio_url`, `play_count` (int, default 0), `created_at` |
 | `track_artists` | Join: track↔artist (many-to-many, credits/collabs) | `track_id` (FK), `artist_id` (FK), composite PK |
@@ -84,7 +84,7 @@ This is split into two execution phases with different rigor:
 - `play_count` increments via a Postgres RPC function (`increment_play_count`
   or similar) rather than a client-side read-modify-write, to avoid races.
   Plays are anonymous — no event log, no user association.
-- A user *is* an artist whenever an `artists` row's `profile_id` points at
+- A user *is* an artist whenever an `artists` row's `user_id` points at
   their `users.id` — independent of that user's `role` value (a
   `label_member` can also have their own artist row).
 
