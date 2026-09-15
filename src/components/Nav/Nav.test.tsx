@@ -10,7 +10,7 @@ describe('Nav + Footer', () => {
       <>
         <Nav>
           <NavBrand>HUMAN</NavBrand>
-          <NavLinks><a href="/">Home</a></NavLinks>
+          <NavLinks><a href="#">Home</a></NavLinks>
         </Nav>
         <Footer>© Human Records</Footer>
       </>,
