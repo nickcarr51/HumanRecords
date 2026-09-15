@@ -62,3 +62,17 @@ describe("submitOtp", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 });
+
+describe("signOut", () => {
+  it("signs out and redirects to /login", async () => {
+    const signOutFn = vi.fn().mockResolvedValue({ error: null });
+    const { createClient } = await import("@/lib/supabase/server");
+    (createClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      auth: { signOut: signOutFn },
+    });
+    const { signOut } = await import("./actions");
+    await expect(signOut()).rejects.toThrow("NEXT_REDIRECT");
+    expect(signOutFn).toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith("/login");
+  });
+});

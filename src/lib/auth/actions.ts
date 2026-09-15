@@ -27,3 +27,9 @@ export async function submitOtp(email: string, token: string): Promise<Result> {
   if (error) return { error: error.message };
   redirect("/dashboard");
 }
+
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/login");
+}
