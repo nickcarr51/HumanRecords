@@ -33,4 +33,20 @@ describe("GET /auth/confirm", () => {
     const res = await GET(req("?token_hash=abc&type=email"));
     expect(res.headers.get("location")).toContain("/login?error=auth");
   });
+
+  it("neutralizes malicious absolute URL in next param", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    const res = await GET(req("?token_hash=abc&type=invite&next=https://evil.example/phish"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/dashboard");
+    expect(res.headers.get("location")).not.toContain("evil.example");
+  });
+
+  it("neutralizes malicious protocol-relative URL in next param", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    const res = await GET(req("?token_hash=abc&type=invite&next=//evil.example/phish"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/dashboard");
+    expect(res.headers.get("location")).not.toContain("evil.example");
+  });
 });
