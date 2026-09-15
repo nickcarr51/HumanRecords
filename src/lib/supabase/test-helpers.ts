@@ -5,6 +5,16 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const secretKey = process.env.SUPABASE_SECRET_KEY!;
 
+// These tests create and delete real auth users and catalog rows. Refuse
+// to run against anything but a local Supabase instance so a misconfigured
+// NEXT_PUBLIC_SUPABASE_URL (e.g. pointed at hosted develop under future CI)
+// can't turn the suite destructive.
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
+  throw new Error(
+    "test-helpers.ts refuses to run against a non-local Supabase URL — these tests create and delete real data.",
+  );
+}
+
 export function createAnonClient(): SupabaseClient {
   return createClient(url, publishableKey, {
     auth: { autoRefreshToken: false, persistSession: false },
