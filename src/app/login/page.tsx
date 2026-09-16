@@ -113,7 +113,7 @@ function LoginForm() {
               <FormField
                 label="Code"
                 htmlFor="code"
-                hint="6-digit code from your email"
+                hint="8-character code from your email"
               >
                 <Input
                   id="code"

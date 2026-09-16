@@ -245,10 +245,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Customized so invite / magic-link emails route through our /auth/confirm
+# SSR callback (the token_hash flow) and expose the OTP code for the login
+# form. See src/app/auth/confirm/route.ts and src/app/login/page.tsx.
+[auth.email.template.invite]
+subject = "You're invited to Human Services"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "Your Human Services sign-in code"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
