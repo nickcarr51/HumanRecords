@@ -36,10 +36,19 @@ describe("requestOtp", () => {
     });
   });
 
-  it("surfaces the Supabase error message", async () => {
+  it("surfaces an unexpected Supabase error message as-is", async () => {
     signInWithOtp.mockResolvedValue({ error: { message: "rate limited" } });
     const res = await requestOtp("ada@example.com");
     expect(res.error).toBe("rate limited");
+  });
+
+  it("maps the invite-only guard error to invite-aware copy", async () => {
+    signInWithOtp.mockResolvedValue({
+      error: { message: "Signups not allowed for otp" },
+    });
+    const res = await requestOtp("stranger@example.com");
+    expect(res.error).toMatch(/invitation/i);
+    expect(res.error).not.toMatch(/signup/i);
   });
 });
 

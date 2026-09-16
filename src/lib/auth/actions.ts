@@ -15,7 +15,17 @@ export async function requestOtp(email: string): Promise<Result> {
     email: normalized,
     options: { shouldCreateUser: false },
   });
-  return { error: error?.message ?? null };
+  if (!error) return { error: null };
+
+  // An uninvited email trips Supabase's invite-only guard (the exact
+  // message varies by GoTrue version: "Signups not allowed for otp",
+  // "User not found", etc.). Replace the raw error with invite-aware copy.
+  if (/not allowed|signup|not found/i.test(error.message)) {
+    return {
+      error: "No invitation found for that email — Human Services is invite-only.",
+    };
+  }
+  return { error: error.message };
 }
 
 export async function submitOtp(
