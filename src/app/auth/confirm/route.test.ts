@@ -64,6 +64,17 @@ describe("GET /auth/confirm", () => {
     expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
   });
 
+  it("treats an empty next param as absent and redirects to /dashboard", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    const request = req("?token_hash=abc&type=invite&next=");
+    const requestOrigin = new URL(request.url).origin;
+    const res = await GET(request);
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location")!;
+    expect(new URL(location).origin).toBe(requestOrigin);
+    expect(new URL(location).pathname).toBe("/dashboard");
+  });
+
   it("accepts legitimate relative next param", async () => {
     verifyOtp.mockResolvedValue({ error: null });
     const request = req("?token_hash=abc&type=invite&next=/profile");

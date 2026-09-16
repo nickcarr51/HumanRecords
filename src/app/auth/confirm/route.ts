@@ -6,7 +6,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const { searchParams } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const rawNext = searchParams.get("next") ?? "/dashboard";
+  const rawNext = searchParams.get("next") || "/dashboard";
   let next = "/dashboard";
   try {
     const candidate = new URL(rawNext, request.url);
