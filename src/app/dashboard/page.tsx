@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth/actions";
 import { getSessionUser } from "@/lib/auth/session";
 import {
@@ -12,8 +13,11 @@ import {
 import { Screen } from "../screen.styles";
 
 export default async function DashboardPage() {
+  // Defense in depth: middleware already gates this route, but never render
+  // the page for an unauthenticated request even if that ever regresses.
   const user = await getSessionUser();
-  const email = typeof user?.email === "string" ? user.email : "unknown";
+  if (!user) redirect("/login");
+  const email = typeof user.email === "string" ? user.email : "unknown";
 
   return (
     <Screen>

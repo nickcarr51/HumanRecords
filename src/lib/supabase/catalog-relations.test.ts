@@ -82,4 +82,40 @@ describe("catalog relations", () => {
       await user.cleanup();
     }
   });
+
+  it("does not expose one user's downloads to another user", async () => {
+    const admin = createAdminClient();
+    const { data: track } = await admin
+      .from("tracks")
+      .insert({ title: "Isolation Test Track", audio_url: "https://example.com/iso.mp3" })
+      .select("id")
+      .single();
+    const owner = await createTestUser();
+    const other = await createTestUser();
+    try {
+      await admin.from("downloads").insert({ user_id: owner.id, track_id: track!.id });
+
+      // The owner reads their own download.
+      const ownerClient = await owner.signIn();
+      const { data: ownRows } = await ownerClient
+        .from("downloads")
+        .select("user_id, track_id")
+        .eq("track_id", track!.id);
+      expect(ownRows).toEqual([{ user_id: owner.id, track_id: track!.id }]);
+
+      // A different member sees nothing — RLS scopes reads to the owner.
+      const otherClient = await other.signIn();
+      const { data: otherRows, error: otherError } = await otherClient
+        .from("downloads")
+        .select("user_id, track_id")
+        .eq("track_id", track!.id);
+      expect(otherError).toBeNull();
+      expect(otherRows).toEqual([]);
+    } finally {
+      await admin.from("downloads").delete().eq("track_id", track!.id);
+      await admin.from("tracks").delete().eq("id", track!.id);
+      await owner.cleanup();
+      await other.cleanup();
+    }
+  });
 });
