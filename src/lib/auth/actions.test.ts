@@ -61,6 +61,22 @@ describe("submitOtp", () => {
     expect(res.error).toBe("invalid code");
     expect(redirect).not.toHaveBeenCalled();
   });
+
+  it("redirects to a safe next path when provided", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    await expect(
+      submitOtp("ada@example.com", "123456", "/dashboard/settings"),
+    ).rejects.toThrow("NEXT_REDIRECT");
+    expect(redirect).toHaveBeenCalledWith("/dashboard/settings");
+  });
+
+  it("ignores an unsafe next path and redirects to /dashboard", async () => {
+    verifyOtp.mockResolvedValue({ error: null });
+    await expect(
+      submitOtp("ada@example.com", "123456", "https://evil.example"),
+    ).rejects.toThrow("NEXT_REDIRECT");
+    expect(redirect).toHaveBeenCalledWith("/dashboard");
+  });
 });
 
 describe("signOut", () => {

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeNextPath } from "./safe-next";
 
 type Result = { error: string | null };
 
@@ -17,7 +18,11 @@ export async function requestOtp(email: string): Promise<Result> {
   return { error: error?.message ?? null };
 }
 
-export async function submitOtp(email: string, token: string): Promise<Result> {
+export async function submitOtp(
+  email: string,
+  token: string,
+  next?: string,
+): Promise<Result> {
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({
     email: email.trim().toLowerCase(),
@@ -25,7 +30,7 @@ export async function submitOtp(email: string, token: string): Promise<Result> {
     type: "email",
   });
   if (error) return { error: error.message };
-  redirect("/dashboard");
+  redirect(safeNextPath(next));
 }
 
 export async function signOut(): Promise<void> {

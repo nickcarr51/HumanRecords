@@ -48,6 +48,11 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = redirectTo;
     url.search = "";
+    // When bouncing a signed-out user off a protected route, remember where
+    // they were headed so login can send them back there.
+    if (redirectTo === "/login") {
+      url.searchParams.set("next", request.nextUrl.pathname);
+    }
     const redirectResponse = NextResponse.redirect(url);
     supabaseResponse.cookies.getAll().forEach((cookie) =>
       redirectResponse.cookies.set(cookie),
