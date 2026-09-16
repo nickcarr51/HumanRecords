@@ -43,3 +43,6 @@ docs/
 
 # superpowers subagent-driven-development scratch workspace (ledgers, briefs, review packages)
 .superpowers/
+
+# git worktrees (native tool creates these here)
+.claude/worktrees/

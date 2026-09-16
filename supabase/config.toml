@@ -218,9 +218,13 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project. false = same
-# invite-only rule as [auth].enable_signup, scoped to the email provider.
-enable_signup = false
+# Whether the email auth provider is enabled at all — this maps to GoTrue's
+# EXTERNAL_EMAIL_ENABLED, NOT a signup-only switch. It MUST stay true or all
+# email auth breaks with "Email logins are disabled" (login, magic link,
+# invite verification). Invite-only is enforced by [auth].enable_signup =
+# false above (disable_signup), which blocks new user creation while still
+# letting invited users sign in.
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
@@ -245,10 +249,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Customized so invite / magic-link emails route through our /auth/confirm
+# SSR callback (the token_hash flow) and expose the OTP code for the login
+# form. See src/app/auth/confirm/route.ts and src/app/login/page.tsx.
+[auth.email.template.invite]
+subject = "You're invited to Human Services"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "Your Human Services sign-in code"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
