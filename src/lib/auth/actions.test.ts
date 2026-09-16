@@ -36,10 +36,21 @@ describe("requestOtp", () => {
     });
   });
 
-  it("surfaces an unexpected Supabase error message as-is", async () => {
-    signInWithOtp.mockResolvedValue({ error: { message: "rate limited" } });
+  it("maps rate-limit errors to friendly copy", async () => {
+    signInWithOtp.mockResolvedValue({
+      error: { message: "email rate limit exceeded" },
+    });
     const res = await requestOtp("ada@example.com");
-    expect(res.error).toBe("rate limited");
+    expect(res.error).toMatch(/too many|wait/i);
+  });
+
+  it("hides raw wording behind a generic message for unknown errors", async () => {
+    signInWithOtp.mockResolvedValue({
+      error: { message: "internal boom xyz" },
+    });
+    const res = await requestOtp("ada@example.com");
+    expect(res.error).toMatch(/something went wrong/i);
+    expect(res.error).not.toMatch(/boom/i);
   });
 
   it("maps the invite-only guard error to invite-aware copy", async () => {
@@ -64,10 +75,13 @@ describe("submitOtp", () => {
     expect(redirect).toHaveBeenCalledWith("/dashboard");
   });
 
-  it("returns the error and does not redirect on failure", async () => {
-    verifyOtp.mockResolvedValue({ error: { message: "invalid code" } });
+  it("returns a friendly message and does not redirect on failure", async () => {
+    verifyOtp.mockResolvedValue({
+      error: { message: "Token has expired or is invalid" },
+    });
     const res = await submitOtp("ada@example.com", "000000");
-    expect(res.error).toBe("invalid code");
+    expect(res.error).toMatch(/invalid or expired/i);
+    expect(res.error).not.toMatch(/token/i); // raw wording not leaked
     expect(redirect).not.toHaveBeenCalled();
   });
 

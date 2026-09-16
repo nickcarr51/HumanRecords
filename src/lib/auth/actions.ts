@@ -25,7 +25,11 @@ export async function requestOtp(email: string): Promise<Result> {
       error: "No invitation found for that email — Human Services is invite-only.",
     };
   }
-  return { error: error.message };
+  if (/rate|too many/i.test(error.message)) {
+    return { error: "Too many attempts — wait a minute and try again." };
+  }
+  // Don't surface raw GoTrue wording to end users.
+  return { error: "Something went wrong. Please try again." };
 }
 
 export async function submitOtp(
@@ -39,7 +43,13 @@ export async function submitOtp(
     token: token.trim(),
     type: "email",
   });
-  if (error) return { error: error.message };
+  if (error) {
+    return {
+      error: /expired|invalid|incorrect|token/i.test(error.message)
+        ? "That code is invalid or expired — request a new one."
+        : "Something went wrong. Please try again.",
+    };
+  }
   redirect(safeNextPath(next));
 }
 

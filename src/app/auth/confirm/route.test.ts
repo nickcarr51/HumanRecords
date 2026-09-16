@@ -34,6 +34,12 @@ describe("GET /auth/confirm", () => {
     expect(res.headers.get("location")).toContain("/login?error=auth");
   });
 
+  it("rejects an unknown otp type without verifying", async () => {
+    const res = await GET(req("?token_hash=abc&type=bogus"));
+    expect(verifyOtp).not.toHaveBeenCalled();
+    expect(res.headers.get("location")).toContain("/login?error=auth");
+  });
+
   it("neutralizes malicious absolute URL in next param", async () => {
     verifyOtp.mockResolvedValue({ error: null });
     const request = req("?token_hash=abc&type=invite&next=https://evil.example/phish");
