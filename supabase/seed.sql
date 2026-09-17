@@ -110,4 +110,58 @@ begin
   perform public.increment_play_count(v_track_1_id);
   perform public.increment_play_count(v_track_1_id);
   perform public.increment_play_count(v_track_2_id);
+
+  -- Bulk demo catalog so browse/search/pagination have real volume locally.
+  -- Names are varied so ILIKE search returns partial matches; ~40% get a
+  -- placeholder photo so both the photo and initials-tile paths render.
+  declare
+    v_names text[] := array[
+      'Midnight Ledger','Cass Vetiver','The Owl Hours','Nadia Br?ne','Slow Transit',
+      'Ivory Pipeline','Juno Cassette','Halden Frost','The Paper Kites Cover','Mara Sol',
+      'Echo Foundry','Vesper Lane','Kingsley Ono','Tundra Mail','Little Ghost Radio',
+      'August Pryce','The Blue Ferns','Odalys','North of Neon','Sable & Stone',
+      'Rue Delacroix','Piano for Wolves','Tempo Moon','Cedar Halls','Wren Adair',
+      'The Static Sea','Loam','Mirror Falls','Quiet Company Lines','Aster Vale'
+    ];
+    v_artist_ids uuid[] := '{}';
+    v_new_artist uuid;
+    v_new_track uuid;
+    v_new_album uuid;
+    i int;
+    j int;
+    v_photo text;
+  begin
+    for i in 1 .. array_length(v_names, 1) loop
+      v_photo := case when i % 5 < 2
+        then format('https://placehold.co/200x200?text=%s', left(v_names[i], 12))
+        else null end;
+      insert into public.artists (id, name, bio, profile_photo_url)
+        values (
+          gen_random_uuid(),
+          v_names[i],
+          format('%s is part of the Human Records vault. Placeholder bio.', v_names[i]),
+          v_photo
+        )
+        returning id into v_new_artist;
+      v_artist_ids := v_artist_ids || v_new_artist;
+
+      -- Give each artist an album and 0-3 tracks (i % 4 tracks) so detail
+      -- pages vary, including artists with an empty track list.
+      insert into public.albums (id, title, album_art_url)
+        values (gen_random_uuid(), format('%s LP', v_names[i]),
+                format('https://placehold.co/400x400?text=%s', left(v_names[i], 10)))
+        returning id into v_new_album;
+      insert into public.album_artists (album_id, artist_id) values (v_new_album, v_new_artist);
+
+      for j in 1 .. (i % 4) loop
+        insert into public.tracks (id, title, audio_url, track_art_url)
+          values (gen_random_uuid(), format('%s - Track %s', v_names[i], j),
+                  format('https://example.com/%s-%s.mp3', i, j), null)
+          returning id into v_new_track;
+        insert into public.track_artists (track_id, artist_id) values (v_new_track, v_new_artist);
+        insert into public.track_albums (track_id, album_id) values (v_new_track, v_new_album);
+        perform public.increment_play_count(v_new_track);
+      end loop;
+    end loop;
+  end;
 end $$;
