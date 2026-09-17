@@ -6,6 +6,9 @@ const eq = vi.fn(() => ({ single }));
 const select = vi.fn(() => ({ eq }));
 const from = vi.fn(() => ({ select }));
 const signStreamUrl = vi.fn();
+const upsert = vi.fn(() => Promise.resolve({ error: null }));
+const serviceFrom = vi.fn(() => ({ upsert }));
+const signDownloadUrl = vi.fn();
 
 vi.mock("@/lib/auth/session", () => ({ getSessionUser: () => getSessionUser() }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -13,10 +16,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("./sign", () => ({
   signStreamUrl: (...a: unknown[]) => signStreamUrl(...a),
-  signDownloadUrl: vi.fn(),
+  signDownloadUrl: (...a: unknown[]) => signDownloadUrl(...a),
+}));
+vi.mock("@/lib/supabase/service", () => ({
+  createServiceClient: () => ({ from: serviceFrom }),
 }));
 
-import { getTrackStreamUrl } from "./actions";
+import { getTrackDownloadUrl, getTrackStreamUrl } from "./actions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -48,5 +54,38 @@ describe("getTrackStreamUrl", () => {
     const res = await getTrackStreamUrl("missing");
     expect(res).toEqual({ url: null, error: "Track not found." });
     expect(signStreamUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTrackDownloadUrl", () => {
+  it("signs a download URL and records the download once (ignoreDuplicates)", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({
+      data: { title: "My Song", audio_url: "tracks/track-1/audio.mp3" },
+      error: null,
+    });
+    signDownloadUrl.mockResolvedValue("https://signed.example/download");
+    const res = await getTrackDownloadUrl("track-1");
+    expect(signDownloadUrl).toHaveBeenCalledWith(
+      "tracks/track-1/audio.mp3",
+      "My Song.mp3",
+    );
+    expect(serviceFrom).toHaveBeenCalledWith("downloads");
+    expect(upsert).toHaveBeenCalledWith(
+      { user_id: "user-1", track_id: "track-1" },
+      { onConflict: "user_id,track_id", ignoreDuplicates: true },
+    );
+    expect(res).toEqual({
+      url: "https://signed.example/download",
+      error: null,
+    });
+  });
+
+  it("does not sign or record when unauthenticated", async () => {
+    getSessionUser.mockResolvedValue(null);
+    const res = await getTrackDownloadUrl("track-1");
+    expect(res).toEqual({ url: null, error: "Not authenticated." });
+    expect(signDownloadUrl).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 });
