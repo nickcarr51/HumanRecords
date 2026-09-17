@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server-only. Mints presigned R2 (S3-compatible) GET URLs. NEVER import
 // from a client component — it reads the R2 secret via getR2Config().
 import { AwsClient } from "aws4fetch";

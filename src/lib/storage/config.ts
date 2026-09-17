@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server-only. Reads and validates R2 credentials from the environment at
 // call time (not module load) so serverless / Fluid compute picks up
 // per-invocation env, mirroring src/lib/supabase/server.ts.

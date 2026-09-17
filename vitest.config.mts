@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -8,6 +9,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tsconfigPaths(), react()],
+    resolve: {
+      alias: {
+        'server-only': fileURLToPath(
+          new URL('./src/test/server-only-stub.ts', import.meta.url),
+        ),
+      },
+    },
     test: {
       environment: 'jsdom',
       setupFiles: ['./vitest.setup.ts'],
