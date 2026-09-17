@@ -1,4 +1,4 @@
-import { Heading, Tag, Text } from '@/components';
+import { Heading, Link, Tag, Text } from '@/components';
 import { Screen } from './screen.styles';
 import * as S from './page.styles';
 
@@ -12,6 +12,7 @@ export default function Home() {
           HUMAN SERVICES
         </Heading>
         <Text $variant="muted">By Human Records</Text>
+        <Link href="/login">Sign in</Link>
       </S.Centered>
     </Screen>
   );

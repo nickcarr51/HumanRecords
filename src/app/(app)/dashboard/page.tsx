@@ -10,7 +10,7 @@ import {
   Stack,
   Text,
 } from "@/components";
-import { Screen } from "../screen.styles";
+import { Screen } from "../../screen.styles";
 
 export default async function DashboardPage() {
   // Defense in depth: middleware already gates this route, but never render
