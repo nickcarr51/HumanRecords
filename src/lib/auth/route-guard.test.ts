@@ -15,6 +15,15 @@ describe("authRedirectPath", () => {
     expect(authRedirectPath("/login", true)).toBe("/dashboard");
   });
 
+  it("sends signed-out users off /artists to /login", () => {
+    expect(authRedirectPath("/artists", false)).toBe("/login");
+    expect(authRedirectPath("/artists/123", false)).toBe("/login");
+  });
+
+  it("lets signed-in users into /artists", () => {
+    expect(authRedirectPath("/artists", true)).toBeNull();
+  });
+
   it("leaves public routes alone", () => {
     expect(authRedirectPath("/", false)).toBeNull();
     expect(authRedirectPath("/login", false)).toBeNull();
