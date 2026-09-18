@@ -13,6 +13,7 @@ describe("AppShell", () => {
         <p>child content</p>
       </AppShell>,
     );
+    expect(screen.getByRole("link", { name: /Human Services/ })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: /Artists/ })).toHaveAttribute("href", "/artists");
     expect(screen.getByRole("button", { name: /Sign out/ })).toBeInTheDocument();
     expect(screen.getByText("child content")).toBeInTheDocument();

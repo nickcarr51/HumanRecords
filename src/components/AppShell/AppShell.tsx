@@ -3,19 +3,47 @@
 import Link from 'next/link';
 import styled from 'styled-components';
 import { signOut } from '@/lib/auth/actions';
-import { Nav, NavBrand, NavLinks } from '@/components/Nav';
+import { Nav, NavLinks } from '@/components/Nav';
 
 const Wrapper = styled.div`
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: ${({ theme }) => theme.colors.bg};
 `;
 
+// Fills the space between the nav and (eventually) the universal player.
+// A flex column with min-height:0 so a full-height page can own its own
+// internal scrolling instead of scrolling the whole document.
 const Main = styled.main`
   flex: 1;
-  /* Bottom space reserved for the universal player added in Worktree B. */
-  padding-bottom: ${({ theme }) => theme.space.xl};
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+`;
+
+const Brand = styled(Link)`
+  display: inline-flex;
+  align-items: baseline;
+  gap: ${({ theme }) => theme.space.sm};
+  text-decoration: none;
+  border: 0;
+`;
+
+const BrandName = styled.span`
+  font-family: ${({ theme }) => theme.fonts.display};
+  font-weight: ${({ theme }) => theme.fontWeights.bold};
+  font-size: ${({ theme }) => theme.fontSizes.lg};
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const BrandBy = styled.span`
+  font-family: ${({ theme }) => theme.fonts.mono};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.muted};
 `;
 
 const NavItem = styled(Link)`
@@ -44,9 +72,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <Wrapper>
       <Nav>
-        <NavBrand as={Link} href="/artists">
-          Human Records
-        </NavBrand>
+        <Brand href="/dashboard">
+          <BrandName>Human Services</BrandName>
+          <BrandBy>by Human Records</BrandBy>
+        </Brand>
         <NavLinks>
           <NavItem href="/artists">Artists</NavItem>
           <form action={signOut}>
