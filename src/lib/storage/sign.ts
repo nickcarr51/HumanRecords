@@ -23,11 +23,18 @@ async function signObjectUrl(
   const url = new URL(`${endpoint}/${bucket}/${key}`);
   url.searchParams.set("X-Amz-Expires", String(opts.expiresIn));
   if (opts.downloadFilename) {
-    // Strip quotes/backslashes so they can't break out of the header value.
-    const safe = opts.downloadFilename.replace(/["\\]/g, "");
+    // RFC 6266: emit an ASCII fallback plus a UTF-8 form so non-ASCII titles
+    // (e.g. "Café") aren't mangled by clients. The fallback strips
+    // quotes/backslashes (so they can't break out of the quoted value) and
+    // replaces any remaining non-ASCII byte; filename* carries the true name,
+    // percent-encoded per RFC 5987.
+    const asciiFallback = opts.downloadFilename
+      .replace(/["\\]/g, "")
+      .replace(/[^\x20-\x7e]/g, "_");
+    const utf8 = encodeURIComponent(opts.downloadFilename);
     url.searchParams.set(
       "response-content-disposition",
-      `attachment; filename="${safe}"`,
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8}`,
     );
   }
   const signed = await aws.sign(url.toString(), {

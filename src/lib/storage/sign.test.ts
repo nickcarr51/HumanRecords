@@ -34,6 +34,17 @@ describe("signDownloadUrl", () => {
     expect(disp).toContain("attachment");
     expect(disp).toContain('filename="Song Title.mp3"');
   });
+
+  it("uses an RFC 6266 filename* form for non-ASCII filenames", async () => {
+    const url = await signDownloadUrl("tracks/abc/audio.mp3", "Café.mp3");
+    const u = new URL(url);
+    const disp = u.searchParams.get("response-content-disposition");
+    // UTF-8 form carries the real name, percent-encoded per RFC 5987
+    expect(disp).toContain("filename*=UTF-8''");
+    expect(disp).toContain(encodeURIComponent("Café.mp3")); // Caf%C3%A9.mp3
+    // ASCII fallback keeps the non-ASCII char replaced, not dropped
+    expect(disp).toContain('filename="Caf_.mp3"');
+  });
 });
 
 describe("signImageUrl", () => {

@@ -1,8 +1,8 @@
 "use server";
 
 import { getSessionUser } from "@/lib/auth/session";
-import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { signDownloadUrl, signStreamUrl } from "./sign";
 
 export type UrlResult = { url: string | null; error: string | null };
@@ -19,8 +19,16 @@ export async function getTrackStreamUrl(trackId: string): Promise<UrlResult> {
     .single();
   if (error || !data) return { url: null, error: "Track not found." };
 
-  const url = await signStreamUrl(data.audio_url);
-  return { url, error: null };
+  // Signing can throw on server misconfig (missing R2 env). Keep the
+  // { url, error } contract instead of rejecting the action so the UI can
+  // surface a clean message; the real cause is logged server-side.
+  try {
+    const url = await signStreamUrl(data.audio_url);
+    return { url, error: null };
+  } catch (err) {
+    console.error("Failed to sign stream URL", err);
+    return { url: null, error: "Could not generate link." };
+  }
 }
 
 export async function getTrackDownloadUrl(trackId: string): Promise<UrlResult> {
@@ -38,7 +46,17 @@ export async function getTrackDownloadUrl(trackId: string): Promise<UrlResult> {
 
   const ext = data.audio_url.split(".").pop() ?? "bin";
   const filename = `${data.title}.${ext}`;
-  const url = await signDownloadUrl(data.audio_url, filename);
+
+  // Signing can throw on server misconfig (missing R2 env). Keep the
+  // { url, error } contract; log the real cause server-side. Recording
+  // happens only after a URL is successfully minted.
+  let url: string;
+  try {
+    url = await signDownloadUrl(data.audio_url, filename);
+  } catch (err) {
+    console.error("Failed to sign download URL", err);
+    return { url: null, error: "Could not generate link." };
+  }
 
   // Record the download. downloads has no RLS insert policy, so use the
   // service-role client. ignoreDuplicates => INSERT ... ON CONFLICT DO
