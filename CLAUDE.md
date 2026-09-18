@@ -44,6 +44,6 @@ features are built.
 
 ## Out of scope so far
 
-Supabase client/env wiring, Cloudflare R2, any auth/invite flow,
+Supabase client/env wiring, any auth/invite flow,
 dashboard UI. See `docs/superpowers/specs/2026-09-12-project-bootstrap-design.md`
 for the full bootstrap design rationale.
