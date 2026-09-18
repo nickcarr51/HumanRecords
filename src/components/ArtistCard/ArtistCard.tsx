@@ -2,6 +2,11 @@
 
 import Link from 'next/link';
 import styled from 'styled-components';
+import { initials } from '@/lib/initials';
+
+// Re-exported so existing consumers importing `initials` from the component
+// keep working; the implementation lives in the server-safe '@/lib/initials'.
+export { initials };
 
 export type ArtistCardProps = {
   id: string;
@@ -9,16 +14,6 @@ export type ArtistCardProps = {
   photoUrl: string | null;
   trackCount: number;
 };
-
-export function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase();
-}
 
 const Row = styled(Link)`
   display: grid;

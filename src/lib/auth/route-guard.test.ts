@@ -11,8 +11,9 @@ describe("authRedirectPath", () => {
     expect(authRedirectPath("/dashboard", true)).toBeNull();
   });
 
-  it("sends signed-in users away from /login to /dashboard", () => {
+  it("sends signed-in users away from /login and / to /dashboard", () => {
     expect(authRedirectPath("/login", true)).toBe("/dashboard");
+    expect(authRedirectPath("/", true)).toBe("/dashboard");
   });
 
   it("sends signed-out users off /artists to /login", () => {

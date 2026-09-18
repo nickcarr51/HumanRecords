@@ -5,6 +5,8 @@ export function authRedirectPath(pathname: string, isAuthed: boolean): string | 
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
   if (isProtected && !isAuthed) return "/login";
-  if (pathname === "/login" && isAuthed) return "/dashboard";
+  // Signed-in users have no use for the public entry points (the marketing
+  // splash at "/" or the login form) — send them to the dashboard.
+  if ((pathname === "/login" || pathname === "/") && isAuthed) return "/dashboard";
   return null;
 }
