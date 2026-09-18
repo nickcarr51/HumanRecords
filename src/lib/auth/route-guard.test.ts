@@ -11,8 +11,18 @@ describe("authRedirectPath", () => {
     expect(authRedirectPath("/dashboard", true)).toBeNull();
   });
 
-  it("sends signed-in users away from /login to /dashboard", () => {
+  it("sends signed-in users away from /login and / to /dashboard", () => {
     expect(authRedirectPath("/login", true)).toBe("/dashboard");
+    expect(authRedirectPath("/", true)).toBe("/dashboard");
+  });
+
+  it("sends signed-out users off /artists to /login", () => {
+    expect(authRedirectPath("/artists", false)).toBe("/login");
+    expect(authRedirectPath("/artists/123", false)).toBe("/login");
+  });
+
+  it("lets signed-in users into /artists", () => {
+    expect(authRedirectPath("/artists", true)).toBeNull();
   });
 
   it("leaves public routes alone", () => {
