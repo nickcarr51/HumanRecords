@@ -32,13 +32,26 @@ export type ArtistDetail = {
 
 const DEFAULT_PAGE_SIZE = 12;
 
+// Cap the free-text search so a member can't force arbitrarily large scans.
+const MAX_QUERY_LENGTH = 100;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Escape LIKE/ILIKE metacharacters so user input is matched literally — a bare
+// `%` or `_` would otherwise act as a wildcard (backslash is Postgres' default
+// LIKE escape character).
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export async function getArtists(
   supabase: SupabaseClient<Database>,
   opts: { query?: string; page?: number; pageSize?: number } = {},
 ): Promise<ArtistsPage> {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = Math.max(1, opts.pageSize ?? DEFAULT_PAGE_SIZE);
-  const query = opts.query?.trim() ?? "";
+  const query = (opts.query ?? "").trim().slice(0, MAX_QUERY_LENGTH);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -48,7 +61,7 @@ export async function getArtists(
     .order("name", { ascending: true })
     .range(from, to);
 
-  if (query) builder = builder.ilike("name", `%${query}%`);
+  if (query) builder = builder.ilike("name", `%${escapeLike(query)}%`);
 
   const { data, error, count } = await builder;
   if (error) throw error;
@@ -70,6 +83,10 @@ export async function getArtist(
   supabase: SupabaseClient<Database>,
   id: string,
 ): Promise<ArtistDetail | null> {
+  // A non-UUID id would make Postgres raise "invalid input syntax for type
+  // uuid" and surface as a 500; treat a malformed id as simply not found.
+  if (!UUID_RE.test(id)) return null;
+
   const { data: artist, error } = await supabase
     .from("artists")
     .select("id, name, bio, profile_photo_url")

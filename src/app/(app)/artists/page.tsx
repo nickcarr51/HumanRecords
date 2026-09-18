@@ -1,9 +1,10 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getArtists } from '@/lib/supabase/artists';
-import { ArtistCard, Heading, Text } from '@/components';
+import { ArtistCard, Heading } from '@/components';
 import { SearchInput } from './SearchInput';
 import { Pagination } from './Pagination';
-import { Page, Header, SearchSlot, List } from './artists.styles';
+import { Page, Header, SearchSlot, List, Empty, Foot } from './artists.styles';
 
 export default async function ArtistsPage({
   searchParams,
@@ -12,11 +13,23 @@ export default async function ArtistsPage({
 }) {
   const sp = await searchParams;
   const query = (sp.q ?? '').trim();
-  const page = Math.max(1, Number(sp.page) || 1);
+  const requestedPage = Number(sp.page);
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
 
   const supabase = await createClient();
   const { artists, total, pageSize } = await getArtists(supabase, { query, page });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // A page past the end (stale link, hand-typed URL, or shrunken data) would
+  // otherwise render an empty "no artists" state with an N-of-M pager where
+  // N > M. Send the user to the last real page instead.
+  if (total > 0 && page > totalPages) {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (totalPages > 1) params.set('page', String(totalPages));
+    const qs = params.toString();
+    redirect(qs ? `/artists?${qs}` : '/artists');
+  }
 
   return (
     <Page>
@@ -27,13 +40,13 @@ export default async function ArtistsPage({
         </SearchSlot>
       </Header>
 
-      {artists.length === 0 ? (
-        <Text $variant="muted">
-          {query ? `No artists match "${query}".` : 'No artists yet.'}
-        </Text>
-      ) : (
-        <List>
-          {artists.map((a) => (
+      <List>
+        {artists.length === 0 ? (
+          <Empty>
+            {query ? `No artists match "${query}".` : 'No artists yet.'}
+          </Empty>
+        ) : (
+          artists.map((a) => (
             <ArtistCard
               key={a.id}
               id={a.id}
@@ -41,11 +54,13 @@ export default async function ArtistsPage({
               photoUrl={a.photoUrl}
               trackCount={a.trackCount}
             />
-          ))}
-        </List>
-      )}
+          ))
+        )}
+      </List>
 
-      <Pagination query={query} page={page} totalPages={totalPages} />
+      <Foot>
+        <Pagination query={query} page={page} totalPages={totalPages} />
+      </Foot>
     </Page>
   );
 }

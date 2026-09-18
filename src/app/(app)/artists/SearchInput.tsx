@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components';
 
@@ -9,6 +9,9 @@ export function SearchInput({ initialQuery }: { initialQuery: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Cancel a pending debounced navigation if the input unmounts.
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   function onChange(value: string) {
     clearTimeout(timer.current);

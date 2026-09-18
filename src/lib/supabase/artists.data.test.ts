@@ -63,6 +63,23 @@ describe("getArtists", () => {
       await user.cleanup();
     }
   });
+
+  it("treats LIKE wildcards in the query as literal characters", async () => {
+    const prefix = `LK-${Date.now()}-`;
+    const percentId = await makeArtist(`${prefix}50%off`);
+    await makeArtist(`${prefix}plain`);
+    const user = await createTestUser();
+    try {
+      const client = await user.signIn();
+      // A bare "%" must match only the name that literally contains "%",
+      // not every row (which is what an unescaped wildcard would do).
+      const result = await getArtists(client, { query: `${prefix}50%`, pageSize: 10 });
+      expect(result.total).toBe(1);
+      expect(result.artists[0].id).toBe(percentId);
+    } finally {
+      await user.cleanup();
+    }
+  });
 });
 
 describe("getArtist", () => {
@@ -87,6 +104,16 @@ describe("getArtist", () => {
       expect(missing).toBeNull();
     } finally {
       await admin.from("tracks").delete().eq("id", track.data!.id);
+      await user.cleanup();
+    }
+  });
+
+  it("returns null (not a thrown error) for a malformed, non-UUID id", async () => {
+    const user = await createTestUser();
+    try {
+      const client = await user.signIn();
+      await expect(getArtist(client, "not-a-uuid")).resolves.toBeNull();
+    } finally {
       await user.cleanup();
     }
   });
