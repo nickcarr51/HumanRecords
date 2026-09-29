@@ -4,6 +4,7 @@ import Link from 'next/link';
 import styled from 'styled-components';
 import { signOut } from '@/lib/auth/actions';
 import { Nav, NavLinks } from '@/components/Nav';
+import { PlayerProvider, PlayerBar } from '@/components/Player';
 
 const Wrapper = styled.div`
   height: 100dvh;
@@ -46,15 +47,6 @@ const BrandBy = styled.span`
   color: ${({ theme }) => theme.colors.muted};
 `;
 
-const NavItem = styled(Link)`
-  color: ${({ theme }) => theme.colors.muted};
-  text-decoration: none;
-  &:hover,
-  &:focus-visible {
-    color: ${({ theme }) => theme.colors.accent};
-  }
-`;
-
 const SignOutButton = styled.button`
   background: none;
   border: none;
@@ -70,20 +62,22 @@ const SignOutButton = styled.button`
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <Wrapper>
-      <Nav>
-        <Brand href="/dashboard">
-          <BrandName>Human Services</BrandName>
-          <BrandBy>by Human Records</BrandBy>
-        </Brand>
-        <NavLinks>
-          <NavItem href="/artists">Artists</NavItem>
-          <form action={signOut}>
-            <SignOutButton type="submit">Sign out</SignOutButton>
-          </form>
-        </NavLinks>
-      </Nav>
-      <Main>{children}</Main>
-    </Wrapper>
+    <PlayerProvider>
+      <Wrapper>
+        <Nav>
+          <Brand href="/feed">
+            <BrandName>Human Services</BrandName>
+            <BrandBy>by Human Records</BrandBy>
+          </Brand>
+          <NavLinks>
+            <form action={signOut}>
+              <SignOutButton type="submit">Sign out</SignOutButton>
+            </form>
+          </NavLinks>
+        </Nav>
+        <Main>{children}</Main>
+        <PlayerBar />
+      </Wrapper>
+    </PlayerProvider>
   );
 }
