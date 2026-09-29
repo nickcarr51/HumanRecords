@@ -67,101 +67,69 @@ declare
   v_listener_id uuid;
   v_artist_user_id uuid;
   v_label_member_id uuid;
-  v_unsigned_artist_id uuid;
-  v_signed_artist_id uuid;
+  v_artist_castillonaire uuid;
+  v_artist_sawcy uuid;
+  v_artist_quinoa uuid;
+  v_artist_daye uuid;
   v_album_id uuid;
-  v_track_1_id uuid;
-  v_track_2_id uuid;
+  v_album_track_1 uuid;
+  v_album_track_2 uuid;
+  v_single_id uuid;
 begin
   v_listener_id := pg_temp.seed_user('listener@example.com', 'listener', 'Lena', 'Listener');
   v_artist_user_id := pg_temp.seed_user('artist@example.com', 'artist', 'Ada', 'Artist');
   v_label_member_id := pg_temp.seed_user('label@example.com', 'label_member', 'Lou', 'LabelMember');
 
-  -- Unsigned artist: catalog entity with no linked account yet.
-  insert into public.artists (id, name, bio) values (gen_random_uuid(), 'Unsigned Collective', 'Not yet on the platform.')
-    returning id into v_unsigned_artist_id;
+  -- Four artists. Track 1 is credited to two of them (Castillonaire & Sawcy),
+  -- which the many-to-many track_artists table supports directly.
+  insert into public.artists (id, name, bio)
+    values (gen_random_uuid(), 'Castillonaire', 'Human Records artist.')
+    returning id into v_artist_castillonaire;
+  insert into public.artists (id, name, bio)
+    values (gen_random_uuid(), 'Sawcy', 'Human Records artist.')
+    returning id into v_artist_sawcy;
+  insert into public.artists (id, name, bio)
+    values (gen_random_uuid(), 'Quinoa Jones', 'Human Records artist.')
+    returning id into v_artist_quinoa;
+  insert into public.artists (id, name, bio)
+    values (gen_random_uuid(), 'Daye', 'Human Records artist.')
+    returning id into v_artist_daye;
 
-  -- Signed artist: linked to the seeded 'artist@example.com' account.
-  insert into public.artists (id, name, bio, user_id)
-    values (gen_random_uuid(), 'Ada Artist', 'Plays synths.', v_artist_user_id)
-    returning id into v_signed_artist_id;
-
-  insert into public.albums (id, title, album_art_url)
-    values (gen_random_uuid(), 'Debut Sessions', 'https://placehold.co/400x400?text=Debut+Sessions')
+  -- Album "The Breaks" with two tracks. audio_url holds the R2 OBJECT KEY
+  -- (the exact object name in the humanrecords-media-dev bucket), not a URL.
+  insert into public.albums (id, title, album_art_url, created_at)
+    values (gen_random_uuid(), 'The Breaks', null, now() - interval '1 hour')
     returning id into v_album_id;
 
-  insert into public.tracks (id, title, audio_url, track_art_url)
-    values (gen_random_uuid(), 'Opening Track', 'https://example.com/opening-track.mp3', null)
-    returning id into v_track_1_id;
+  insert into public.tracks (id, title, audio_url, track_art_url, created_at)
+    values (gen_random_uuid(), 'ASSUMPTIONS', 'Castillonaire & sawcy - ASSUMPTIONS.mp3', null, now() - interval '1 hour')
+    returning id into v_album_track_1;
+  insert into public.tracks (id, title, audio_url, track_art_url, created_at)
+    values (gen_random_uuid(), 'JERK CLUB TOOL', 'JERK CLUB TOOL.mp3', null, now() - interval '1 hour')
+    returning id into v_album_track_2;
 
-  insert into public.tracks (id, title, audio_url, track_art_url)
-    values (gen_random_uuid(), 'Collab Cut', 'https://example.com/collab-cut.mp3', null)
-    returning id into v_track_2_id;
+  -- One standalone track (NO track_albums row => appears as a single).
+  -- Newer timestamp so it sorts above the album in the timeline.
+  insert into public.tracks (id, title, audio_url, track_art_url, created_at)
+    values (gen_random_uuid(), 'LET EM KNOW', 'DAYE. - LET EM KNOW.mp3', null, now())
+    returning id into v_single_id;
 
-  insert into public.track_artists (track_id, artist_id) values (v_track_1_id, v_signed_artist_id);
-  insert into public.track_artists (track_id, artist_id) values (v_track_2_id, v_signed_artist_id);
-  insert into public.track_artists (track_id, artist_id) values (v_track_2_id, v_unsigned_artist_id);
+  -- Credit artists to tracks: ASSUMPTIONS -> Castillonaire + Sawcy,
+  -- JERK CLUB TOOL -> Quinoa Jones, LET EM KNOW -> Daye.
+  insert into public.track_artists (track_id, artist_id) values (v_album_track_1, v_artist_castillonaire);
+  insert into public.track_artists (track_id, artist_id) values (v_album_track_1, v_artist_sawcy);
+  insert into public.track_artists (track_id, artist_id) values (v_album_track_2, v_artist_quinoa);
+  insert into public.track_artists (track_id, artist_id) values (v_single_id, v_artist_daye);
 
-  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_signed_artist_id);
-  insert into public.track_albums (track_id, album_id) values (v_track_1_id, v_album_id);
+  -- Album membership + album credit (the three artists who appear on it).
+  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_castillonaire);
+  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_sawcy);
+  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_quinoa);
+  insert into public.track_albums (track_id, album_id) values (v_album_track_1, v_album_id);
+  insert into public.track_albums (track_id, album_id) values (v_album_track_2, v_album_id);
 
-  insert into public.downloads (user_id, track_id) values (v_listener_id, v_track_1_id);
-
-  perform public.increment_play_count(v_track_1_id);
-  perform public.increment_play_count(v_track_1_id);
-  perform public.increment_play_count(v_track_2_id);
-
-  -- Bulk demo catalog so browse/search/pagination have real volume locally.
-  -- Names are varied so ILIKE search returns partial matches; ~40% get a
-  -- placeholder photo so both the photo and initials-tile paths render.
-  declare
-    v_names text[] := array[
-      'Midnight Ledger','Cass Vetiver','The Owl Hours','Nadia Br?ne','Slow Transit',
-      'Ivory Pipeline','Juno Cassette','Halden Frost','The Paper Kites Cover','Mara Sol',
-      'Echo Foundry','Vesper Lane','Kingsley Ono','Tundra Mail','Little Ghost Radio',
-      'August Pryce','The Blue Ferns','Odalys','North of Neon','Sable & Stone',
-      'Rue Delacroix','Piano for Wolves','Tempo Moon','Cedar Halls','Wren Adair',
-      'The Static Sea','Loam','Mirror Falls','Quiet Company Lines','Aster Vale'
-    ];
-    v_artist_ids uuid[] := '{}';
-    v_new_artist uuid;
-    v_new_track uuid;
-    v_new_album uuid;
-    i int;
-    j int;
-    v_photo text;
-  begin
-    for i in 1 .. array_length(v_names, 1) loop
-      v_photo := case when i % 5 < 2
-        then format('https://placehold.co/200x200?text=%s', left(v_names[i], 12))
-        else null end;
-      insert into public.artists (id, name, bio, profile_photo_url)
-        values (
-          gen_random_uuid(),
-          v_names[i],
-          format('%s is part of the Human Records vault. Placeholder bio.', v_names[i]),
-          v_photo
-        )
-        returning id into v_new_artist;
-      v_artist_ids := v_artist_ids || v_new_artist;
-
-      -- Give each artist an album and 0-3 tracks (i % 4 tracks) so detail
-      -- pages vary, including artists with an empty track list.
-      insert into public.albums (id, title, album_art_url)
-        values (gen_random_uuid(), format('%s LP', v_names[i]),
-                format('https://placehold.co/400x400?text=%s', left(v_names[i], 10)))
-        returning id into v_new_album;
-      insert into public.album_artists (album_id, artist_id) values (v_new_album, v_new_artist);
-
-      for j in 1 .. (i % 4) loop
-        insert into public.tracks (id, title, audio_url, track_art_url)
-          values (gen_random_uuid(), format('%s - Track %s', v_names[i], j),
-                  format('https://example.com/%s-%s.mp3', i, j), null)
-          returning id into v_new_track;
-        insert into public.track_artists (track_id, artist_id) values (v_new_track, v_new_artist);
-        insert into public.track_albums (track_id, album_id) values (v_new_track, v_new_album);
-        perform public.increment_play_count(v_new_track);
-      end loop;
-    end loop;
-  end;
+  -- A little activity so downloads/play_count are non-empty locally.
+  insert into public.downloads (user_id, track_id) values (v_listener_id, v_single_id);
+  perform public.increment_play_count(v_single_id);
+  perform public.increment_play_count(v_album_track_1);
 end $$;

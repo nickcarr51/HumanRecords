@@ -7,22 +7,22 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/artists/123")).toBe("/artists/123");
   });
 
-  it("defaults to /dashboard for empty or missing values", () => {
-    expect(safeNextPath(undefined)).toBe("/dashboard");
-    expect(safeNextPath(null)).toBe("/dashboard");
-    expect(safeNextPath("")).toBe("/dashboard");
+  it("defaults to /feed for empty or missing values", () => {
+    expect(safeNextPath(undefined)).toBe("/feed");
+    expect(safeNextPath(null)).toBe("/feed");
+    expect(safeNextPath("")).toBe("/feed");
   });
 
   it("rejects absolute URLs", () => {
-    expect(safeNextPath("https://evil.example/phish")).toBe("/dashboard");
+    expect(safeNextPath("https://evil.example/phish")).toBe("/feed");
   });
 
   it("rejects protocol-relative and backslash-prefixed paths", () => {
-    expect(safeNextPath("//evil.example")).toBe("/dashboard");
-    expect(safeNextPath("/\\evil.example")).toBe("/dashboard");
+    expect(safeNextPath("//evil.example")).toBe("/feed");
+    expect(safeNextPath("/\\evil.example")).toBe("/feed");
   });
 
   it("rejects values that don't start with a slash", () => {
-    expect(safeNextPath("dashboard")).toBe("/dashboard");
+    expect(safeNextPath("dashboard")).toBe("/feed");
   });
 });

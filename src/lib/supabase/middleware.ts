@@ -7,8 +7,9 @@ import type { Database } from "./database.types";
  * Refreshes the Auth session on every matched request (see the matcher in
  * ../../middleware.ts), keeps the browser/server cookies in sync, and
  * enforces route protection: signed-out users are redirected off protected
- * routes (`/dashboard`) to `/login`, and signed-in users are redirected off
- * `/login` to `/dashboard`. See `authRedirectPath` for the exact rules.
+ * routes (prefixes include `/dashboard`, `/artists`, `/feed`, `/albums`) to
+ * `/login`, and signed-in users are redirected off `/login` to `/feed`. See
+ * `authRedirectPath` for the exact rules.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

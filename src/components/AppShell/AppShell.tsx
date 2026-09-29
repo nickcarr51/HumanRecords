@@ -4,6 +4,7 @@ import Link from 'next/link';
 import styled from 'styled-components';
 import { signOut } from '@/lib/auth/actions';
 import { Nav, NavLinks } from '@/components/Nav';
+import { PlayerProvider, PlayerBar } from '@/components/Player';
 
 const Wrapper = styled.div`
   height: 100dvh;
@@ -13,9 +14,10 @@ const Wrapper = styled.div`
   background: ${({ theme }) => theme.colors.bg};
 `;
 
-// Fills the space between the nav and (eventually) the universal player.
-// A flex column with min-height:0 so a full-height page can own its own
-// internal scrolling instead of scrolling the whole document.
+// Fills the space between the nav and the universal player (PlayerBar,
+// mounted below Main). A flex column with min-height:0 so a full-height
+// page can own its own internal scrolling instead of scrolling the whole
+// document.
 const Main = styled.main`
   flex: 1;
   min-height: 0;
@@ -46,15 +48,6 @@ const BrandBy = styled.span`
   color: ${({ theme }) => theme.colors.muted};
 `;
 
-const NavItem = styled(Link)`
-  color: ${({ theme }) => theme.colors.muted};
-  text-decoration: none;
-  &:hover,
-  &:focus-visible {
-    color: ${({ theme }) => theme.colors.accent};
-  }
-`;
-
 const SignOutButton = styled.button`
   background: none;
   border: none;
@@ -70,20 +63,22 @@ const SignOutButton = styled.button`
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <Wrapper>
-      <Nav>
-        <Brand href="/dashboard">
-          <BrandName>Human Services</BrandName>
-          <BrandBy>by Human Records</BrandBy>
-        </Brand>
-        <NavLinks>
-          <NavItem href="/artists">Artists</NavItem>
-          <form action={signOut}>
-            <SignOutButton type="submit">Sign out</SignOutButton>
-          </form>
-        </NavLinks>
-      </Nav>
-      <Main>{children}</Main>
-    </Wrapper>
+    <PlayerProvider>
+      <Wrapper>
+        <Nav>
+          <Brand href="/feed">
+            <BrandName>Human Services</BrandName>
+            <BrandBy>by Human Records</BrandBy>
+          </Brand>
+          <NavLinks>
+            <form action={signOut}>
+              <SignOutButton type="submit">Sign out</SignOutButton>
+            </form>
+          </NavLinks>
+        </Nav>
+        <Main>{children}</Main>
+        <PlayerBar />
+      </Wrapper>
+    </PlayerProvider>
   );
 }

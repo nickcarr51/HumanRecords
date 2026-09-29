@@ -24,13 +24,13 @@ describe("updateSession route protection", () => {
     expect(location.searchParams.get("next")).toBe("/dashboard/settings");
   });
 
-  it("bounces a signed-in user off /login to /dashboard", async () => {
+  it("bounces a signed-in user off /login to /feed", async () => {
     getClaims.mockResolvedValue({ data: { claims: { sub: "u1" } } });
 
     const res = await updateSession(new NextRequest("http://127.0.0.1:3000/login"));
 
     expect(res.status).toBe(307);
-    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/feed");
   });
 
   it("lets a signed-in user through to a protected route", async () => {

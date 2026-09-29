@@ -46,3 +46,6 @@ docs/
 
 # git worktrees (native tool creates these here)
 .claude/worktrees/
+
+# skill walkthroughs are local human-onboarding notes, not committed skill surface
+.claude/skills/**/Walkthrough/
