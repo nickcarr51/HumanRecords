@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
@@ -86,5 +86,48 @@ describe("PlayerProvider", () => {
     await waitFor(() =>
       expect(screen.getByTestId("status")).not.toHaveTextContent("loading"),
     );
+  });
+
+  it("auto-advances to the next track when the audio element fires 'ended'", async () => {
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+
+    const audio = container.querySelector("audio");
+    if (!audio) throw new Error("audio element not found");
+    fireEvent(audio, new Event("ended"));
+
+    expect(screen.getByTestId("title")).toHaveTextContent("Two");
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+  });
+
+  it("next() on the last track is a no-op", async () => {
+    renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+
+    mockGet.mockClear();
+    await userEvent.click(screen.getByText("next"));
+
+    expect(screen.getByTestId("title")).toHaveTextContent("Two");
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it("prev() moves to the previous track", async () => {
+    renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+
+    mockGet.mockClear();
+    await userEvent.click(screen.getByText("prev"));
+
+    // jsdom keeps audio.currentTime at 0, so prev() takes the
+    // "go to previous track" branch rather than the restart-current-track one.
+    expect(screen.getByTestId("title")).toHaveTextContent("One");
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
   });
 });
