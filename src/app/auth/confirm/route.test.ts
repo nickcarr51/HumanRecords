@@ -47,7 +47,7 @@ describe("GET /auth/confirm", () => {
     const res = await GET(request);
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
-    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/feed");
   });
 
   it("neutralizes malicious protocol-relative URL in next param", async () => {
@@ -57,7 +57,7 @@ describe("GET /auth/confirm", () => {
     const res = await GET(request);
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
-    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/feed");
   });
 
   it("neutralizes malicious backslash bypass in next param", async () => {
@@ -67,10 +67,10 @@ describe("GET /auth/confirm", () => {
     const res = await GET(request);
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("location")!).origin).toBe(requestOrigin);
-    expect(new URL(res.headers.get("location")!).pathname).toBe("/dashboard");
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/feed");
   });
 
-  it("treats an empty next param as absent and redirects to /dashboard", async () => {
+  it("treats an empty next param as absent and redirects to /feed", async () => {
     verifyOtp.mockResolvedValue({ error: null });
     const request = req("?token_hash=abc&type=invite&next=");
     const requestOrigin = new URL(request.url).origin;
@@ -78,7 +78,7 @@ describe("GET /auth/confirm", () => {
     expect(res.status).toBe(307);
     const location = res.headers.get("location")!;
     expect(new URL(location).origin).toBe(requestOrigin);
-    expect(new URL(location).pathname).toBe("/dashboard");
+    expect(new URL(location).pathname).toBe("/feed");
   });
 
   it("accepts legitimate relative next param", async () => {
