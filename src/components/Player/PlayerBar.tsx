@@ -12,6 +12,12 @@ const Bar = styled.div`
   padding: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.lg};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
+
+  /* On phones, drop the scrubber onto its own full-width row below meta+controls. */
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    grid-template-columns: 1fr auto;
+    row-gap: ${({ theme }) => theme.space.sm};
+  }
 `;
 
 const Meta = styled.div`
@@ -68,12 +74,22 @@ const Scrubber = styled.div`
   align-items: center;
   gap: ${({ theme }) => theme.space.sm};
   justify-content: flex-end;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
 `;
 
 const Range = styled.input`
   width: 100%;
   max-width: 260px;
   accent-color: ${({ theme }) => theme.colors.accent};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    max-width: none;
+    flex: 1;
+  }
 `;
 
 const Time = styled.span`
