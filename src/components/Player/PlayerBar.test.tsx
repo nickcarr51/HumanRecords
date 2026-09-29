@@ -52,6 +52,16 @@ describe("PlayerBar", () => {
     expect(s.prev).toHaveBeenCalled();
   });
 
+  it("shows the play control when paused and the pause control when playing", () => {
+    mockUse.mockReturnValue(state({ isPlaying: false }));
+    const { rerender } = renderWithTheme(<PlayerBar />);
+    expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
+
+    mockUse.mockReturnValue(state({ isPlaying: true }));
+    rerender(<PlayerBar />);
+    expect(screen.getByRole("button", { name: /^pause$/i })).toBeInTheDocument();
+  });
+
   it("scrubbing calls seek", () => {
     const s = state();
     mockUse.mockReturnValue(s);

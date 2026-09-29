@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import type { FeedTrack } from "./feed";
+import { namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type AlbumDetail = {
   id: string;
@@ -12,15 +13,6 @@ export type AlbumDetail = {
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type ArtistNameRel = Array<{ artists: { name: string } | null }> | null;
-
-function namesFrom(rel: ArtistNameRel): string[] {
-  const names = (rel ?? [])
-    .map((r) => r.artists?.name)
-    .filter((n): n is string => Boolean(n));
-  return Array.from(new Set(names));
-}
 
 export async function getAlbum(
   supabase: SupabaseClient<Database>,

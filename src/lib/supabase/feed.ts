@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type FeedTrack = {
   id: string;
@@ -34,17 +35,6 @@ export type FeedPage = {
 };
 
 const DEFAULT_PAGE_SIZE = 20;
-
-// PostgREST embeds are typed loosely by the generated types; these shapes
-// mirror the exact `select()` strings below and are bridged with `as unknown`.
-type ArtistNameRel = Array<{ artists: { name: string } | null }> | null;
-
-function namesFrom(rel: ArtistNameRel): string[] {
-  const names = (rel ?? [])
-    .map((r) => r.artists?.name)
-    .filter((n): n is string => Boolean(n));
-  return Array.from(new Set(names));
-}
 
 export async function getFeed(
   supabase: SupabaseClient<Database>,
@@ -111,8 +101,10 @@ export async function getFeed(
       createdAt: row.created_at,
     }));
 
+  // Newest first. createdAt is a non-null ISO-8601 UTC timestamp, so a plain
+  // string comparison orders correctly and is cheaper than localeCompare.
   const merged = [...albumItems, ...trackItems].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+    a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
   );
 
   const start = (page - 1) * pageSize;

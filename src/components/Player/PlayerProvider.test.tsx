@@ -35,6 +35,7 @@ function Harness() {
       <button onClick={() => p.playQueue(TRACKS, 0)}>play</button>
       <button onClick={() => p.next()}>next</button>
       <button onClick={() => p.prev()}>prev</button>
+      <button onClick={() => p.toggle()}>toggle</button>
     </div>
   );
 }
@@ -113,6 +114,39 @@ describe("PlayerProvider", () => {
 
     expect(screen.getByTestId("title")).toHaveTextContent("Two");
     expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it("toggle() plays the current track", async () => {
+    renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+
+    const play = window.HTMLMediaElement.prototype.play as unknown as ReturnType<typeof vi.fn>;
+    play.mockClear();
+    await userEvent.click(screen.getByText("toggle"));
+    expect(play).toHaveBeenCalled();
+  });
+
+  it("clears the element and toggle() is a no-op after a load error (no stale audio)", async () => {
+    const { container } = renderPlayer();
+    // First track loads OK and sets audio.src.
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+
+    // Next track fails to sign → error branch must clear the stale src.
+    mockGet.mockResolvedValue({ url: null, error: "Track not found." });
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("error"));
+
+    const audio = container.querySelector("audio");
+    if (!audio) throw new Error("audio element not found");
+    expect(audio.getAttribute("src")).toBeNull();
+
+    // Pressing play/pause while errored must not resume the previous track.
+    const play = window.HTMLMediaElement.prototype.play as unknown as ReturnType<typeof vi.fn>;
+    play.mockClear();
+    await userEvent.click(screen.getByText("toggle"));
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("prev() moves to the previous track", async () => {

@@ -82,10 +82,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
+    // No-op while errored: there is no valid loaded track to play, and the
+    // element's src has been cleared, so a toggle must not resume stale audio.
+    if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
     else audio.pause();
-  }, [currentTrack]);
+  }, [currentTrack, status]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -142,6 +144,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const audio = audioRef.current;
       if (!audio) return;
       if (res.error || !res.url) {
+        // Clear the previously-loaded track so a later toggle()/play can't
+        // resume the wrong audio under the failed track's title.
+        audio.removeAttribute("src");
+        audio.load();
         setStatus("error");
         setIsPlaying(false);
         return;
