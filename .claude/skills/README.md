@@ -8,7 +8,7 @@ Claude Code skills specific to Human Services, one directory per major feature.
 <feature-name>/
     SKILL.md          # main skill file (frontmatter name + description); summary + links
     References/        # drill-down .md files, one per aspect of the feature
-    Walkthrough/       # human-engineer onboarding narrative (gitignored)
+    Walkthrough/       # code guide: how the feature's CODE works, for a human reading the source (gitignored)
 ```
 
 - `SKILL.md` must be uppercase with `name:`/`description:` frontmatter so Claude Code
