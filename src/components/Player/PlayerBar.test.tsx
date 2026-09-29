@@ -65,4 +65,16 @@ describe("PlayerBar", () => {
     renderWithTheme(<PlayerBar />);
     expect(screen.getByText(/couldn.t play/i)).toBeInTheDocument();
   });
+
+  it("guards slider max against NaN duration", () => {
+    mockUse.mockReturnValue(state({ duration: NaN }));
+    renderWithTheme(<PlayerBar />);
+    expect(screen.getByRole("slider")).toHaveAttribute("max", "0");
+  });
+
+  it("guards slider max against Infinity duration", () => {
+    mockUse.mockReturnValue(state({ duration: Infinity }));
+    renderWithTheme(<PlayerBar />);
+    expect(screen.getByRole("slider")).toHaveAttribute("max", "0");
+  });
 });

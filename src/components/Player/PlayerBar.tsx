@@ -102,6 +102,9 @@ export function PlayerBar() {
 
   if (!currentTrack) return null;
 
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeCurrent = Number.isFinite(currentTime) ? Math.min(Math.max(currentTime, 0), safeDuration) : 0;
+
   return (
     <Bar>
       <Meta>
@@ -131,9 +134,9 @@ export function PlayerBar() {
           type="range"
           aria-label="Seek"
           min={0}
-          max={Math.max(duration, 0)}
+          max={safeDuration}
           step={1}
-          value={Math.min(currentTime, duration || 0)}
+          value={safeCurrent}
           onChange={(e) => seek(Number(e.target.value))}
         />
         <Time>{fmt(duration)}</Time>
