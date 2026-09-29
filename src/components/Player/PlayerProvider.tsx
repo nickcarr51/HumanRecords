@@ -105,7 +105,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setStatus("playing");
     };
     const onPause = () => setIsPlaying(false);
-    const onEnded = () => next();
+    const onEnded = () => {
+      setIsPlaying(false);
+      next();
+    };
     const onError = () => {
       setStatus("error");
       setIsPlaying(false);
@@ -133,6 +136,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setStatus("loading");
     setCurrentTime(0);
     setDuration(0);
+    audioRef.current?.pause();
     getTrackStreamUrl(currentTrack.id).then((res) => {
       if (cancelled) return;
       const audio = audioRef.current;

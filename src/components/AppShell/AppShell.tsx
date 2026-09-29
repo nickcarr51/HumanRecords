@@ -14,9 +14,10 @@ const Wrapper = styled.div`
   background: ${({ theme }) => theme.colors.bg};
 `;
 
-// Fills the space between the nav and (eventually) the universal player.
-// A flex column with min-height:0 so a full-height page can own its own
-// internal scrolling instead of scrolling the whole document.
+// Fills the space between the nav and the universal player (PlayerBar,
+// mounted below Main). A flex column with min-height:0 so a full-height
+// page can own its own internal scrolling instead of scrolling the whole
+// document.
 const Main = styled.main`
   flex: 1;
   min-height: 0;
