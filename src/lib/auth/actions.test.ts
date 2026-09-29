@@ -72,7 +72,7 @@ describe("submitOtp", () => {
       token: "123456",
       type: "email",
     });
-    expect(redirect).toHaveBeenCalledWith("/dashboard");
+    expect(redirect).toHaveBeenCalledWith("/feed");
   });
 
   it("returns a friendly message and does not redirect on failure", async () => {
@@ -93,12 +93,12 @@ describe("submitOtp", () => {
     expect(redirect).toHaveBeenCalledWith("/dashboard/settings");
   });
 
-  it("ignores an unsafe next path and redirects to /dashboard", async () => {
+  it("ignores an unsafe next path and redirects to /feed", async () => {
     verifyOtp.mockResolvedValue({ error: null });
     await expect(
       submitOtp("ada@example.com", "123456", "https://evil.example"),
     ).rejects.toThrow("NEXT_REDIRECT");
-    expect(redirect).toHaveBeenCalledWith("/dashboard");
+    expect(redirect).toHaveBeenCalledWith("/feed");
   });
 });
 

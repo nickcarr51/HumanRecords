@@ -1,5 +1,5 @@
 /**
- * Returns a safe same-origin destination path, defaulting to "/dashboard".
+ * Returns a safe same-origin destination path, defaulting to "/feed".
  *
  * Guards against open redirects: only an absolute path on this origin is
  * accepted — it must start with a single "/" and must not begin with "//"
@@ -7,7 +7,7 @@
  * cross-origin URL once it lands in a Location header.
  */
 export function safeNextPath(raw: string | null | undefined): string {
-  if (!raw || !raw.startsWith("/")) return "/dashboard";
-  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
+  if (!raw || !raw.startsWith("/")) return "/feed";
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/feed";
   return raw;
 }
