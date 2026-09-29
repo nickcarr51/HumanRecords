@@ -25,3 +25,4 @@ export * from './Nav';
 export * from './Footer';
 export * from './ArtistCard';
 export * from './AppShell';
+export * from './Player';
