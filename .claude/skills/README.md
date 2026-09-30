@@ -21,6 +21,7 @@ Claude Code skills specific to Human Services, one directory per major feature.
 
 - **timeline-player** — the `/feed` listener timeline, the persistent music player, the
   album page, and the feed/album data + auth redirects. (First skill; template for the rest.)
+- **admin-upload** — releases model, label-member admin portal, and the single/album upload flow.
 
 Planned (one per thread): component-library, catalog-schema, auth, media-storage,
 artists-read. See `docs/handoffs/2026-09-29-skill-directories-divvy.md`.

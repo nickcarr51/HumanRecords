@@ -19,9 +19,11 @@ null render on empty queue; title/artist; controls call actions; play vs pause i
 (integration, `*.data.test.ts` convention). These require a **local Supabase** running
 (`yarn supabase start`); `test-helpers.ts` refuses non-local URLs. They self-seed rows with
 `createAdminClient`/`createTestUser`, sign in, exercise real queries, and clean up in
-`afterEach`. Covers: album carries its tracks + artist names; standalone tracks excluded
-from albums and not duplicated; uncredited track → empty `artistNames`; pagination
-(`pageSize`/`hasMore`); `getAlbum` positive + null (missing + non-UUID) paths.
+`afterEach`. Covers: releases newest first with album tracks + credits in `position`
+order; tracks without a release excluded; uncredited single → empty `artistNames`;
+pagination (`pageSize`/`hasMore`) — the tests give `releases.created_at` values that
+contradict track creation order, proving ordering comes from `releases`; `getAlbum`
+positive + null (missing + non-UUID) paths and position (not title) track order.
 
 **Auth redirects** — `route-guard.test.ts`, `safe-next.test.ts`, `not-found.test.tsx`,
 `middleware.test.ts`, `auth/confirm/route.test.ts` all assert the `/feed` targets.

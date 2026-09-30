@@ -21,8 +21,8 @@ navigation, the player mounted inside `AppShell` persists (see
 Signed-in users land on `/feed` everywhere the app used to send them to `/dashboard`:
 
 - `src/lib/auth/route-guard.ts` — `authRedirectPath(pathname, isAuthed)`:
-  - `PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums"]`; signed-out on any
-    of these → `/login`.
+  - `PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums", "/admin"]`;
+    signed-out on any of these → `/login`. (`/admin` role gating is in [[admin-upload]].)
   - signed-in on `/artists` or `/artists/*` → `/feed` (route retired, code kept).
   - signed-in on `/` or `/login` → `/feed`.
   - Consumed by `src/lib/supabase/middleware.ts` (via `src/middleware.ts`).
