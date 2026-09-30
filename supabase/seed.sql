@@ -80,6 +80,11 @@ begin
   v_artist_user_id := pg_temp.seed_user('artist@example.com', 'artist', 'Ada', 'Artist');
   v_label_member_id := pg_temp.seed_user('label@example.com', 'label_member', 'Lou', 'LabelMember');
 
+  -- Real accounts for local testing of the admin portal. Sign in via OTP from
+  -- the app and read the code in Mailpit (http://127.0.0.1:54324).
+  perform pg_temp.seed_user('quinoajonesmusic@gmail.com', 'label_member', 'Quinoa', 'Jones');
+  perform pg_temp.seed_user('nick.carr84@gmail.com', 'listener', 'Nick', 'Carr');
+
   -- Four artists. Track 1 is credited to two of them (Castillonaire & Sawcy),
   -- which the many-to-many track_artists table supports directly.
   insert into public.artists (id, name, bio)
@@ -108,7 +113,7 @@ begin
     values (gen_random_uuid(), 'JERK CLUB TOOL', 'JERK CLUB TOOL.mp3', null, now() - interval '1 hour')
     returning id into v_album_track_2;
 
-  -- One standalone track (NO track_albums row => appears as a single).
+  -- One standalone track, published below as a single release.
   -- Newer timestamp so it sorts above the album in the timeline.
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
     values (gen_random_uuid(), 'LET EM KNOW', 'DAYE. - LET EM KNOW.mp3', null, now())
@@ -116,17 +121,22 @@ begin
 
   -- Credit artists to tracks: ASSUMPTIONS -> Castillonaire + Sawcy,
   -- JERK CLUB TOOL -> Quinoa Jones, LET EM KNOW -> Daye.
-  insert into public.track_artists (track_id, artist_id) values (v_album_track_1, v_artist_castillonaire);
-  insert into public.track_artists (track_id, artist_id) values (v_album_track_1, v_artist_sawcy);
-  insert into public.track_artists (track_id, artist_id) values (v_album_track_2, v_artist_quinoa);
-  insert into public.track_artists (track_id, artist_id) values (v_single_id, v_artist_daye);
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_castillonaire, 1);
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_sawcy, 2);
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_2, v_artist_quinoa, 1);
+  insert into public.track_artists (track_id, artist_id, position) values (v_single_id, v_artist_daye, 1);
 
   -- Album membership + album credit (the three artists who appear on it).
-  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_castillonaire);
-  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_sawcy);
-  insert into public.album_artists (album_id, artist_id) values (v_album_id, v_artist_quinoa);
-  insert into public.track_albums (track_id, album_id) values (v_album_track_1, v_album_id);
-  insert into public.track_albums (track_id, album_id) values (v_album_track_2, v_album_id);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_castillonaire, 1);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_sawcy, 2);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_quinoa, 3);
+  insert into public.track_albums (track_id, album_id, position) values (v_album_track_1, v_album_id, 1);
+  insert into public.track_albums (track_id, album_id, position) values (v_album_track_2, v_album_id, 2);
+
+  -- Timeline entries: the album as one release, the standalone track as a
+  -- single. created_at mirrors the catalog rows so ordering is unchanged.
+  insert into public.releases (kind, album_id, created_at) values ('album', v_album_id, now() - interval '1 hour');
+  insert into public.releases (kind, track_id, created_at) values ('single', v_single_id, now());
 
   -- A little activity so downloads/play_count are non-empty locally.
   insert into public.downloads (user_id, track_id) values (v_listener_id, v_single_id);
