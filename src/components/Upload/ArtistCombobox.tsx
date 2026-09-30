@@ -104,6 +104,7 @@ export function ArtistCombobox({
   const [results, setResults] = useState<ArtistMatch[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const [searchFailed, setSearchFailed] = useState(false);
   const latest = useRef('');
 
   // Debounced search. `latest` drops responses for queries the user has
@@ -116,8 +117,22 @@ export function ArtistCombobox({
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await search(q);
-      if (latest.current === q) setResults(res.artists);
+      let res: ArtistSearchResult | null = null;
+      try {
+        res = await search(q);
+      } catch {
+        res = null;
+      }
+      if (latest.current !== q) return;
+      if (!res || res.error) {
+        setResults([]);
+        setActive(-1);
+        setSearchFailed(true);
+      } else {
+        setResults(res.artists);
+        setActive(-1);
+        setSearchFailed(false);
+      }
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, search]);
@@ -133,6 +148,7 @@ export function ArtistCombobox({
     setQuery('');
     setResults([]);
     setActive(-1);
+    setSearchFailed(false);
     setOpen(false);
   }
 
@@ -145,9 +161,11 @@ export function ArtistCombobox({
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      if (options.length === 0) return;
+      if (!showList) return;
+      const o = options[active >= 0 ? active : 0];
+      if (!o) return;
       e.preventDefault();
-      pick(options[active >= 0 ? active : 0]);
+      pick(o);
     } else if (e.key === 'Escape') {
       setOpen(false);
       setActive(-1);
@@ -185,13 +203,16 @@ export function ArtistCombobox({
           aria-expanded={showList}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={active >= 0 ? `${id}-opt-${active}` : undefined}
+          aria-activedescendant={showList && active >= 0 ? `${id}-opt-${active}` : undefined}
           $invalid={Boolean(error)}
           value={query}
           placeholder="Search or add an artist"
           autoComplete="off"
           onChange={(e) => {
             setQuery(e.target.value);
+            // Drop results for the previous query right away so they can't be picked while the debounce runs.
+            setResults([]);
+            setSearchFailed(false);
             setActive(-1);
             setOpen(true);
           }}
@@ -220,6 +241,7 @@ export function ArtistCombobox({
           </List>
         ) : null}
       </Box>
+      {searchFailed ? <div role="status">Couldn&apos;t search artists.</div> : null}
     </FormField>
   );
 }

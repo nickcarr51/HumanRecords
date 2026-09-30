@@ -108,4 +108,53 @@ describe("ArtistCombobox", () => {
     expect(screen.queryByRole("option", { name: "Daye" })).toBeNull();
     expect(screen.getByRole("option", { name: "Sawcy" })).toBeInTheDocument();
   });
+
+  it("resets the highlight when results shrink; Enter does not throw", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce({ artists: [{ id: "a1", name: "Daye" }], error: null })
+      .mockResolvedValueOnce({ artists: [], error: null });
+    const { input, onAdd } = setup({ search });
+    await type(input, "day");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // Create row
+    await type(input, "dayx"); // only the Create row remains
+    expect(() => fireEvent.keyDown(input, { key: "Enter" })).not.toThrow();
+    expect(onAdd).toHaveBeenCalledWith(newChip("dayx"));
+  });
+
+  it("Enter after Escape does nothing", async () => {
+    const { input, onAdd } = setup();
+    await type(input, "day");
+    fireEvent.keyDown(input, { key: "Escape" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it("shows a status when the search returns an error, keeping Create", async () => {
+    const search = vi.fn(async () => ({ artists: [], error: "Search failed." }));
+    const { input } = setup({ search });
+    await type(input, "day");
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn't search artists.");
+    expect(screen.getByRole("option", { name: 'Create "day"' })).toBeInTheDocument();
+  });
+
+  it("shows a status when the search rejects", async () => {
+    const search = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const { input } = setup({ search });
+    await type(input, "day");
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn't search artists.");
+    fireEvent.change(input, { target: { value: "dayz" } });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("drops old results immediately when the query changes", async () => {
+    const { input } = setup();
+    await type(input, "day");
+    expect(screen.getByRole("option", { name: "Daye" })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "sawc" } });
+    expect(screen.queryByRole("option", { name: "Daye" })).toBeNull();
+  });
 });
