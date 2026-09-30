@@ -65,6 +65,16 @@ describe("runPool", () => {
   });
 });
 
+describe("runPool falsy failures", () => {
+  it("rejects even when a worker throws undefined", async () => {
+    await expect(
+      runPool([1], 1, async () => {
+        throw undefined;
+      }),
+    ).rejects.toBeUndefined();
+  });
+});
+
 describe("runPublish", () => {
   it("shows errors and does nothing else when the form is invalid", async () => {
     const { d, actions } = deps();
@@ -138,5 +148,31 @@ describe("runPublish", () => {
     const b = deps({ publishRelease: vi.fn(async () => ({ error: "Track 2 needs a title." })) });
     await runPublish(readyAlbum(), b.d);
     expect(b.actions.at(-1)).toEqual({ type: "publishFailed", error: "Track 2 needs a title." });
+  });
+
+  it("recovers when createUploadUrls or publishRelease rejects", async () => {
+    const msg = { type: "publishFailed", error: "Couldn't reach the server. Publish again to retry." };
+    const a = deps({ createUploadUrls: vi.fn(async () => { throw new Error("net"); }) });
+    await runPublish(readyAlbum(), a.d);
+    expect(a.actions.at(-1)).toEqual(msg);
+    const b = deps({ publishRelease: vi.fn(async () => { throw new Error("net"); }) });
+    await runPublish(readyAlbum(), b.d);
+    expect(b.actions.at(-1)).toEqual(msg);
+  });
+
+  it("rethrows a Next.js redirect from publishRelease", async () => {
+    const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/feed;307;" });
+    const { d, actions } = deps({ publishRelease: vi.fn(async () => { throw redirect; }) });
+    await expect(runPublish(readyAlbum(), d)).rejects.toBe(redirect);
+    expect(actions.some((a) => a.type === "publishFailed")).toBe(false);
+  });
+
+  it("fails when returned targets don't match the requested files", async () => {
+    const { d, actions } = deps({
+      createUploadUrls: vi.fn(async () => ({ targets: [{ clientId: "t1", key: "k", url: "u" }], error: null })),
+    });
+    await runPublish(readyAlbum(), d);
+    expect(actions.at(-1)).toEqual({ type: "publishFailed", error: "Couldn't prepare the upload." });
+    expect(d.putFile).not.toHaveBeenCalled();
   });
 });

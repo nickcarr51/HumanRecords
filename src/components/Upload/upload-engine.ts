@@ -27,19 +27,23 @@ export function putFile(url: string, file: File, onProgress: (fraction: number) 
 // failure no new items start; in-flight ones settle, then it rejects.
 export async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
   let next = 0;
-  let failure: unknown = null;
+  let failed = false;
+  let failure: unknown;
   async function lane() {
-    while (failure === null && next < items.length) {
+    while (!failed && next < items.length) {
       const item = items[next++];
       try {
         await worker(item);
       } catch (err) {
-        if (failure === null) failure = err;
+        if (!failed) {
+          failed = true;
+          failure = err;
+        }
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
-  if (failure !== null) throw failure;
+  if (failed) throw failure;
 }
 
 export type PublishDeps = {
@@ -48,6 +52,14 @@ export type PublishDeps = {
   publishRelease: (payload: ReleasePayload) => Promise<PublishResult | undefined>;
   dispatch: (action: UploadAction) => void;
 };
+
+// A rejected server call must not leave the form stuck in `publishing`. Next's
+// redirect() signals via a thrown NEXT_REDIRECT error, which must propagate.
+function failUnreachable(err: unknown, deps: PublishDeps): void {
+  const digest = (err as { digest?: unknown } | null)?.digest;
+  if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) throw err;
+  deps.dispatch({ type: "publishFailed", error: "Couldn't reach the server. Publish again to retry." });
+}
 
 export async function runPublish(state: UploadState, deps: PublishDeps): Promise<void> {
   if (state.publishing) return;
@@ -65,11 +77,22 @@ export async function runPublish(state: UploadState, deps: PublishDeps): Promise
   const toUpload = state.tracks.filter((t) => !keys[t.clientId]);
 
   if (toUpload.length > 0) {
-    const res = await deps.createUploadUrls(
-      toUpload.map((t) => ({ clientId: t.clientId, name: t.file!.name, size: t.file!.size })),
-    );
+    let res: UploadUrlsResult;
+    try {
+      res = await deps.createUploadUrls(
+        toUpload.map((t) => ({ clientId: t.clientId, name: t.file!.name, size: t.file!.size })),
+      );
+    } catch (err) {
+      failUnreachable(err, deps);
+      return;
+    }
     if (res.error !== null) {
       deps.dispatch({ type: "publishFailed", error: res.error });
+      return;
+    }
+    const returned = new Set(res.targets.map((t) => t.clientId));
+    if (res.targets.length !== toUpload.length || !toUpload.every((t) => returned.has(t.clientId))) {
+      deps.dispatch({ type: "publishFailed", error: "Couldn't prepare the upload." });
       return;
     }
     const files = new Map(toUpload.map((t) => [t.clientId, t.file!]));
@@ -94,6 +117,12 @@ export async function runPublish(state: UploadState, deps: PublishDeps): Promise
   }
 
   // On success publishRelease redirects to /feed and this never resumes.
-  const result = await deps.publishRelease(buildPayload(state, keys));
+  let result: PublishResult | undefined;
+  try {
+    result = await deps.publishRelease(buildPayload(state, keys));
+  } catch (err) {
+    failUnreachable(err, deps);
+    return;
+  }
   if (result?.error) deps.dispatch({ type: "publishFailed", error: result.error });
 }
