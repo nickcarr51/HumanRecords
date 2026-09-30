@@ -107,8 +107,12 @@ describe("getFeed", () => {
 
   it("credits an uncredited single with an empty artistNames array", async () => {
     const tag = `NOART-${Date.now()}-`;
+    // Created first (older track row) but released newest; the later-created
+    // track has the older release. Only a releases-based feed puts `single` first.
     const single = await makeTrack(`${tag}Uncredited`);
-    await makeSingleRelease(single, "2099-02-01T00:00:00Z");
+    const other = await makeTrack(`${tag}Other`);
+    await makeSingleRelease(other, "2099-02-01T00:00:00Z");
+    await makeSingleRelease(single, "2099-02-02T00:00:00Z");
     const user = await createTestUser();
     try {
       const client = await user.signIn();
@@ -124,17 +128,18 @@ describe("getFeed", () => {
     const ids: string[] = [];
     for (let i = 0; i < 3; i++) {
       const id = await makeTrack(`${tag}${i}`);
-      await makeSingleRelease(id, `2099-03-0${i + 1}T00:00:00Z`);
+      // Release dates run opposite to track creation order (first-created = newest release).
+      await makeSingleRelease(id, `2099-03-0${3 - i}T00:00:00Z`);
       ids.push(id);
     }
     const user = await createTestUser();
     try {
       const client = await user.signIn();
       const page1 = await getFeed(client, { page: 1, pageSize: 2 });
-      expect(page1.items.map((i) => i.id)).toEqual([ids[2], ids[1]]);
+      expect(page1.items.map((i) => i.id)).toEqual([ids[0], ids[1]]);
       expect(page1.hasMore).toBe(true);
       const page2 = await getFeed(client, { page: 2, pageSize: 2 });
-      expect(page2.items[0].id).toBe(ids[0]);
+      expect(page2.items[0].id).toBe(ids[2]);
     } finally {
       await user.cleanup();
     }
