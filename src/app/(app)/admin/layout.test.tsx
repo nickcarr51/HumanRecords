@@ -4,8 +4,13 @@ const getCurrentRole = vi.fn();
 const notFound = vi.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
 });
-vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("next/navigation", () => ({ notFound: () => notFound() }));
+vi.mock("@/lib/auth/role", () => ({
+  // Mirror requireLabelMember's contract on top of the mocked role.
+  requireLabelMember: async () => {
+    if ((await getCurrentRole()) !== "label_member") notFound();
+  },
+}));
 
 import AdminLayout from "./layout";
 
