@@ -5,8 +5,8 @@ description: Use when working on the listener timeline (the `/feed` page), the p
 
 # Timeline + Persistent Player
 
-The listener MVP: a single chronological **timeline** at `/feed` (a mix of albums and
-singles, i.e. releases) and a **music player** that keeps playing while the user navigates the
+The listener MVP: a single chronological **timeline** at `/feed` (a mix of album and
+single releases) and a **music player** that keeps playing while the user navigates the
 app — SoundCloud-style. Built on branch `feature/media-player-and-refactor` (2026-09-29).
 
 ## The one thing to understand first
