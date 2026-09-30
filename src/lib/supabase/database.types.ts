@@ -322,6 +322,8 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       increment_play_count: { Args: { p_track_id: string }; Returns: undefined }
+      publish_release: { Args: { payload: Json }; Returns: string }
+      resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
     }
     Enums: {
       release_kind: "single" | "album"
