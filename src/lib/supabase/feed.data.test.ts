@@ -46,19 +46,19 @@ describe("getFeed", () => {
     const albumId = await makeAlbum(`${tag}Album`);
     const t1 = await makeTrack(`${tag}AlbumTrack1`);
     const t2 = await makeTrack(`${tag}AlbumTrack2`);
-    await admin.from("album_artists").insert({ album_id: albumId, artist_id: artistA });
+    await admin.from("album_artists").insert({ album_id: albumId, artist_id: artistA, position: 1 });
     await admin.from("track_albums").insert([
-      { track_id: t1, album_id: albumId },
-      { track_id: t2, album_id: albumId },
+      { track_id: t1, album_id: albumId, position: 1 },
+      { track_id: t2, album_id: albumId, position: 2 },
     ]);
     await admin.from("track_artists").insert([
-      { track_id: t1, artist_id: artistA },
-      { track_id: t2, artist_id: artistB },
+      { track_id: t1, artist_id: artistA, position: 1 },
+      { track_id: t2, artist_id: artistB, position: 1 },
     ]);
 
     // A standalone track (no track_albums row).
     const single = await makeTrack(`${tag}Single`);
-    await admin.from("track_artists").insert({ track_id: single, artist_id: artistB });
+    await admin.from("track_artists").insert({ track_id: single, artist_id: artistB, position: 1 });
 
     const user = await createTestUser();
     try {

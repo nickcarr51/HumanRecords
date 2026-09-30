@@ -26,9 +26,9 @@ describe("getAlbum", () => {
       .select("id")
       .single();
     trackIds.push(track!.id);
-    await admin.from("album_artists").insert({ album_id: album!.id, artist_id: artist!.id });
-    await admin.from("track_albums").insert({ track_id: track!.id, album_id: album!.id });
-    await admin.from("track_artists").insert({ track_id: track!.id, artist_id: artist!.id });
+    await admin.from("album_artists").insert({ album_id: album!.id, artist_id: artist!.id, position: 1 });
+    await admin.from("track_albums").insert({ track_id: track!.id, album_id: album!.id, position: 1 });
+    await admin.from("track_artists").insert({ track_id: track!.id, artist_id: artist!.id, position: 1 });
 
     const user = await createTestUser();
     try {

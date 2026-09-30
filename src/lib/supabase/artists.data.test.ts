@@ -32,7 +32,7 @@ describe("getArtists", () => {
       .insert({ title: "T", audio_url: "https://example.com/t.mp3" })
       .select("id")
       .single();
-    await admin.from("track_artists").insert({ track_id: track.data!.id, artist_id: alphaId });
+    await admin.from("track_artists").insert({ track_id: track.data!.id, artist_id: alphaId, position: 1 });
 
     const user = await createTestUser();
     try {
@@ -90,7 +90,7 @@ describe("getArtist", () => {
       .insert({ title: "Only Track", audio_url: "https://example.com/o.mp3" })
       .select("id")
       .single();
-    await admin.from("track_artists").insert({ track_id: track.data!.id, artist_id: id });
+    await admin.from("track_artists").insert({ track_id: track.data!.id, artist_id: id, position: 1 });
 
     const user = await createTestUser();
     try {
