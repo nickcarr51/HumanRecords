@@ -37,6 +37,7 @@ async function isLabelMember(): Promise<boolean> {
 
 export async function searchArtists(query: string): Promise<ArtistSearchResult> {
   if (!(await isLabelMember())) return { artists: [], error: FORBIDDEN };
+  if (typeof query !== "string") return { artists: [], error: null };
   const q = query.trim().slice(0, MAX_QUERY_LENGTH);
   if (!q) return { artists: [], error: null };
 
@@ -47,7 +48,10 @@ export async function searchArtists(query: string): Promise<ArtistSearchResult> 
     .ilike("name", `%${escapeLike(q)}%`)
     .order("name", { ascending: true })
     .limit(ARTIST_SEARCH_LIMIT);
-  if (error) return { artists: [], error: "Search failed." };
+  if (error) {
+    console.error("Artist search failed", error);
+    return { artists: [], error: "Search failed." };
+  }
   return { artists: data ?? [], error: null };
 }
 
@@ -77,13 +81,23 @@ export async function createUploadUrls(files: UploadRequest[]): Promise<UploadUr
 export async function publishRelease(payload: ReleasePayload): Promise<PublishResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
 
-  const keys = payload.tracks.map((t) => t.audioKey);
-  if (keys.some((k) => !AUDIO_KEY_RE.test(k))) return { error: "Invalid audio file reference." };
+  if (!payload || typeof payload !== "object" || !Array.isArray(payload.tracks)) {
+    return { error: "Invalid release." };
+  }
+  if (payload.tracks.length > MAX_TRACKS) return { error: "Too many tracks." };
+
+  const keys: unknown[] = payload.tracks.map((t) => t?.audioKey);
+  if (
+    keys.some((k) => typeof k !== "string" || !AUDIO_KEY_RE.test(k)) ||
+    new Set(keys).size !== keys.length
+  ) {
+    return { error: "Invalid audio file reference." };
+  }
 
   try {
-    for (const key of keys) {
+    for (const key of keys as string[]) {
       const head = await headObject(key);
-      if (!head) return { error: "A file didn't finish uploading. Publish again to retry." };
+      if (!head || head.size <= 0) return { error: "A file didn't finish uploading. Publish again to retry." };
       if (head.size > MAX_AUDIO_BYTES) return { error: "MP3s must be 50 MB or smaller." };
     }
   } catch (err) {

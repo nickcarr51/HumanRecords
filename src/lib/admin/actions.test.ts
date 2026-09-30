@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getCurrentRole = vi.fn();
 const rpc = vi.fn();
 const limit = vi.fn();
-const order = vi.fn(() => ({ limit }));
-const ilike = vi.fn(() => ({ order }));
+const order = vi.fn((_c?: string, _o?: unknown) => ({ limit }));
+const ilike = vi.fn((_c?: string, _p?: string) => ({ order }));
 const select = vi.fn(() => ({ ilike }));
 const from = vi.fn(() => ({ select }));
-const signUploadUrl = vi.fn(async (key: string) => `https://signed.example/${key}`);
+const signUploadUrl = vi.fn(async (key: string, _contentType?: string) => `https://signed.example/${key}`);
 const headObject = vi.fn();
 const revalidatePath = vi.fn();
-const redirect = vi.fn(() => {
+const redirect = vi.fn((_path?: string) => {
   throw new Error("NEXT_REDIRECT");
 });
 
@@ -61,6 +61,17 @@ describe("searchArtists", () => {
     expect(order).toHaveBeenCalledWith("name", { ascending: true });
     expect(limit).toHaveBeenCalledWith(8);
     expect(res).toEqual({ artists: [{ id: "a1", name: "Daye" }], error: null });
+  });
+
+  it("logs and reports a failed search; ignores non-string queries", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    limit.mockResolvedValue({ data: null, error: { message: "boom" } });
+    expect(await searchArtists("da")).toEqual({ artists: [], error: "Search failed." });
+    expect(spy).toHaveBeenCalledWith("Artist search failed", { message: "boom" });
+    spy.mockRestore();
+    from.mockClear();
+    expect(await searchArtists(5 as unknown as string)).toEqual({ artists: [], error: null });
+    expect(from).not.toHaveBeenCalled();
   });
 
   it("returns nothing for a blank query without hitting the DB", async () => {
@@ -128,6 +139,28 @@ describe("publishRelease", () => {
     });
     headObject.mockResolvedValueOnce({ size: 50 * 1024 * 1024 + 1 });
     expect(await publishRelease(single)).toEqual({ error: "MP3s must be 50 MB or smaller." });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed payloads without touching storage or the DB", async () => {
+    const tracks = Array.from({ length: 51 }, () => single.tracks[0]);
+    expect(await publishRelease({ ...single, tracks })).toEqual({ error: "Too many tracks." });
+    const bad = { ...single, tracks: [{ ...single.tracks[0], audioKey: [KEY] }] } as unknown as ReleasePayload;
+    expect(await publishRelease(bad)).toEqual({ error: "Invalid audio file reference." });
+    const notArray = { kind: "single", tracks: "nope" } as unknown as ReleasePayload;
+    expect(await publishRelease(notArray)).toEqual({ error: "Invalid release." });
+    expect(await publishRelease(null as unknown as ReleasePayload)).toEqual({ error: "Invalid release." });
+    const dup = { ...single, tracks: [single.tracks[0], single.tracks[0]] };
+    expect(await publishRelease(dup)).toEqual({ error: "Invalid audio file reference." });
+    expect(headObject).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("treats a zero-byte upload as unfinished", async () => {
+    headObject.mockResolvedValueOnce({ size: 0 });
+    expect(await publishRelease(single)).toEqual({
+      error: "A file didn't finish uploading. Publish again to retry.",
+    });
     expect(rpc).not.toHaveBeenCalled();
   });
 
