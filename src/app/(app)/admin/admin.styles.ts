@@ -50,7 +50,10 @@ export const ActionCard = styled(Link)`
   &:hover,
   &:focus-visible {
     border-color: ${({ theme }) => theme.colors.accent};
-    outline: none;
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accent};
+    outline-offset: 2px;
   }
   @media (prefers-reduced-motion: reduce) {
     transition: none;

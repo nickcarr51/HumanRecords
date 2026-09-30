@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
 const push = vi.fn();
@@ -80,5 +80,26 @@ describe("UploadForm", () => {
     fireEvent.change(screen.getByLabelText("Track title"), { target: { value: "Draft" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(window.confirm).toHaveBeenCalled();
+  });
+
+  it("locks the form while publishing", async () => {
+    createUploadUrls.mockReturnValue(new Promise(() => {})); // never settles
+    renderWithTheme(<UploadForm />);
+    fireEvent.change(screen.getByLabelText("MP3 file"), {
+      target: { files: [new File(["x"], "My_Song.mp3", { type: "audio/mpeg" })] },
+    });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Daye" } });
+    fireEvent.mouseDown(await screen.findByRole("option", { name: 'Create "Daye"' }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(createUploadUrls).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Publish" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    expect(screen.getByLabelText("Track title")).toBeDisabled();
+    expect(screen.getByLabelText("MP3 file")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Clear all" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Album" })).toBeDisabled();
   });
 });

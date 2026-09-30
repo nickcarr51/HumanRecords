@@ -28,10 +28,11 @@ export const Section = styled.section`
   gap: ${({ theme }) => theme.space.md};
 `;
 
-// Positioned so the progress line can run along the card's top edge.
+// Positioned so the progress line can run along the card's top edge. No
+// overflow clipping here: the ArtistCombobox dropdown must extend past the
+// card's bottom edge.
 export const TrackCard = styled.div`
   position: relative;
-  overflow: hidden;
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.md};
@@ -62,13 +63,17 @@ export const TrackControls = styled.span`
   gap: ${({ theme }) => theme.space.xs};
 `;
 
-// The upload's progress, drawn as a line across the top edge of its track card.
+// The upload's progress, drawn as a line across the top edge of its track
+// card. It rounds and clips itself to the card's inner top corners (card
+// radius minus its 1px border) since the card doesn't clip overflow.
 export const Progress = styled.div<{ $value: number; $error: boolean }>`
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 3px;
+  overflow: hidden;
+  border-radius: calc(${({ theme }) => theme.radii.md} - 1px) calc(${({ theme }) => theme.radii.md} - 1px) 0 0;
   background: ${({ theme }) => theme.colors.border};
   &::after {
     content: '';
@@ -92,11 +97,12 @@ export const UploadError = styled.span`
 `;
 
 // Sticky so Publish stays in reach on long albums. "Clear all" sits apart
-// on the left, away from Cancel/Publish.
+// on the left, away from Cancel/Publish. No z-index on purpose: it still paints
+// over the (earlier, z-auto) track cards, but an open ArtistCombobox dropdown
+// (zIndex.dropdown) paints over it instead of being hidden behind it.
 export const Footer = styled.div`
   position: sticky;
   bottom: 0;
-  z-index: ${({ theme }) => theme.zIndex.sticky};
   margin-top: auto;
   display: flex;
   flex-wrap: wrap;
