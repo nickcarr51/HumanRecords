@@ -97,3 +97,10 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 - **"Various Artists"**: `albumArtistLabel(names)` returns `"Various Artists"` when an album
   has no `album_artists` rows. Display-only (used by `AlbumRow` and the album page); nothing
   is stored.
+
+## Gotchas
+
+- Tracks/albums inserted by hand (SQL editor) don't appear on `/feed` without a matching
+  `releases` row — `getFeed` reads `releases`, not `tracks`/`albums`.
+- Prod deploy order: push the migrations to the hosted project (`supabase db push`)
+  **before** merging develop → main; the new `getFeed` needs the `releases` table.

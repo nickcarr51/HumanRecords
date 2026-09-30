@@ -36,7 +36,7 @@ check exists at four layers because each one alone has a hole.
 (`where id = auth.uid()`).
 
 `getCurrentRole()` calls it via the user's cookie-based server client and returns the role
-or `null`. It **never throws**: an RPC error or a thrown exception both return `null`
+or `null`; wrapped in React `cache()` so one request makes one RPC. It **never throws**: an RPC error or a thrown exception both return `null`
 (callers treat `null` as "no access"). This matters because the `(app)` layout calls it on
 every page render — a throw would take down the shell for all users.
 
@@ -54,3 +54,7 @@ Roles are set from `user_metadata.role` when the account is created (seed's
 `pg_temp.seed_user`, or `scripts/invite-users.mts` on hosted). There's no UI for it. See
 the memory note on the role trigger: if self-signup is ever enabled, the trigger must read
 `app_metadata` instead, or anyone could sign up as a label member.
+
+## Rollout pre-check
+
+Before `db push` to develop/prod, confirm Supabase dashboard → Authentication → Allow new users to sign up is OFF. `handle_new_user` reads role from user-writable `user_metadata`; with signup on, anyone could self-register as label_member and publish.

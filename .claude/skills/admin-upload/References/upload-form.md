@@ -91,7 +91,7 @@ Keyboard:
 | ↑ | highlight previous (min 0; doesn't open) |
 | Enter | only when the list is visible and the option exists: pick highlighted, or the first if none |
 | Esc | close, clear highlight |
-| Backspace (empty input) | remove the last chip |
+| Backspace (empty input) | remove the last chip (no-op when `disabled`) |
 
 Chips: `←` / `→` reorder (disabled at the ends), `×` removes, a `new` badge + accent border
 for `id: null`.
@@ -105,9 +105,9 @@ for `id: null`.
   along the card's top edge once an upload starts (red on error).
 - Footer (sticky): Clear all (confirm) · Cancel (confirm if dirty → `/admin`) · Publish.
 - While publishing: Publish shows loading; kind toggle, album title, file/title inputs,
-  track controls, Add track, Clear all, Cancel are disabled. (Artist comboboxes are **not**
-  disabled — see gaps in the walkthrough.)
-- `beforeunload` warning while dirty (browser reload/close only; not in-app link clicks).
+  track controls, Add track, Clear all, Cancel and the artist comboboxes (input + chip
+  buttons; `ArtistCombobox` `disabled` prop) are disabled.
+- `beforeunload` warning while dirty (`preventDefault()` + `returnValue = ''`; browser reload/close only; not in-app link clicks).
 
 ## Validation messages
 
