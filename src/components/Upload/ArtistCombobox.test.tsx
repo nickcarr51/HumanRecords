@@ -158,3 +158,16 @@ describe("ArtistCombobox", () => {
     expect(screen.queryByRole("option", { name: "Daye" })).toBeNull();
   });
 });
+
+describe("ArtistCombobox disabled", () => {
+  it("disables the input and chip buttons, and Backspace does not remove", () => {
+    const chip = existingChip({ id: "a1", name: "Daye" });
+    const { input, onRemove } = setup({ disabled: true, chips: [chip] });
+    expect(input).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Daye" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Daye left" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Daye right" })).toBeDisabled();
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+});

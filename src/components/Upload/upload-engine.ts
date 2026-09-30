@@ -19,6 +19,9 @@ export function putFile(url: string, file: File, onProgress: (fraction: number) 
     };
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
     xhr.onerror = () => reject(new Error("Upload failed (network)"));
+    xhr.timeout = 10 * 60 * 1000;
+    xhr.ontimeout = () => reject(new Error("Upload failed (timeout)"));
+    xhr.onabort = () => reject(new Error("Upload failed (aborted)"));
     xhr.send(file);
   });
 }

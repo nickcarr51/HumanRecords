@@ -38,7 +38,10 @@ export function UploadForm() {
 
   useEffect(() => {
     if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
@@ -93,6 +96,7 @@ export function UploadForm() {
             label="Album artists (optional)"
             chips={state.album.artists}
             pending={pending}
+            disabled={busy}
             onAdd={(chip) => dispatch({ type: 'addAlbumArtist', chip })}
             onRemove={(key) => dispatch({ type: 'removeAlbumArtist', key })}
             onMove={(key, dir) => dispatch({ type: 'moveAlbumArtist', key, dir })}

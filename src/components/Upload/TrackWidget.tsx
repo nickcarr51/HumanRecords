@@ -83,6 +83,7 @@ export function TrackWidget({
         chips={track.artists}
         pending={pending}
         error={errors?.artists}
+        disabled={disabled}
         onAdd={(chip) => dispatch({ type: 'addTrackArtist', clientId: id, chip })}
         onRemove={(key) => dispatch({ type: 'removeTrackArtist', clientId: id, key })}
         onMove={(key, dir) => dispatch({ type: 'moveTrackArtist', clientId: id, key, dir })}

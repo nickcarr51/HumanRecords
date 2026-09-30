@@ -101,5 +101,7 @@ describe("UploadForm", () => {
     expect(screen.getByRole("button", { name: "Clear all" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(screen.getByRole("radio", { name: "Album" })).toBeDisabled();
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Daye" })).toBeDisabled();
   });
 });

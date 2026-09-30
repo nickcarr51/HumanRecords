@@ -21,6 +21,7 @@ export type ArtistComboboxProps = {
   onMove: (key: string, dir: Direction) => void;
   error?: string;
   search?: (query: string) => Promise<ArtistSearchResult>;
+  disabled?: boolean;
 };
 
 const Box = styled.div`
@@ -99,6 +100,7 @@ export function ArtistCombobox({
   onMove,
   error,
   search = searchArtists,
+  disabled = false,
 }: ArtistComboboxProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ArtistMatch[]>([]);
@@ -139,7 +141,7 @@ export function ArtistCombobox({
 
   const options = buildOptions(query, results, pending, chips);
   const listId = `${id}-listbox`;
-  const showList = open && options.length > 0;
+  const showList = open && !disabled && options.length > 0;
 
   function pick(o: ComboOption) {
     // Never create a blank artist (buildOptions already yields nothing for a blank query).
@@ -153,6 +155,7 @@ export function ArtistCombobox({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
@@ -179,7 +182,7 @@ export function ArtistCombobox({
       <Box>
         {chips.map((c, i) => (
           <Chip key={c.key} $new={c.id === null}>
-            <ChipButton type="button" aria-label={`Move ${c.name} left`} disabled={i === 0} onClick={() => onMove(c.key, -1)}>
+            <ChipButton type="button" aria-label={`Move ${c.name} left`} disabled={disabled || i === 0} onClick={() => onMove(c.key, -1)}>
               ←
             </ChipButton>
             {c.name}
@@ -187,12 +190,12 @@ export function ArtistCombobox({
             <ChipButton
               type="button"
               aria-label={`Move ${c.name} right`}
-              disabled={i === chips.length - 1}
+              disabled={disabled || i === chips.length - 1}
               onClick={() => onMove(c.key, 1)}
             >
               →
             </ChipButton>
-            <ChipButton type="button" aria-label={`Remove ${c.name}`} onClick={() => onRemove(c.key)}>
+            <ChipButton type="button" aria-label={`Remove ${c.name}`} disabled={disabled} onClick={() => onRemove(c.key)}>
               ×
             </ChipButton>
           </Chip>
@@ -206,6 +209,7 @@ export function ArtistCombobox({
           aria-activedescendant={showList && active >= 0 ? `${id}-opt-${active}` : undefined}
           $invalid={Boolean(error)}
           value={query}
+          disabled={disabled}
           placeholder="Search or add an artist"
           autoComplete="off"
           onChange={(e) => {
@@ -218,7 +222,7 @@ export function ArtistCombobox({
           }}
           onKeyDown={onKeyDown}
           onBlur={() => setOpen(false)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => !disabled && setOpen(true)}
         />
         {showList ? (
           <List id={listId} role="listbox">
