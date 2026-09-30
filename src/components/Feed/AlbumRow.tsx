@@ -6,12 +6,13 @@ import { usePlayer, toPlayerTrack } from '@/components/Player';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
 import { AlbumTracks } from './AlbumTracks';
+import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
 export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> }) {
   const { playQueue } = usePlayer();
   const [expanded, setExpanded] = useState(false);
   const hasTracks = item.tracks.length > 0;
-  const artist = item.artistNames.length ? item.artistNames.join(', ') : 'Unknown Artist';
+  const artist = albumArtistLabel(item.artistNames);
 
   return (
     <div>

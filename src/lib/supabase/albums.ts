@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import type { FeedTrack } from "./feed";
-import { namesFrom, type ArtistNameRel } from "./artist-names";
+import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type AlbumDetail = {
   id: string;
@@ -25,21 +25,21 @@ export async function getAlbum(
   const { data, error } = await supabase
     .from("albums")
     .select(
-      "id, title, album_art_url, album_artists ( artists ( name ) ), track_albums ( tracks ( id, title, track_artists ( artists ( name ) ) ) )",
+      "id, title, album_art_url, album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, title, track_artists ( position, artists ( name ) ) ) )",
     )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
 
-  const trackRel = data.track_albums as unknown as Array<{
+  const trackRel = (data.track_albums ?? []) as unknown as Array<{
+    position: number;
     tracks: { id: string; title: string; track_artists: ArtistNameRel } | null;
-  }> | null;
-  const tracks: FeedTrack[] = (trackRel ?? [])
+  }>;
+  const tracks: FeedTrack[] = byPosition(trackRel)
     .map((r) => r.tracks)
     .filter((t): t is NonNullable<typeof t> => t !== null)
-    .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }))
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
 
   return {
     id: data.id,

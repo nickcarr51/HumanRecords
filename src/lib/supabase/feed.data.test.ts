@@ -10,24 +10,36 @@ const artistIds: string[] = [];
 async function makeArtist(name: string) {
   const { data, error } = await admin.from("artists").insert({ name }).select("id").single();
   if (error) throw error;
-  artistIds.push(data!.id);
-  return data!.id as string;
+  artistIds.push(data.id);
+  return data.id as string;
 }
 async function makeTrack(title: string) {
   const { data, error } = await admin
     .from("tracks")
-    .insert({ title, audio_url: `tracks/${title}/audio.mp3` })
+    .insert({ title, audio_url: `tracks/${title}.mp3` })
     .select("id")
     .single();
   if (error) throw error;
-  trackIds.push(data!.id);
-  return data!.id as string;
+  trackIds.push(data.id);
+  return data.id as string;
 }
 async function makeAlbum(title: string) {
   const { data, error } = await admin.from("albums").insert({ title }).select("id").single();
   if (error) throw error;
-  albumIds.push(data!.id);
-  return data!.id as string;
+  albumIds.push(data.id);
+  return data.id as string;
+}
+async function makeSingleRelease(trackId: string, createdAt?: string) {
+  const { error } = await admin
+    .from("releases")
+    .insert({ kind: "single", track_id: trackId, ...(createdAt ? { created_at: createdAt } : {}) });
+  if (error) throw error;
+}
+async function makeAlbumRelease(albumId: string, createdAt?: string) {
+  const { error } = await admin
+    .from("releases")
+    .insert({ kind: "album", album_id: albumId, ...(createdAt ? { created_at: createdAt } : {}) });
+  if (error) throw error;
 }
 
 afterEach(async () => {
@@ -37,80 +49,92 @@ afterEach(async () => {
 });
 
 describe("getFeed", () => {
-  it("returns albums (with their tracks + artist names) and standalone tracks, newest first", async () => {
+  it("returns album and single releases newest first, with tracks and credits in position order", async () => {
     const tag = `FEED-${Date.now()}-`;
-    const artistA = await makeArtist(`${tag}Alpha`);
-    const artistB = await makeArtist(`${tag}Beta`);
+    const lead = await makeArtist(`${tag}Lead`);
+    const feat = await makeArtist(`${tag}Feat`);
 
-    // An album with two tracks.
     const albumId = await makeAlbum(`${tag}Album`);
-    const t1 = await makeTrack(`${tag}AlbumTrack1`);
-    const t2 = await makeTrack(`${tag}AlbumTrack2`);
-    await admin.from("album_artists").insert({ album_id: albumId, artist_id: artistA, position: 1 });
+    const first = await makeTrack(`${tag}Zed`); // title sorts last, position 1
+    const second = await makeTrack(`${tag}Alpha`);
+    await admin.from("album_artists").insert({ album_id: albumId, artist_id: lead, position: 1 });
     await admin.from("track_albums").insert([
-      { track_id: t1, album_id: albumId, position: 1 },
-      { track_id: t2, album_id: albumId, position: 2 },
+      { track_id: second, album_id: albumId, position: 2 },
+      { track_id: first, album_id: albumId, position: 1 },
     ]);
     await admin.from("track_artists").insert([
-      { track_id: t1, artist_id: artistA, position: 1 },
-      { track_id: t2, artist_id: artistB, position: 1 },
+      { track_id: first, artist_id: feat, position: 2 },
+      { track_id: first, artist_id: lead, position: 1 },
+      { track_id: second, artist_id: lead, position: 1 },
     ]);
+    await makeAlbumRelease(albumId, "2099-01-01T00:00:00Z");
 
-    // A standalone track (no track_albums row).
     const single = await makeTrack(`${tag}Single`);
-    await admin.from("track_artists").insert({ track_id: single, artist_id: artistB, position: 1 });
+    await admin.from("track_artists").insert({ track_id: single, artist_id: feat, position: 1 });
+    await makeSingleRelease(single, "2099-01-02T00:00:00Z");
 
     const user = await createTestUser();
     try {
       const client = await user.signIn();
-      const { items } = await getFeed(client, { page: 1, pageSize: 50 });
+      const { items } = await getFeed(client, { page: 1, pageSize: 2 });
 
-      const album = items.find((i) => i.kind === "album" && i.id === albumId);
-      expect(album).toBeDefined();
-      if (album?.kind === "album") {
-        expect(album.tracks.map((t) => t.title).sort()).toEqual(
-          [`${tag}AlbumTrack1`, `${tag}AlbumTrack2`].sort(),
-        );
-        expect(album.artistNames).toContain(`${tag}Alpha`);
-      }
-
-      const feedSingle = items.find((i) => i.kind === "track" && i.id === single);
-      expect(feedSingle).toBeDefined();
-      if (feedSingle?.kind === "track") {
-        expect(feedSingle.artistNames).toEqual([`${tag}Beta`]);
-      }
-
-      // The album's own tracks must NOT appear as standalone feed items.
-      expect(items.some((i) => i.kind === "track" && (i.id === t1 || i.id === t2))).toBe(false);
+      expect(items.map((i) => i.kind)).toEqual(["track", "album"]); // newest first
+      const [s, a] = items;
+      if (s.kind !== "track" || a.kind !== "album") throw new Error("unexpected kinds");
+      expect(s.id).toBe(single);
+      expect(s.artistNames).toEqual([`${tag}Feat`]);
+      expect(a.id).toBe(albumId);
+      expect(a.artistNames).toEqual([`${tag}Lead`]);
+      expect(a.tracks.map((t) => t.id)).toEqual([first, second]);
+      expect(a.tracks[0].artistNames).toEqual([`${tag}Lead`, `${tag}Feat`]);
     } finally {
       await user.cleanup();
     }
   });
 
-  it("credits an uncredited track with an empty artistNames array (never crashes)", async () => {
+  it("excludes tracks that have no release", async () => {
+    const tag = `NOREL-${Date.now()}-`;
+    const orphan = await makeTrack(`${tag}Orphan`);
+    const user = await createTestUser();
+    try {
+      const client = await user.signIn();
+      const { items } = await getFeed(client, { page: 1, pageSize: 100 });
+      expect(items.some((i) => i.id === orphan)).toBe(false);
+    } finally {
+      await user.cleanup();
+    }
+  });
+
+  it("credits an uncredited single with an empty artistNames array", async () => {
     const tag = `NOART-${Date.now()}-`;
-    const single = await makeTrack(`${tag}Orphan`);
+    const single = await makeTrack(`${tag}Uncredited`);
+    await makeSingleRelease(single, "2099-02-01T00:00:00Z");
     const user = await createTestUser();
     try {
       const client = await user.signIn();
-      const { items } = await getFeed(client, { page: 1, pageSize: 50 });
-      const orphan = items.find((i) => i.kind === "track" && i.id === single);
-      expect(orphan).toBeDefined();
-      if (orphan?.kind === "track") expect(orphan.artistNames).toEqual([]);
+      const { items } = await getFeed(client, { page: 1, pageSize: 1 });
+      expect(items[0]).toMatchObject({ kind: "track", id: single, artistNames: [] });
     } finally {
       await user.cleanup();
     }
   });
 
-  it("paginates: pageSize caps items and hasMore flags a remainder", async () => {
+  it("paginates in the database: pageSize caps items and hasMore flags a remainder", async () => {
     const tag = `PG-${Date.now()}-`;
-    for (let i = 0; i < 3; i++) await makeTrack(`${tag}${i}`);
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const id = await makeTrack(`${tag}${i}`);
+      await makeSingleRelease(id, `2099-03-0${i + 1}T00:00:00Z`);
+      ids.push(id);
+    }
     const user = await createTestUser();
     try {
       const client = await user.signIn();
       const page1 = await getFeed(client, { page: 1, pageSize: 2 });
-      expect(page1.items.length).toBe(2);
+      expect(page1.items.map((i) => i.id)).toEqual([ids[2], ids[1]]);
       expect(page1.hasMore).toBe(true);
+      const page2 = await getFeed(client, { page: 2, pageSize: 2 });
+      expect(page2.items[0].id).toBe(ids[0]);
     } finally {
       await user.cleanup();
     }
