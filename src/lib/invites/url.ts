@@ -4,7 +4,7 @@
 export function inviteUrl(
   email: string,
   token: string,
-  siteUrl: string | undefined = process.env.SITE_URL,
+  siteUrl: string | undefined,
 ): string {
   if (!siteUrl) throw new Error("SITE_URL is not set — invite links can't be built.");
   const url = new URL("/login", siteUrl);
