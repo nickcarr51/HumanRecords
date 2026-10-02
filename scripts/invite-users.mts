@@ -10,9 +10,9 @@
 import { createClient } from "@supabase/supabase-js";
 
 type Role = "listener" | "artist" | "label_member";
-const USERS: Array<{ email: string; role: Role; firstName: string; lastName: string }> = [
-  { email: "quinoajonesmusic@gmail.com", role: "label_member", firstName: "Quinoa", lastName: "Jones" },
-  { email: "nick.carr84@gmail.com", role: "listener", firstName: "Nick", lastName: "Carr" },
+const USERS: Array<{ email: string; role: Role; name: string }> = [
+  { email: "quinoajonesmusic@gmail.com", role: "label_member", name: "Quinoa Jones" },
+  { email: "nick.carr84@gmail.com", role: "listener", name: "Nick Carr" },
 ];
 
 const url = process.env.SUPABASE_URL;
@@ -38,7 +38,8 @@ for (const u of USERS) {
     const { error } = await admin.auth.admin.createUser({
       email: u.email,
       email_confirm: true,
-      user_metadata: { role: u.role, first_name: u.firstName, last_name: u.lastName },
+      app_metadata: { role: u.role },
+      user_metadata: { name: u.name },
     });
     if (error) throw error;
     console.log(`created  ${u.email} as ${u.role}`);

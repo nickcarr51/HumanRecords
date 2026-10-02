@@ -38,20 +38,18 @@ type TestUserRole = "listener" | "artist" | "label_member";
 // redeems it for a session, the same call the login UI will make.
 export async function createTestUser(opts: {
   role?: TestUserRole;
-  firstName?: string;
-  lastName?: string;
+  name?: string;
 } = {}) {
   const admin = createAdminClient();
   const email = `test-${randomUUID()}@example.com`;
 
+  // Role goes in app_metadata (admin-only) — the trigger ignores
+  // user_metadata.role, which users can write themselves.
   const { data, error } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
-    user_metadata: {
-      role: opts.role ?? "listener",
-      first_name: opts.firstName ?? "Test",
-      last_name: opts.lastName ?? "User",
-    },
+    app_metadata: { role: opts.role ?? "listener" },
+    user_metadata: { name: opts.name ?? "Test User" },
   });
   if (error || !data.user) throw error ?? new Error("createUser returned no user");
 
