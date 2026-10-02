@@ -9,6 +9,10 @@ const Group = styled.div`
   border-radius: ${({ theme }) => theme.radii.sm};
   overflow: hidden;
   align-self: flex-start;
+  /* overflow:hidden drops a flex item's automatic min-height to 0, so inside
+     the scrolling Page column the toggle would shrink to nothing once the
+     form (album mode) outgrows the viewport. */
+  flex-shrink: 0;
 `;
 
 const Choice = styled.label<{ $checked: boolean; $disabled?: boolean }>`

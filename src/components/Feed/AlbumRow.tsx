@@ -2,13 +2,22 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePlayer, toPlayerTrack } from '@/components/Player';
+import { usePlayer, type PlayerTrack } from '@/components/Player';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
 import { AlbumTracks } from './AlbumTracks';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
-export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> }) {
+export function AlbumRow({
+  item,
+  queue,
+  queueStart,
+}: {
+  item: Extract<FeedItem, { kind: 'album' }>;
+  // The feed-wide queue and the index of this album's first track in it.
+  queue: PlayerTrack[];
+  queueStart: number;
+}) {
   const { playQueue } = usePlayer();
   const [expanded, setExpanded] = useState(false);
   const hasTracks = item.tracks.length > 0;
@@ -21,7 +30,7 @@ export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> 
           type="button"
           aria-label="Play album"
           disabled={!hasTracks}
-          onClick={() => playQueue(item.tracks.map(toPlayerTrack), 0)}
+          onClick={() => playQueue(queue, queueStart)}
         >
           ▶
         </PlayButton>
@@ -48,7 +57,7 @@ export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> 
       </Row>
       {expanded ? (
         <ExpandArea>
-          <AlbumTracks tracks={item.tracks} />
+          <AlbumTracks tracks={item.tracks} queue={queue} queueStart={queueStart} />
         </ExpandArea>
       ) : null}
     </div>

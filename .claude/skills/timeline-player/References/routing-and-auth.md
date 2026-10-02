@@ -54,8 +54,11 @@ state instead of a 500.
 `src/components/Feed/` (all `'use client'`, consume `usePlayer` + `toPlayerTrack`):
 
 - `FeedList` — maps `FeedItem[]` to `AlbumRow`/`SingleTrackRow`; "Nothing here yet." when empty.
-- `SingleTrackRow` — play → `playQueue([track], 0)`.
-- `AlbumRow` — collapsed by default; expand reveals `AlbumTracks`; "play album" disabled when
-  the album has no tracks; links to `/albums/{id}`.
-- `AlbumTracks` — shared by the expanded row and the album page; each track row plays
-  `playQueue(albumTracks, index)`.
+  Builds ONE feed-wide queue (every track, in feed order — singles as one track, albums as
+  their tracks) plus each item's offset into it, so next/prev move from release to release.
+- `SingleTrackRow` — play → `playQueue(feedQueue, itsOffset)`.
+- `AlbumRow` — collapsed by default; expand reveals `AlbumTracks`; "play album" →
+  `playQueue(feedQueue, albumOffset)`, disabled when the album has no tracks; links to `/albums/{id}`.
+- `AlbumTracks` — shared by the expanded row and the album page. In the feed it gets the
+  feed queue + album offset (`playQueue(feedQueue, albumOffset + i)`); on the album page those
+  props are omitted and the album is its own queue (`playQueue(albumTracks, i)`).
