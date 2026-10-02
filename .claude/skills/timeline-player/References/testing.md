@@ -28,20 +28,24 @@ positive + null (missing + non-UUID) paths and position (not title) track order.
 **Auth redirects** — `route-guard.test.ts`, `safe-next.test.ts`, `not-found.test.tsx`,
 `middleware.test.ts`, `auth/confirm/route.test.ts` all assert the `/feed` targets.
 
+**Feed play wiring** — `src/components/Feed/FeedList.test.tsx` (unit). Mocks `usePlayer`
+(keeps the real `toPlayerTrack`) and `next/link`. Covers the feed-wide queue and offsets
+(single, album, and a track inside an expanded album each start at the right index) and the
+`usePlayButton` rules: pause shown for the current track and toggles instead of restarting,
+paused current track resumes, album button reflects any of its tracks, clicks ignored while
+loading, errored track retries via `playQueue`.
+
 ## What is deliberately NOT tested (agreed scope)
 
-Pure front-end component render tests for the feed rows (`FeedList`/`SingleTrackRow`/
-`AlbumRow`) and `AppShell`'s layout/player mount were intentionally dropped as overkill for
-this stage — the player state machine and data layer carry the meaningful coverage, and the
-play-on-click wiring + empty states are checked in the manual smoke. The original
-`AppShell.test.tsx` was deleted when the player was mounted; a new one was later added by
-[[admin-upload]] and covers only the label-member Admin nav link (shown for label members,
-hidden otherwise). If you add feature logic to these components, add tests for the logic
-(not just render).
+Pure presentational render tests for `SingleTrackRow`/`AlbumRow` layout and `AppShell`'s
+player mount are intentionally skipped — the player state machine, the feed queue logic, and
+the data layer carry the meaningful coverage. `AppShell.test.tsx` covers only the
+label-member Admin nav link ([[admin-upload]]). If you add feature logic to these
+components, add tests for the logic (not just render).
 
 ## Running
 
-- Unit only (no DB): `yarn test --run src/components/Player`
+- Unit only (no DB): `yarn test --run src/components/Player src/components/Feed`
 - Data layer: ensure `yarn supabase start` is up, then
   `yarn test --run src/lib/supabase/feed.data.test.ts src/lib/supabase/albums.data.test.ts`
 - Everything: `yarn test --run` (data tests fail on connection if Supabase is down — that's

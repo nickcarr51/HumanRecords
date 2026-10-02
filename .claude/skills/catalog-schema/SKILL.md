@@ -1,0 +1,76 @@
+---
+name: catalog-schema
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`), editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
+---
+
+# Catalog Schema + Supabase Data Layer
+
+The Postgres schema (users, artists, albums, tracks, their link tables, downloads, releases),
+its Row Level Security model, the three Supabase client factories, the local Supabase
+workflow, and the generated TypeScript types. Every other feature reads through this.
+
+## The one thing to understand first
+
+**The `authenticated` role can read the catalog and write nothing.** Every table has RLS on,
+every table has an `authenticated … for select using (true)` policy (except `downloads`,
+owner-only), and **no table has an insert/update/delete policy**. All writes go through one of
+two doors: a `security definer` SQL function that checks the caller itself
+(`increment_play_count`, `publish_release`), or the server-only **service-role** client
+(`createServiceClient`, used for recording downloads). A blocked write under RLS does not
+error — it silently affects zero rows. Design new writes as a definer function with a role
+check (see `publish_release` in [[admin-upload]]) rather than opening a write policy.
+
+## Pieces
+
+| Concern | Where |
+|---|---|
+| `users` + `user_role` enum + `handle_new_user` trigger | `supabase/migrations/20260915004137_create_users.sql` |
+| `artists` (unique `user_id`) | `…20260915004749_create_artists.sql` |
+| `albums`, `tracks`, `increment_play_count` | `…20260915005111_create_albums_and_tracks.sql` |
+| Link tables + `downloads` + reverse-lookup indexes | `…20260915005504_create_catalog_relations.sql` |
+| RPC grant hardening (no `public`/`anon`) | `…20260915013116_revoke_play_count_public_execute.sql` |
+| `downloads` owner-only select | `…20260916140000_downloads_owner_only_select.sql` |
+| Hide `users.role` via column grants | `…20260916140001_hide_user_role_column.sql` |
+| `releases`, `position` columns, unique artist names, `current_user_role()` | `…20260929120000_create_releases.sql` |
+| `resolve_artist_refs` + `publish_release` | `…20260929120100_publish_release.sql` |
+| Local seed (users, 4 artists, 1 album, 1 single, releases) | `supabase/seed.sql` |
+| Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
+| Generated types (`Database`) | `src/lib/supabase/database.types.ts` |
+| Browser client | `src/lib/supabase/client.ts` |
+| Server client (cookies; RSC, route handlers, actions) | `src/lib/supabase/server.ts` |
+| Service-role client (bypasses RLS, `server-only`) | `src/lib/supabase/service.ts` |
+| Session refresh + route guard per request | `src/lib/supabase/middleware.ts` (see [[auth]]) |
+| Test helpers (local-only guard, OTP test users) | `src/lib/supabase/test-helpers.ts` |
+| Schema/RLS tests | `src/lib/supabase/{users,artists,catalog,catalog-relations,releases-schema.data,publish-release.data}.test.ts` |
+
+## References
+
+- [tables-and-relations.md](References/tables-and-relations.md) — every table and column,
+  the many-to-many link tables, `position` ordering, `releases`, indexes, and the
+  "`audio_url` holds an R2 key, not a URL" rule.
+- [rls-model.md](References/rls-model.md) — read policies, the column grant hiding `role`,
+  owner-only downloads, definer functions, and how to add a write path safely.
+- [functions.md](References/functions.md) — `handle_new_user`, `increment_play_count`,
+  `current_user_role`, `resolve_artist_refs`, `publish_release` (signatures, grants, callers).
+- [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
+  dependency-injection convention for data functions, and regenerating `database.types.ts`.
+- [local-workflow.md](References/local-workflow.md) — `supabase start`/`db reset`, seed
+  accounts, Mailpit, adding a migration, pushing to hosted, and the data-test conventions.
+
+## Depends on
+
+Nothing — this is foundational. Feature skills that build on it: [[auth]] (users table,
+role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timeline-player]]
+(`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[artists-read]].
+
+## Known deferrals (as of 2026-10-02)
+
+- **Role-trigger landmine:** `handle_new_user` reads `role` from user-writable
+  `raw_user_meta_data`. Safe only while sign-up is disabled (`enable_signup = false`, and OFF
+  in each hosted dashboard). If self-signup is ever enabled, move role to `app_metadata` first.
+- No update/delete paths yet — edit/delete releases is the next branch ([[admin-upload]]).
+- `play_count` has an RPC but nothing in the app calls it yet.
+- No ORM. Raw supabase-js + SQL functions; revisit (likely Drizzle) with edit/delete.
+
+A code guide (migration-by-migration read, with why each security fix exists) is in
+`Walkthrough/walkthrough.md` (gitignored).
