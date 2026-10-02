@@ -57,13 +57,14 @@ never unmount. No global state library, no refresh-resume.
 - [[admin-upload]] — owns the `releases` table, `position` columns, and the publish path
   that creates what the feed shows.
 - [[component-library]] — all UI is styled-components using the theme tokens.
+- [[auth]] — the `(app)` layout session guard and the redirect model that lands users on `/feed`.
 
-## Known deferrals (as of 2026-09-29)
+## Known deferrals (as of 2026-10-02)
 
 - **Releases model** — shipped in `feature/admin-release-upload`: the feed reads a
   `releases` table and link rows carry `position`. See [[admin-upload]].
 - Feed search bar and Load-More/pagination UI are deferred (data layer supports paging).
 - Player icons/artwork are placeholder pending a design pass.
 
-A human-oriented walk-through (how to run it, add a track, gotchas) is in
+A code guide (mount chain, player state machine, feed data, reading order) is in
 `Walkthrough/walkthrough.md` (gitignored).

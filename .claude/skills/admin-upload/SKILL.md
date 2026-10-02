@@ -77,6 +77,8 @@ files already uploaded stay in R2 (orphans; accepted for now).
 - [[catalog-schema]] — `artists`/`tracks`/`albums` and the link tables that
   `publish_release` writes; RLS "authenticated can read" policies.
 - [[component-library]] — `Button`, `Input`, `FormField`, `Alert`, `Heading`, theme tokens.
+- [[auth]] — session/middleware layer under the label-member gate; `getCurrentRole` and
+  `requireLabelMember` live in `src/lib/auth/role.ts`.
 
 ## Known deferrals (as of 2026-09-30)
 

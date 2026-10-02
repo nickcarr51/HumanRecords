@@ -4,10 +4,11 @@
 
 Authenticated pages live under `src/app/(app)/` and share one layout,
 `src/app/(app)/layout.tsx`, which guards the session (`getSessionUser()` → `redirect("/login")`
-if signed out) and renders `<AppShell>`. Because the layout stays mounted across in-app
+if signed out), reads `getCurrentRole()` for the Admin nav link, and renders
+`<AppShell isLabelMember={…}>`. Because the layout stays mounted across in-app
 navigation, the player mounted inside `AppShell` persists (see
 [persistent-player.md](persistent-player.md)). Routes in the group: `/feed`, `/albums/[id]`,
-`/dashboard`, and the retired `/artists`.
+`/dashboard`, `/admin/**` ([[admin-upload]]), and the retired `/artists` ([[artists-read]]).
 
 - `/feed` (`src/app/(app)/feed/page.tsx`) — async server component: `createClient()` →
   `getFeed(supabase, { page: 1 })` → `<FeedList items={...} />`. Title-only header (search

@@ -19,9 +19,23 @@ Claude Code skills specific to Human Services, one directory per major feature.
 
 ## Skills
 
-- **timeline-player** — the `/feed` listener timeline, the persistent music player, the
-  album page, and the feed/album data + auth redirects. (First skill; template for the rest.)
-- **admin-upload** — releases model, label-member admin portal, and the single/album upload flow.
+Foundational (no dependencies):
 
-Planned (one per thread): component-library, catalog-schema, auth, media-storage,
-artists-read. See `docs/handoffs/2026-09-29-skill-directories-divvy.md`.
+- **component-library** — theme tokens, styled-components SSR registry, the `src/components`
+  primitives, `*.styles.ts` conventions, `/style-guide`.
+- **catalog-schema** — Supabase migrations, tables + RLS, SQL functions, seed, the three
+  client factories, generated types, local workflow + data tests.
+
+Platform:
+
+- **auth** — invite-only OTP/magic-link sign-in, middleware + route guard, `/feed` redirect
+  model, session/role helpers, email templates, inviting users.
+- **media-storage** — private R2 bucket, presigned stream/download/image/upload URLs,
+  session-gated storage actions, object keys, download recording.
+
+Features:
+
+- **timeline-player** — the `/feed` listener timeline, the persistent music player, the
+  album page, and the feed/album data. (First skill; template for the rest.)
+- **admin-upload** — releases model, label-member admin portal, and the single/album upload flow.
+- **artists-read** — `/artists` browse/search/detail; present but retired (redirected to `/feed`).
