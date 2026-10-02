@@ -17,13 +17,13 @@ describe("catalog relations", () => {
     const admin = createAdminClient();
     const { artistId, albumId, trackId } = await makeTrackArtistAlbum(admin);
     try {
-      const { error: taError } = await admin.from("track_artists").insert({ track_id: trackId, artist_id: artistId });
+      const { error: taError } = await admin.from("track_artists").insert({ track_id: trackId, artist_id: artistId, position: 1 });
       expect(taError).toBeNull();
 
-      const { error: aaError } = await admin.from("album_artists").insert({ album_id: albumId, artist_id: artistId });
+      const { error: aaError } = await admin.from("album_artists").insert({ album_id: albumId, artist_id: artistId, position: 1 });
       expect(aaError).toBeNull();
 
-      const { error: talError } = await admin.from("track_albums").insert({ track_id: trackId, album_id: albumId });
+      const { error: talError } = await admin.from("track_albums").insert({ track_id: trackId, album_id: albumId, position: 1 });
       expect(talError).toBeNull();
 
       const user = await createTestUser();

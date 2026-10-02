@@ -8,19 +8,20 @@ import { getR2Config } from "./config";
 export const STREAM_TTL_SECONDS = 7200; // 2h — must outlast the longest track for seeking
 export const DOWNLOAD_TTL_SECONDS = 300; // 5min — one-shot grab
 export const IMAGE_TTL_SECONDS = 3600; // 1h — comfortably outlasts a page session
+export const UPLOAD_TTL_SECONDS = 900; // 15min — enough to upload a 50MB file on a slow link
+
+function r2() {
+  const { accessKeyId, secretAccessKey, bucket, endpoint } = getR2Config();
+  const aws = new AwsClient({ accessKeyId, secretAccessKey, region: "auto", service: "s3" });
+  return { aws, objectUrl: (key: string) => new URL(`${endpoint}/${bucket}/${key}`) };
+}
 
 async function signObjectUrl(
   key: string,
   opts: { expiresIn: number; downloadFilename?: string },
 ): Promise<string> {
-  const { accessKeyId, secretAccessKey, bucket, endpoint } = getR2Config();
-  const aws = new AwsClient({
-    accessKeyId,
-    secretAccessKey,
-    region: "auto",
-    service: "s3",
-  });
-  const url = new URL(`${endpoint}/${bucket}/${key}`);
+  const { aws, objectUrl } = r2();
+  const url = objectUrl(key);
   url.searchParams.set("X-Amz-Expires", String(opts.expiresIn));
   if (opts.downloadFilename) {
     // RFC 6266: emit an ASCII fallback plus a UTF-8 form so non-ASCII titles
@@ -58,4 +59,28 @@ export function signDownloadUrl(key: string, filename: string): Promise<string> 
 export async function signImageUrl(key: string | null): Promise<string | null> {
   if (!key) return null;
   return signObjectUrl(key, { expiresIn: IMAGE_TTL_SECONDS });
+}
+
+// Presigned PUT for a browser upload. Content-Type is signed (aws4fetch
+// excludes it by default, hence allHeaders), so the browser must send exactly
+// this Content-Type or R2 rejects the signature.
+export async function signUploadUrl(key: string, contentType: string): Promise<string> {
+  const { aws, objectUrl } = r2();
+  const url = objectUrl(key);
+  url.searchParams.set("X-Amz-Expires", String(UPLOAD_TTL_SECONDS));
+  const signed = await aws.sign(url.toString(), {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    aws: { signQuery: true, allHeaders: true },
+  });
+  return signed.url;
+}
+
+// Confirms an uploaded object exists before it's referenced by a track row.
+export async function headObject(key: string): Promise<{ size: number } | null> {
+  const { aws, objectUrl } = r2();
+  const res = await aws.fetch(objectUrl(key).toString(), { method: "HEAD" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`R2 HEAD failed with ${res.status}`);
+  return { size: Number(res.headers.get("content-length") ?? 0) };
 }

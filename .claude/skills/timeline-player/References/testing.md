@@ -19,9 +19,11 @@ null render on empty queue; title/artist; controls call actions; play vs pause i
 (integration, `*.data.test.ts` convention). These require a **local Supabase** running
 (`yarn supabase start`); `test-helpers.ts` refuses non-local URLs. They self-seed rows with
 `createAdminClient`/`createTestUser`, sign in, exercise real queries, and clean up in
-`afterEach`. Covers: album carries its tracks + artist names; standalone tracks excluded
-from albums and not duplicated; uncredited track → empty `artistNames`; pagination
-(`pageSize`/`hasMore`); `getAlbum` positive + null (missing + non-UUID) paths.
+`afterEach`. Covers: releases newest first with album tracks + credits in `position`
+order; tracks without a release excluded; uncredited single → empty `artistNames`;
+pagination (`pageSize`/`hasMore`) — the tests give `releases.created_at` values that
+contradict track creation order, proving ordering comes from `releases`; `getAlbum`
+positive + null (missing + non-UUID) paths and position (not title) track order.
 
 **Auth redirects** — `route-guard.test.ts`, `safe-next.test.ts`, `not-found.test.tsx`,
 `middleware.test.ts`, `auth/confirm/route.test.ts` all assert the `/feed` targets.
@@ -29,11 +31,13 @@ from albums and not duplicated; uncredited track → empty `artistNames`; pagina
 ## What is deliberately NOT tested (agreed scope)
 
 Pure front-end component render tests for the feed rows (`FeedList`/`SingleTrackRow`/
-`AlbumRow`) and `AppShell` were intentionally dropped as overkill for this stage — the
-player state machine and data layer carry the meaningful coverage, and the play-on-click
-wiring + empty states are checked in the manual smoke. `AppShell.test.tsx` was deleted (not
-replaced) when the player was mounted. If you add feature logic to those components, add
-tests for the logic (not just render).
+`AlbumRow`) and `AppShell`'s layout/player mount were intentionally dropped as overkill for
+this stage — the player state machine and data layer carry the meaningful coverage, and the
+play-on-click wiring + empty states are checked in the manual smoke. The original
+`AppShell.test.tsx` was deleted when the player was mounted; a new one was later added by
+[[admin-upload]] and covers only the label-member Admin nav link (shown for label members,
+hidden otherwise). If you add feature logic to these components, add tests for the logic
+(not just render).
 
 ## Running
 

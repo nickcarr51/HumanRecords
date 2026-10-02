@@ -1,61 +1,62 @@
 # Reference: Feed + album data layer
 
 Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/albums.ts`,
-`src/lib/supabase/artist-names.ts`. Tests: `feed.data.test.ts`, `albums.data.test.ts`.
+`src/lib/supabase/artist-names.ts`. Tests: `feed.data.test.ts`, `albums.data.test.ts`,
+`artist-names.test.ts`.
 
 Both functions follow the project convention: they take a `SupabaseClient<Database>` as the
 **first argument** (dependency injection), never calling the cookie-based `createClient()`
 themselves. That makes them unit-testable against local Supabase and reusable by server
-components. See [[catalog-schema]] for the underlying tables and RLS.
+components. See [[catalog-schema]] for the underlying tables and RLS, and [[admin-upload]]
+for the `releases` table and `position` columns this reads.
 
 ## `getFeed(supabase, { page?, pageSize? })` → `FeedPage`
 
-Returns a chronological (newest-first) **merge** of two kinds of `FeedItem` (a discriminated
-union on `kind`):
+Returns the timeline newest-first as a discriminated union on `kind`:
 
 - `{ kind: "album", id, title, albumArtUrl, artistNames[], createdAt, tracks: FeedTrack[] }`
 - `{ kind: "track", id, title, trackArtUrl, artistNames[], createdAt }`
 
 `FeedTrack = { id, title, artistNames[] }`. `FeedPage = { items, page, pageSize, hasMore }`.
+`createdAt` is the **release's** `created_at` (publish time).
 
 How it works:
 
-1. Two queries in `Promise.all`: recent `albums` (embedding their tracks via `track_albums`
-   and artist names via `album_artists → artists`), and recent `tracks` (embedding
-   `track_albums(album_id)` and `track_artists → artists`).
-2. **Standalone rule:** a track is a feed "track" item only if its embedded `track_albums`
-   array is empty (i.e. it belongs to no album). Album tracks appear only nested under their
-   album, never as their own feed row.
-3. Merge both lists, sort by `createdAt` descending (plain ISO-string compare — the column
-   is a non-null ISO-8601 UTC timestamp, so `localeCompare` is unnecessary), then slice the
-   page window. `hasMore` = there was at least one item past the window.
+1. **One query on `releases`** (`RELEASE_SELECT`), embedding the target via its foreign key:
+   `track:tracks(id, title, track_art_url, track_artists(position, artists(name)))` for a
+   single, and `album:albums(id, title, album_art_url, album_artists(position,
+   artists(name)), track_albums(position, tracks(id, title, track_artists(position,
+   artists(name)))))` for an album. Only things with a `releases` row appear — an album's
+   tracks are never their own feed row because they have no release of their own.
+2. Ordered `created_at desc, id desc` (id breaks ties so pages are stable).
+3. **Pagination in SQL**: `.range(from, from + pageSize)` with `from = (page-1)*pageSize`.
+   `range` is inclusive, so it fetches `pageSize + 1` rows; the first `pageSize` become the
+   page and `hasMore = rows.length > pageSize`.
+4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
+   item. A release whose embedded target is null (hidden/removed) is skipped (so a page can
+   have fewer than `pageSize` items).
+5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list
+   is in credit order via `namesFrom`.
 
-Artist names are flattened + de-duped by `namesFrom()` from `artist-names.ts` (shared with
-`getAlbum`). An uncredited track yields `artistNames: []` (never a crash); the UI shows
+An uncredited track yields `artistNames: []` (never a crash); the UI shows
 "Unknown Artist".
-
-### Known limitation (deferred to the releases model)
-
-Each source is over-fetched to `page * pageSize + 1` and standalone tracks are filtered
-**after** that DB limit. At real catalog volume, if album tracks dominate the newest rows a
-genuine standalone single ranked past the limit could be missed and `hasMore` could be off.
-Harmless at demo scale (3 tracks). The fix is the planned **releases** model
-([[humanrecords-releases-model]]): one `release = single | album` table queried in one go,
-which also gives album tracks a real `position` order. Until then, album track order is
-**not** consistent between the feed's expanded album row and the album page.
 
 ## `getAlbum(supabase, id)` → `AlbumDetail | null`
 
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
 - `.maybeSingle()`; returns `null` for a missing album.
-- Embeds tracks (via `track_albums → tracks → track_artists → artists`) and album artists;
-  currently sorts tracks by title (a placeholder order — see the releases note above).
+- Same embeds as the feed's album branch; tracks sorted by `track_albums.position`, so the
+  album page and the feed's expanded album row always agree.
 - `AlbumDetail = { id, title, albumArtUrl, artistNames[], tracks: FeedTrack[] }`.
 
 ## `artist-names.ts`
 
-`type ArtistNameRel = Array<{ artists: { name: string } | null }> | null` and
-`namesFrom(rel): string[]` (map → filter falsy → de-dupe via `Set`). Shared by `feed.ts` and
-`albums.ts` so the PostgREST-embed flattening lives in one place. The `as unknown as
-ArtistNameRel` casts at the call sites bridge PostgREST's loose embed typing.
+- `ArtistNameRel = Array<{ position?: number | null; artists: { name: string } | null }> | null`
+  — the shape of a `… ( position, artists ( name ) )` embed. The `as unknown as` casts at
+  the call sites bridge PostgREST's loose embed typing.
+- `byPosition(rows)` — non-mutating sort by `position`. Done in JS because the nested embeds
+  can't be ordered by a link-table column in this select shape.
+- `namesFrom(rel)` — `byPosition` → names → drop nulls → de-dupe.
+- `albumArtistLabel(names)` — joins names, or `"Various Artists"` when an album has no album
+  artists. Display-only (used by `AlbumRow` and the album page); nothing is stored.

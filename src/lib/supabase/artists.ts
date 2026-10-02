@@ -41,7 +41,7 @@ const UUID_RE =
 // Escape LIKE/ILIKE metacharacters so user input is matched literally — a bare
 // `%` or `_` would otherwise act as a wildcard (backslash is Postgres' default
 // LIKE escape character).
-function escapeLike(value: string): string {
+export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 

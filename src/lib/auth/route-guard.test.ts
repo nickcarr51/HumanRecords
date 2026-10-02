@@ -35,4 +35,11 @@ describe("authRedirectPath", () => {
     expect(authRedirectPath("/login", false)).toBeNull();
     expect(authRedirectPath("/auth/confirm", false)).toBeNull();
   });
+
+  it("protects /admin like other app routes", () => {
+    expect(authRedirectPath("/admin", false)).toBe("/login");
+    expect(authRedirectPath("/admin/upload", false)).toBe("/login");
+    expect(authRedirectPath("/admin", true)).toBeNull();
+    expect(authRedirectPath("/admin/upload", true)).toBeNull();
+  });
 });

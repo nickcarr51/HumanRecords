@@ -61,7 +61,23 @@ const SignOutButton = styled.button`
   }
 `;
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+const NavLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.muted};
+  text-decoration: none;
+  border: 0;
+  &:hover,
+  &:focus-visible {
+    color: ${({ theme }) => theme.colors.accent};
+  }
+`;
+
+export function AppShell({
+  children,
+  isLabelMember = false,
+}: {
+  children: React.ReactNode;
+  isLabelMember?: boolean;
+}) {
   return (
     <PlayerProvider>
       <Wrapper>
@@ -71,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <BrandBy>by Human Records</BrandBy>
           </Brand>
           <NavLinks>
+            {isLabelMember ? <NavLink href="/admin">Admin</NavLink> : null}
             <form action={signOut}>
               <SignOutButton type="submit">Sign out</SignOutButton>
             </form>

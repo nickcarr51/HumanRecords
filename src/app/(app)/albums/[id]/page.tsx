@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAlbum } from '@/lib/supabase/albums';
 import { AlbumTracks } from '@/components';
 import { Page, Back, Head, Art, ArtPlaceholder, Title, Artists } from './album-page.styles';
+import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
 export default async function AlbumPage({
   params,
@@ -15,7 +16,7 @@ export default async function AlbumPage({
   const album = await getAlbum(supabase, id);
   if (!album) notFound();
 
-  const artist = album.artistNames.length ? album.artistNames.join(', ') : 'Unknown Artist';
+  const artist = albumArtistLabel(album.artistNames);
 
   return (
     <Page>

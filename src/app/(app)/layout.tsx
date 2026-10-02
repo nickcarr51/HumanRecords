@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentRole } from "@/lib/auth/role";
 import { AppShell } from "@/components";
 
 export default async function AppLayout({
@@ -9,5 +10,6 @@ export default async function AppLayout({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  return <AppShell>{children}</AppShell>;
+  const role = await getCurrentRole();
+  return <AppShell isLabelMember={role === "label_member"}>{children}</AppShell>;
 }

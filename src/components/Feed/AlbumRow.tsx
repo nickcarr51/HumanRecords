@@ -2,27 +2,42 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePlayer, toPlayerTrack } from '@/components/Player';
+import { usePlayer, type PlayerTrack } from '@/components/Player';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
 import { AlbumTracks } from './AlbumTracks';
+import { usePlayButton } from './usePlayButton';
+import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
-export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> }) {
+export function AlbumRow({
+  item,
+  queue,
+  queueStart,
+}: {
+  item: Extract<FeedItem, { kind: 'album' }>;
+  // The feed-wide queue and the index of this album's first track in it.
+  queue: PlayerTrack[];
+  queueStart: number;
+}) {
   const { playQueue } = usePlayer();
   const [expanded, setExpanded] = useState(false);
   const hasTracks = item.tracks.length > 0;
-  const artist = item.artistNames.length ? item.artistNames.join(', ') : 'Unknown Artist';
+  const artist = albumArtistLabel(item.artistNames);
+  const { playing, onClick } = usePlayButton(
+    item.tracks.map((t) => t.id),
+    () => playQueue(queue, queueStart),
+  );
 
   return (
     <div>
       <Row>
         <PlayButton
           type="button"
-          aria-label="Play album"
+          aria-label={playing ? 'Pause album' : 'Play album'}
           disabled={!hasTracks}
-          onClick={() => playQueue(item.tracks.map(toPlayerTrack), 0)}
+          onClick={onClick}
         >
-          ▶
+          {playing ? '⏸' : '▶'}
         </PlayButton>
         <Meta>
           <Title>{item.title}</Title>
@@ -47,7 +62,7 @@ export function AlbumRow({ item }: { item: Extract<FeedItem, { kind: 'album' }> 
       </Row>
       {expanded ? (
         <ExpandArea>
-          <AlbumTracks tracks={item.tracks} />
+          <AlbumTracks tracks={item.tracks} queue={queue} queueStart={queueStart} />
         </ExpandArea>
       ) : null}
     </div>

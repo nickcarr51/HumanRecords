@@ -38,14 +38,17 @@ export type Database = {
         Row: {
           album_id: string
           artist_id: string
+          position: number
         }
         Insert: {
           album_id: string
           artist_id: string
+          position: number
         }
         Update: {
           album_id?: string
           artist_id?: string
+          position?: number
         }
         Relationships: [
           {
@@ -153,17 +156,59 @@ export type Database = {
           },
         ]
       }
+      releases: {
+        Row: {
+          album_id: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["release_kind"]
+          track_id: string | null
+        }
+        Insert: {
+          album_id?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["release_kind"]
+          track_id?: string | null
+        }
+        Update: {
+          album_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["release_kind"]
+          track_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "releases_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: true
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "releases_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: true
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       track_albums: {
         Row: {
           album_id: string
+          position: number
           track_id: string
         }
         Insert: {
           album_id: string
+          position: number
           track_id: string
         }
         Update: {
           album_id?: string
+          position?: number
           track_id?: string
         }
         Relationships: [
@@ -186,14 +231,17 @@ export type Database = {
       track_artists: {
         Row: {
           artist_id: string
+          position: number
           track_id: string
         }
         Insert: {
           artist_id: string
+          position: number
           track_id: string
         }
         Update: {
           artist_id?: string
+          position?: number
           track_id?: string
         }
         Relationships: [
@@ -269,9 +317,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
       increment_play_count: { Args: { p_track_id: string }; Returns: undefined }
+      publish_release: { Args: { payload: Json }; Returns: string }
+      resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
     }
     Enums: {
+      release_kind: "single" | "album"
       user_role: "listener" | "artist" | "label_member"
     }
     CompositeTypes: {
@@ -403,6 +458,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      release_kind: ["single", "album"],
       user_role: ["listener", "artist", "label_member"],
     },
   },

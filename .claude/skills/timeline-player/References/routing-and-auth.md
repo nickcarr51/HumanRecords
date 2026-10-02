@@ -21,8 +21,8 @@ navigation, the player mounted inside `AppShell` persists (see
 Signed-in users land on `/feed` everywhere the app used to send them to `/dashboard`:
 
 - `src/lib/auth/route-guard.ts` — `authRedirectPath(pathname, isAuthed)`:
-  - `PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums"]`; signed-out on any
-    of these → `/login`.
+  - `PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums", "/admin"]`;
+    signed-out on any of these → `/login`. (`/admin` role gating is in [[admin-upload]].)
   - signed-in on `/artists` or `/artists/*` → `/feed` (route retired, code kept).
   - signed-in on `/` or `/login` → `/feed`.
   - Consumed by `src/lib/supabase/middleware.ts` (via `src/middleware.ts`).
@@ -54,8 +54,15 @@ state instead of a 500.
 `src/components/Feed/` (all `'use client'`, consume `usePlayer` + `toPlayerTrack`):
 
 - `FeedList` — maps `FeedItem[]` to `AlbumRow`/`SingleTrackRow`; "Nothing here yet." when empty.
-- `SingleTrackRow` — play → `playQueue([track], 0)`.
-- `AlbumRow` — collapsed by default; expand reveals `AlbumTracks`; "play album" disabled when
-  the album has no tracks; links to `/albums/{id}`.
-- `AlbumTracks` — shared by the expanded row and the album page; each track row plays
-  `playQueue(albumTracks, index)`.
+  Builds ONE feed-wide queue (every track, in feed order — singles as one track, albums as
+  their tracks) plus each item's offset into it, so next/prev move from release to release.
+- `SingleTrackRow` — play → `playQueue(feedQueue, itsOffset)`.
+- `AlbumRow` — collapsed by default; expand reveals `AlbumTracks`; "play album" →
+  `playQueue(feedQueue, albumOffset)`, disabled when the album has no tracks; links to `/albums/{id}`.
+- `AlbumTracks` — shared by the expanded row and the album page. In the feed it gets the
+  feed queue + album offset (`playQueue(feedQueue, albumOffset + i)`); on the album page those
+  props are omitted and the album is its own queue (`playQueue(albumTracks, i)`).
+- `usePlayButton(trackIds, start)` — shared by all three buttons. If the current track is one
+  of `trackIds` the button shows ⏸ while playing (or loading) and toggles pause/resume instead
+  of restarting; an album button covers all its track ids. Not current → `start()`. Loading →
+  click ignored. Errored → `start()` again (retry).

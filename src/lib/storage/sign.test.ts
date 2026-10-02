@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => {
   process.env.R2_ACCOUNT_ID = "testacct";
@@ -8,7 +8,7 @@ beforeAll(() => {
   process.env.R2_ENDPOINT = "https://testacct.r2.cloudflarestorage.com";
 });
 
-import { signDownloadUrl, signImageUrl, signStreamUrl } from "./sign";
+import { headObject, signDownloadUrl, signImageUrl, signStreamUrl, signUploadUrl } from "./sign";
 
 describe("signStreamUrl", () => {
   it("signs a 2h GET URL for the object key", async () => {
@@ -57,5 +57,41 @@ describe("signImageUrl", () => {
     const u = new URL(url!);
     expect(u.searchParams.get("X-Amz-Expires")).toBe("3600");
     expect(u.searchParams.get("X-Amz-Signature")).toBeTruthy();
+  });
+});
+
+describe("signUploadUrl", () => {
+  it("signs a 15min PUT URL with content-type as a signed header", async () => {
+    const url = await signUploadUrl("tracks/abc.mp3", "audio/mpeg");
+    const u = new URL(url);
+    expect(u.origin + u.pathname).toBe(
+      "https://testacct.r2.cloudflarestorage.com/test-bucket/tracks/abc.mp3",
+    );
+    expect(u.searchParams.get("X-Amz-Expires")).toBe("900");
+    expect(u.searchParams.get("X-Amz-SignedHeaders")).toBe("content-type;host");
+    expect(u.searchParams.get("X-Amz-Signature")).toBeTruthy();
+  });
+});
+
+describe("headObject", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns the size when the object exists", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200, headers: { "content-length": "1234" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await headObject("tracks/abc.mp3")).toEqual({ size: 1234 });
+    const req = fetchMock.mock.calls[0][0] as Request;
+    expect(req.method).toBe("HEAD");
+    expect(req.url).toBe("https://testacct.r2.cloudflarestorage.com/test-bucket/tracks/abc.mp3");
+  });
+
+  it("returns null on 404", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    expect(await headObject("tracks/missing.mp3")).toBeNull();
+  });
+
+  it("throws on other errors", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 403 })));
+    await expect(headObject("tracks/x.mp3")).rejects.toThrow("403");
   });
 });

@@ -1,4 +1,4 @@
-const PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums"];
+const PROTECTED_PREFIXES = ["/dashboard", "/artists", "/feed", "/albums", "/admin"];
 
 export function authRedirectPath(pathname: string, isAuthed: boolean): string | null {
   const isProtected = PROTECTED_PREFIXES.some(

@@ -5,8 +5,8 @@ description: Use when working on the listener timeline (the `/feed` page), the p
 
 # Timeline + Persistent Player
 
-The listener MVP: a single chronological **timeline** at `/feed` (a mix of albums and
-standalone tracks) and a **music player** that keeps playing while the user navigates the
+The listener MVP: a single chronological **timeline** at `/feed` (a mix of album and
+single releases) and a **music player** that keeps playing while the user navigates the
 app — SoundCloud-style. Built on branch `feature/media-player-and-refactor` (2026-09-29).
 
 ## The one thing to understand first
@@ -24,7 +24,7 @@ never unmount. No global state library, no refresh-resume.
 |---|---|
 | Player state + `<audio>` + actions | `src/components/Player/PlayerProvider.tsx` |
 | Player control bar (UI) | `src/components/Player/PlayerBar.tsx` |
-| Feed data (albums + singles merge) | `src/lib/supabase/feed.ts` (`getFeed`) |
+| Feed data (releases, newest first) | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Album detail data | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Shared artist-name flattener | `src/lib/supabase/artist-names.ts` |
 | Timeline page | `src/app/(app)/feed/page.tsx` |
@@ -38,9 +38,9 @@ never unmount. No global state library, no refresh-resume.
 
 - [persistent-player.md](References/persistent-player.md) — the player context, its state
   machine (load/play/pause/next/prev/seek), signed-URL playback, and error/autoplay handling.
-- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (chronological
-  merge of albums + standalone tracks, pagination) and `getAlbum`; the standalone-track
-  rule; the current filter-after-limit limitation and the releases-model follow-up.
+- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one query on
+  `releases`, newest first, SQL pagination) and `getAlbum` (tracks in `position` order);
+  position ordering and the "Various Artists" label.
 - [routing-and-auth.md](References/routing-and-auth.md) — the `(app)` route group, `/feed`
   as the authenticated home, `/albums/[id]`, the auth retarget, retired `/artists`, the
   global 404 bounce, and the error boundary.
@@ -52,16 +52,16 @@ never unmount. No global state library, no refresh-resume.
 
 - [[media-storage]] — the player plays signed R2 URLs via the `getTrackStreamUrl` server
   action; the client only ever passes a `trackId`.
-- [[catalog-schema]] — `getFeed`/`getAlbum` read `albums`/`tracks`/`track_albums`/
-  `track_artists`/`album_artists` and rely on the "authenticated" RLS policies.
+- [[catalog-schema]] — `getFeed`/`getAlbum` read `releases`/`albums`/`tracks`/
+  `track_albums`/`track_artists`/`album_artists` and rely on the "authenticated" RLS policies.
+- [[admin-upload]] — owns the `releases` table, `position` columns, and the publish path
+  that creates what the feed shows.
 - [[component-library]] — all UI is styled-components using the theme tokens.
 
 ## Known deferrals (as of 2026-09-29)
 
-- **Releases model** ([[humanrecords-releases-model]] in memory): `getFeed`/`getAlbum` will
-  be unified under a `release = single | album` model, adding a track `position` column.
-  Until then, album track order is not consistent between the feed row and the album page,
-  and `getFeed` filters standalone tracks *after* the DB limit (fine at demo scale).
+- **Releases model** — shipped in `feature/admin-release-upload`: the feed reads a
+  `releases` table and link rows carry `position`. See [[admin-upload]].
 - Feed search bar and Load-More/pagination UI are deferred (data layer supports paging).
 - Player icons/artwork are placeholder pending a design pass.
 
