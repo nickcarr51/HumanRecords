@@ -6,6 +6,7 @@ import { usePlayer, type PlayerTrack } from '@/components/Player';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
 import { AlbumTracks } from './AlbumTracks';
+import { usePlayButton } from './usePlayButton';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
 export function AlbumRow({
@@ -22,17 +23,21 @@ export function AlbumRow({
   const [expanded, setExpanded] = useState(false);
   const hasTracks = item.tracks.length > 0;
   const artist = albumArtistLabel(item.artistNames);
+  const { playing, onClick } = usePlayButton(
+    item.tracks.map((t) => t.id),
+    () => playQueue(queue, queueStart),
+  );
 
   return (
     <div>
       <Row>
         <PlayButton
           type="button"
-          aria-label="Play album"
+          aria-label={playing ? 'Pause album' : 'Play album'}
           disabled={!hasTracks}
-          onClick={() => playQueue(queue, queueStart)}
+          onClick={onClick}
         >
-          ▶
+          {playing ? '⏸' : '▶'}
         </PlayButton>
         <Meta>
           <Title>{item.title}</Title>

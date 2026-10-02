@@ -62,3 +62,7 @@ state instead of a 500.
 - `AlbumTracks` — shared by the expanded row and the album page. In the feed it gets the
   feed queue + album offset (`playQueue(feedQueue, albumOffset + i)`); on the album page those
   props are omitted and the album is its own queue (`playQueue(albumTracks, i)`).
+- `usePlayButton(trackIds, start)` — shared by all three buttons. If the current track is one
+  of `trackIds` the button shows ⏸ while playing (or loading) and toggles pause/resume instead
+  of restarting; an album button covers all its track ids. Not current → `start()`. Loading →
+  click ignored. Errored → `start()` again (retry).
