@@ -38,7 +38,10 @@ So role and self-guard checks exist in the action **and** in Postgres.
 
 ## UI (`src/components/AdminUsers/`)
 
-- `NewUserForm`: email, name, role `Select` (default listener). Success is an inline success
+- All three action-calling components (`NewUserForm`, `RoleSelect`, `InviteCell`) wrap the
+  server action in try/catch/finally: a thrown action (network drop, 500) shows
+  "Something went wrong. Try again." and re-enables the control (RoleSelect also reverts).
+- `NewUserForm`: email, name (`maxLength={100}`, matching the server-side cap), role `Select` (default listener). Success is an inline success
   `Alert` "Invite link created for <email>." (there is no app-wide Toast); fields clear.
 - `UsersTable`: rows stack as cards below the tablet breakpoint. Own row's role select is
   disabled. `RoleSelect` saves on change, shows "Saved" or an error and reverts; it keeps

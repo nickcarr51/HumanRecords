@@ -36,7 +36,7 @@ form appears with the email pre-filled.
 | List + row mapping (`inviteUrl` for unused rows) | `src/lib/admin/users.ts`, types in `users-types.ts` |
 | Welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Redeem (claim → sign-in → restore on failure) | `src/lib/auth/actions.ts` (`redeemInvite`) |
-| `/login` (server component, `Referrer-Policy: no-referrer`) | `src/app/login/page.tsx` |
+| `/login` (server component, `<meta name="referrer" content="no-referrer">` via `metadata.referrer`) | `src/app/login/page.tsx` |
 | Login UI | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
 | Users page | `src/app/(app)/admin/users/page.tsx` |
 | Users UI | `src/components/AdminUsers/{NewUserForm,UsersTable,RoleSelect,InviteCell,mailto}.*`, `users.styles.ts` |

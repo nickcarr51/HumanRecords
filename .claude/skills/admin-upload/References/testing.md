@@ -69,7 +69,7 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 
 ## Manual smoke (local) — needs the R2 CORS rule applied first
 
-1. `yarn supabase db reset && yarn dev`
+1. `yarn supabase migration up && yarn dev`
 2. Sign in as `nick.carr84@gmail.com` (OTP from Mailpit `http://127.0.0.1:54324`): no Admin
    link; visiting `/admin/upload` lands on `/feed`.
 3. Sign out; sign in as `quinoajonesmusic@gmail.com`: Admin link → `/admin` → Upload a release.
