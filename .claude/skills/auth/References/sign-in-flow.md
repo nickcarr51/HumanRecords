@@ -55,7 +55,7 @@ token shows `InviteWelcome`; anything else shows `LoginForm` with the email pre-
 **never auto-sends** a code. **Enter** (a server-action form POST via `redeemInviteForm`, works pre-hydration; a thrown action hits `src/app/login/error.tsx`) → `redeemInvite`: claim token → `admin.getUserById` →
 `admin.generateLink('magiclink')` → `verifyOtp({ token_hash, type: 'email' })` on the cookie
 client → `/feed`; on failure the claim is restored. A used/unknown token is ignored silently.
-`/login` sets `Referrer-Policy: no-referrer`. A signed-in visitor goes to `/feed` via
+`/login` sets `metadata.referrer = "no-referrer"` (a `<meta name="referrer">` tag). A signed-in visitor goes to `/feed` via
 middleware with the token untouched.
 
 ## `/auth/confirm` (`src/app/auth/confirm/route.ts`)

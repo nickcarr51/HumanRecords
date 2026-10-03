@@ -27,6 +27,6 @@ Real OTP verification against Postgres is exercised indirectly by every data tes
 
 Run: `yarn test --run src/lib/auth src/app/auth src/app/login src/lib/supabase/middleware.test.ts`.
 
-Manual smoke: `yarn supabase db reset && yarn dev` → `/login` as `label@example.com` → read the
+Manual smoke: `yarn supabase migration up && yarn dev` → `/login` as `label@example.com` → read the
 code in Mailpit (`http://127.0.0.1:54324`) → lands on `/feed` with an Admin link; sign out →
 `/login`; visit `/albums/x` signed out → `/login?next=/albums/x`.

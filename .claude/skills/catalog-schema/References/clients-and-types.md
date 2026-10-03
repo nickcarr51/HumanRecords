@@ -39,7 +39,7 @@ signed-in test client, against real Postgres. Other conventions in these modules
 `src/lib/supabase/database.types.ts` is generated — don't hand-edit. After any migration:
 
 ```bash
-yarn supabase migration up      # or: yarn supabase db reset
+yarn supabase migration up      # keeps data; db reset wipes local data — avoid
 yarn -s supabase gen types typescript --local > src/lib/supabase/database.types.ts
 ```
 

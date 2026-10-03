@@ -13,7 +13,8 @@ Supabase CLI via yarn (Docker required). Ports from `supabase/config.toml`:
 
 ```bash
 yarn supabase start        # bring the stack up (prints keys for .env.local)
-yarn supabase db reset     # drop DB, re-run every migration in order, then seed.sql
+yarn supabase migration up # apply only pending migrations — keeps local data (default)
+yarn supabase db reset     # WIPES local data: drop DB, re-run every migration, then seed.sql
 yarn supabase status       # show URLs + keys again
 yarn supabase stop
 ```
@@ -48,7 +49,8 @@ counts. `audio_url` values are real object keys in the `humanrecords-media-dev` 
 1. `yarn supabase migration new <snake_name>` → `supabase/migrations/<timestamp>_<name>.sql`.
 2. Write SQL. Migrations are forward-only; never edit one that's been pushed to a hosted
    project — add a new one. Comment the *why* at the top (house style).
-3. `yarn supabase db reset` (or `migration up`) locally.
+3. `yarn supabase migration up` locally (keeps data). Use `db reset` only if you edited an
+   already-applied migration — it wipes local data; say so first (see CLAUDE.md "Database safety").
 4. Regenerate types (see [clients-and-types.md](clients-and-types.md)).
 5. Update `seed.sql` if new `not null` columns or tables need local data.
 6. Add/adjust schema tests.
@@ -66,6 +68,10 @@ yarn supabase db push
 **Before any hosted push:** confirm Dashboard → Authentication → "Allow new users to sign up"
 is OFF (the app is invite-only; role no longer reads `user_metadata`, see [functions.md](functions.md)). Hosted accounts come from
 `scripts/invite-users.mts` (develop) or by hand (production) — never from the seed.
+
+The local CLI stays linked to the develop project, so `db push` and any `--linked` /
+`--db-url` / `--project-ref` command reach hosted data. `.claude/hooks/guard-db.sh` (wired in
+`.claude/settings.json`) forces a permission prompt on these; local commands pass through.
 
 ## Data / schema tests
 

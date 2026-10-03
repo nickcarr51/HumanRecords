@@ -21,7 +21,7 @@
 
 Run: `yarn test --run src/lib/invites src/lib/auth src/lib/admin src/components/Login src/components/AdminUsers`.
 
-## Manual smoke (~10 min; `yarn supabase db reset && yarn dev`)
+## Manual smoke (~10 min; `yarn supabase migration up && yarn dev`)
 
 1. Sign in at `http://127.0.0.1:3000/login` as `quinoajonesmusic@gmail.com` (code in Mailpit,
    `http://127.0.0.1:54324`).
