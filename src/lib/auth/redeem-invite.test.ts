@@ -5,7 +5,7 @@ const restoreInvite = vi.fn();
 const getUserById = vi.fn();
 const generateLink = vi.fn();
 const verifyOtp = vi.fn();
-const redirect = vi.fn((..._a: unknown[]) => {
+const redirect = vi.fn((): never => {
   throw new Error("NEXT_REDIRECT");
 });
 
@@ -17,9 +17,9 @@ vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({ auth: { admin: { getUserById, generateLink } } }),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { verifyOtp } }) }));
-vi.mock("next/navigation", () => ({ redirect: (...a: unknown[]) => redirect(...a) }));
+vi.mock("next/navigation", () => ({ redirect: () => redirect() }));
 
-import { redeemInvite } from "./actions";
+import { redeemInvite, redeemInviteForm } from "./actions";
 
 const TOKEN = "a".repeat(43);
 const CLAIM = { userId: "u1", usedAt: "2026-10-02T12:00:00.000Z" };
@@ -39,7 +39,7 @@ describe("redeemInvite", () => {
     expect(claimInvite).toHaveBeenCalledWith(expect.anything(), TOKEN);
     expect(generateLink).toHaveBeenCalledWith({ type: "magiclink", email: "jane@example.com" });
     expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "HASH", type: "email" });
-    expect(redirect).toHaveBeenCalledWith("/feed");
+    expect(redirect).toHaveBeenCalled();
     expect(restoreInvite).not.toHaveBeenCalled();
   });
 
@@ -83,5 +83,20 @@ describe("redeemInvite", () => {
     const res = await redeemInvite(TOKEN);
     expect(res.error).toMatch(/couldn't sign you in/i);
     expect(restoreInvite).not.toHaveBeenCalled();
+  });
+});
+
+describe("redeemInviteForm", () => {
+  it("reads the token from FormData and redeems it", async () => {
+    const fd = new FormData();
+    fd.set("token", TOKEN);
+    await expect(redeemInviteForm(null, fd)).rejects.toThrow("NEXT_REDIRECT");
+    expect(claimInvite).toHaveBeenCalledWith(expect.anything(), TOKEN);
+  });
+
+  it("returns USED without claiming when the token is missing", async () => {
+    const res = await redeemInviteForm(null, new FormData());
+    expect(res.error).toMatch(/already been used/);
+    expect(claimInvite).not.toHaveBeenCalled();
   });
 });

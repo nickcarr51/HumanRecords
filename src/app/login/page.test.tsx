@@ -4,7 +4,7 @@ import { renderWithTheme } from "@/test/renderWithTheme";
 
 const getInviteGreeting = vi.fn();
 vi.mock("@/lib/auth/invite", () => ({ getInviteGreeting: (...a: unknown[]) => getInviteGreeting(...a) }));
-vi.mock("@/lib/auth/actions", () => ({ requestOtp: vi.fn(), submitOtp: vi.fn(), redeemInvite: vi.fn() }));
+vi.mock("@/lib/auth/actions", () => ({ requestOtp: vi.fn(), submitOtp: vi.fn(), redeemInvite: vi.fn(), redeemInviteForm: vi.fn() }));
 
 import LoginPage, { metadata } from "./page";
 

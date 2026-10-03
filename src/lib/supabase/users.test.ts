@@ -61,6 +61,38 @@ describe("users", () => {
     }
   });
 
+  describe("role sync on app_metadata update", () => {
+    it("copies a changed app_metadata role to public.users", async () => {
+      const user = await createTestUser({ role: "listener" });
+      try {
+        const admin = createAdminClient();
+        const { error } = await admin.auth.admin.updateUserById(user.id, { app_metadata: { role: "artist" } });
+        expect(error).toBeNull();
+        const { data: row, error: readError } = await admin.from("users").select("role").eq("id", user.id).single();
+        expect(readError).toBeNull();
+        expect(row).toMatchObject({ role: "artist" });
+      } finally {
+        await user.cleanup();
+      }
+    });
+
+    it("leaves public.users.role alone when app_metadata has no role change", async () => {
+      const user = await createTestUser({ role: "listener" });
+      try {
+        const admin = createAdminClient();
+        const { error: setError } = await admin.from("users").update({ role: "label_member" }).eq("id", user.id);
+        expect(setError).toBeNull();
+        const { error } = await admin.auth.admin.updateUserById(user.id, { app_metadata: { some_flag: true } });
+        expect(error).toBeNull();
+        const { data: row, error: readError } = await admin.from("users").select("role").eq("id", user.id).single();
+        expect(readError).toBeNull();
+        expect(row).toMatchObject({ role: "label_member" });
+      } finally {
+        await user.cleanup();
+      }
+    });
+  });
+
   it("blocks anonymous reads via RLS", async () => {
     const anon = createAnonClient();
     const { data, error } = await anon.from("users").select("id");

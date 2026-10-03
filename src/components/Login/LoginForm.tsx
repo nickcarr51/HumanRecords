@@ -34,7 +34,7 @@ export function LoginForm({ initialEmail, next, linkFailed, initialError }: Logi
   );
   const [pending, setPending] = useState(false);
 
-    async function sendCode(e: React.FormEvent) {
+  async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
     setError(null);

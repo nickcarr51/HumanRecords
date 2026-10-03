@@ -17,7 +17,7 @@ chars, e.g. truncated by a mail client), or the lookup errored (check server log
 
 ## `InviteWelcome` (client)
 
-"Welcome, <name>" (or "Welcome"), Enter button (a `<form>` POST → `redeemInvite(token)`),
+"Welcome, <name>" (or "Welcome"), Enter button (`<form action>` bound via `useActionState` to the `redeemInviteForm` server action with a hidden `token` input, so it works before hydration → `redeemInvite(token)`; a thrown/rejected action lands in `src/app/login/error.tsx`),
 "Not you? Sign in with email" swaps to `LoginForm`. On an error result it swaps to
 `LoginForm` with the email pre-filled and the message in an `Alert`.
 

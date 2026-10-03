@@ -31,7 +31,7 @@ plus `enable_signup = false`.
 | Session refresh, claims check, redirect + `?next=` | `src/lib/supabase/middleware.ts` (`updateSession`) |
 | Pure redirect rules | `src/lib/auth/route-guard.ts` (`authRedirectPath`, `PROTECTED_PREFIXES`) |
 | Open-redirect guard (default `/feed`) | `src/lib/auth/safe-next.ts` (`safeNextPath`) |
-| Server actions: request code, verify code, sign out, `redeemInvite` | `src/lib/auth/actions.ts` |
+| Server actions: request code, verify code, sign out, `redeemInvite` (+ `redeemInviteForm`) | `src/lib/auth/actions.ts` |
 | Invite welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Current claims (server) | `src/lib/auth/session.ts` (`getSessionUser`) |
 | Own role + label-member gate | `src/lib/auth/role.ts` (`getCurrentRole`, `requireLabelMember`) |
@@ -58,7 +58,7 @@ plus `enable_signup = false`.
 ## Depends on
 
 - [[catalog-schema]] — `public.users`, the `handle_new_user` trigger that copies role from
-  invite metadata, the hidden `role` column, `current_user_role()`, and the server client.
+  `app_metadata`, the hidden `role` column, `current_user_role()`, and the server client.
 - [[invites]] — the `/login?email=&invite=` welcome/Enter flow and `/admin/users`.
 - [[component-library]] — login screen uses `Card`, `FormField`, `Input`, `Button`, `Alert`,
   and `Screen`.

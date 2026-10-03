@@ -62,6 +62,12 @@ export async function signOut(): Promise<void> {
   redirect("/login");
 }
 
+// Log only code/message: PostgREST `details` can echo the token filter value.
+const describe = (e: unknown) =>
+  e && typeof e === "object"
+    ? { code: (e as { code?: unknown }).code, message: (e as { message?: unknown }).message }
+    : String(e);
+
 const INVITE_USED = "That link has already been used — sign in with your email below.";
 const INVITE_FAILED = "Couldn't sign you in — try again, or use your email below.";
 
@@ -78,7 +84,7 @@ export async function redeemInvite(token: string): Promise<Result> {
   try {
     claim = await claimInvite(service, token);
   } catch (err) {
-    console.error("claimInvite failed", err);
+    console.error("claimInvite failed", describe(err));
     return { error: INVITE_FAILED };
   }
   if (!claim) return { error: INVITE_USED };
@@ -101,15 +107,22 @@ export async function redeemInvite(token: string): Promise<Result> {
     });
     if (verifyError) throw verifyError;
   } catch (err) {
-    console.error("redeemInvite sign-in failed", err);
+    console.error("redeemInvite sign-in failed", describe(err));
     try {
       await restoreInvite(service, claim, token);
     } catch (restoreErr) {
-      console.error("restoreInvite failed", restoreErr);
+      console.error("restoreInvite failed", describe(restoreErr));
     }
     return { error: INVITE_FAILED };
   }
 
   // redirect() throws to navigate; keep it outside any try/catch.
   redirect("/feed");
+}
+
+// Form-action wrapper so the Enter <form> works before hydration (progressive
+// enhancement). The signature is what useActionState expects.
+export async function redeemInviteForm(_prev: Result | null, formData: FormData): Promise<Result> {
+  const token = formData.get("token");
+  return redeemInvite(typeof token === "string" ? token : "");
 }

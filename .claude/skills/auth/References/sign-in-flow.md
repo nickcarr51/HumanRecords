@@ -52,7 +52,7 @@ Server component (reads `searchParams`; see Invite links below) rendering `Login
 
 URL shape `/login?email=&invite=`. Page load is read-only (`getInviteGreeting`): a valid unused
 token shows `InviteWelcome`; anything else shows `LoginForm` with the email pre-filled and
-**never auto-sends** a code. **Enter** → `redeemInvite`: claim token → `admin.getUserById` →
+**never auto-sends** a code. **Enter** (a server-action form POST via `redeemInviteForm`, works pre-hydration; a thrown action hits `src/app/login/error.tsx`) → `redeemInvite`: claim token → `admin.getUserById` →
 `admin.generateLink('magiclink')` → `verifyOtp({ token_hash, type: 'email' })` on the cookie
 client → `/feed`; on failure the claim is restored. A used/unknown token is ignored silently.
 `/login` sets `Referrer-Policy: no-referrer`. A signed-in visitor goes to `/feed` via

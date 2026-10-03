@@ -15,7 +15,7 @@ to copy, email by `mailto:`, or write to an NFC card. The invitee opens it, sees
 
 **Opening the link never consumes the token; only the Enter POST does.** `/login` is a server
 component that calls `getInviteGreeting(token)`, which is read-only, so scanners, link
-previewers, and reloads can't burn it. Enter calls the `redeemInvite` server action, which
+previewers, and reloads can't burn it. Enter submits a progressive server-action form (`redeemInviteForm` → `redeemInvite`), which
 turns our long-lived single-use token into a real Supabase session server-side: **claim**
 (atomic `UPDATE … WHERE token = $1 AND used_at IS NULL`) → `admin.getUserById` →
 `admin.generateLink('magiclink')` (sends nothing) → `verifyOtp({ token_hash, type: 'email' })`
