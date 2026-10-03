@@ -1,13 +1,13 @@
 export const palette = {
-  bgBase: '#14141a',
-  surface: '#1c1c24',
-  raised: '#24242e',
-  text: '#f5f0e6',
-  muted: '#a3a3a3',
-  faint: '#6b6b73',
-  border: '#2e2e38',
-  accent: '#ffd000',
-  accentDim: '#b39400',
+  bgBase: '#282723',
+  surface: '#32312c',
+  raised: '#3c3a35',
+  text: '#d1ccc1',
+  muted: '#9a958b',
+  faint: '#85817a',
+  border: '#4a4842',
+  accent: '#eb4601',
+  accentDim: '#c93c01',
   success: '#3fb950',
   error: '#f85149',
   warning: '#d29922',
@@ -36,8 +36,8 @@ export const fontSizes = {
 } as const;
 
 export const fonts = {
-  mono: "var(--font-mono), 'Courier New', ui-monospace, monospace",
-  display: 'var(--font-display), system-ui, -apple-system, sans-serif',
+  mono: "'dico-mono', 'Courier New', ui-monospace, monospace",
+  display: "'dico-mono', 'Courier New', ui-monospace, monospace",
 } as const;
 
 export const fontWeights = {

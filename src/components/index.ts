@@ -12,6 +12,7 @@ export * from './Link';
 export * from './Tag';
 export * from './Card';
 export * from './Input';
+export * from './FileInput';
 export * from './Textarea';
 export * from './Select';
 export * from './Checkbox';

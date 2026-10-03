@@ -11,7 +11,7 @@ export default function Home() {
         <Heading as="h1" $level={1}>
           HUMAN SERVICES
         </Heading>
-        <Text $variant="muted">By Human Records</Text>
+        <Text $variant="muted">Powered by Human Records</Text>
         <Link href="/login">Sign in</Link>
       </S.Centered>
     </Screen>

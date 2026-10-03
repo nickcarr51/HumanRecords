@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import StyledComponentsRegistry from '@/lib/registry';
-import { plexMono, spaceGrotesk } from '@/lib/theme/fonts';
+import { TYPEKIT_KIT_URL } from '@/lib/theme/fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -14,7 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${plexMono.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://use.typekit.net" crossOrigin="" />
+        <link rel="stylesheet" href={TYPEKIT_KIT_URL} />
+      </head>
       <body>
         <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
       </body>

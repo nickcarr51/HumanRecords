@@ -31,7 +31,7 @@ readable display names in dev.
 ## `globals.css`
 
 A tiny reset (`box-sizing`, zero margins) plus `html, body` background/text/font set as
-**literal values** (`#14141a`, `#f5f0e6`, `var(--font-display)`). They duplicate the theme on
+**literal values** (`#282723`, `#d1ccc1`, the `'dico-mono'` stack). They duplicate the theme on
 purpose: they apply before any styled-component CSS loads, so there's no white flash. Keep
 them in sync with `theme.colors.bg` / `.text`.
 

@@ -12,7 +12,7 @@ DOM). Plain props on function components (`Button`, `FormField`, `Modal`) are no
 | Component | Element | Props | Notes |
 |---|---|---|---|
 | `Heading` | `h2` | `$level?: 1-4` (default 2) | Size map 1→`4xl`, 2→`2xl`, 3→`xl`, 4→`lg`. Use `as="h1"` to change the tag independently of size. |
-| `Text` | `p` | `$variant?: 'body' \| 'muted' \| 'small'` | Display font, line-height 1.6. |
+| `Text` | `p` | `$variant?: 'body' \| 'muted' \| 'small'` | Mono font (Dico Mono), line-height 1.6. |
 | `Mono` | `span` | — | Inline mono text (emails, codes, labels). |
 
 ## Layout
@@ -30,7 +30,7 @@ DOM). Plain props on function components (`Button`, `FormField`, `Modal`) are no
 
 | Component | Props | Notes |
 |---|---|---|
-| `Button` | `variant: 'primary' \| 'secondary' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `loading`, + all `<button>` attrs | Mono uppercase. `loading` disables the button, sets `aria-busy`, shows a spinner dot. Default `type` is the browser's (`submit`) — pass `type="button"` for non-submit buttons inside forms. |
+| `Button` | `variant: 'primary' \| 'secondary' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `loading`, + all `<button>` attrs | Mono uppercase. `loading` disables the button, sets `aria-busy`, shows a spinner dot. Default `type` is the browser's (`submit`) — pass `type="button"` for non-submit buttons inside forms. Its look is exported as `buttonStyles` (a `css` block taking `$variant`/`$size`) so other elements can match it; `:disabled` styling is not included, since a `<label>` can't be disabled. |
 | `Link` | styled `<a>` | Accent mono link. **Not** `next/link` — fine for a full-page nav (e.g. `/` → `/login`); for client-side in-app navigation use `styled(Link)` from `next/link` as `AppShell`/`Pagination`/`admin.styles.ts` do. |
 | `Tag` | `$tone?: 'default' \| 'accent' \| 'success' \| 'error' \| 'warning' \| 'info'` | Outlined uppercase pill. |
 | `Card` | `$interactive?: boolean` | `surface` panel; interactive adds hover lift + accent border. |
@@ -40,6 +40,7 @@ DOM). Plain props on function components (`Button`, `FormField`, `Modal`) are no
 | Component | Props | Notes |
 |---|---|---|
 | `Input`, `Textarea`, `Select` | `$invalid?: boolean` + native attrs | All share `fieldStyles` (`src/components/field/fieldStyles.ts`): mono, `bg` fill, accent focus ring, red border when `$invalid`. |
+| `FileInput` | `id` (required), `buttonLabel?` (default "Choose file"), `variant?`/`size?` (Button's), `$invalid?`, + native `<input>` attrs except `type` | The native file input is visually hidden but stays focusable. A `<label>` styled with `buttonStyles` (primary by default) is what people click. Focus ring and disabled look come from `input:focus-visible + label` / `input:disabled + label`; `$invalid` adds a red outline and `aria-invalid`. The chosen file name isn't shown, so put it in the `FormField` hint. Used by `TrackWidget`. |
 | `Checkbox`, `Radio` | native attrs | `styled.input.attrs({ type })` with custom `appearance: none` visuals. |
 | `FormField` | `label`, `htmlFor?`, `hint?`, `error?`, `children` | Label + control + **error (role="alert") replaces hint** when present. Pair `htmlFor` with the control's `id`. |
 

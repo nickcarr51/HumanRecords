@@ -100,7 +100,9 @@ for `id: null`.
 
 - `KindToggle`: radio group (Single | Album).
 - Album: "Album title" + "Album artists (optional)".
-- `TrackWidget`: "MP3 file" (`accept=".mp3,audio/mpeg"`), hint shows name + size, "Track
+- `TrackWidget`: "MP3 file" is a `FileInput` ([[component-library]]): an orange button that
+  reads "Choose MP3", then "Replace MP3" once a file is chosen (`accept=".mp3,audio/mpeg"`).
+  The hint shows name + size, "Track
   title", "Artists"; album mode adds "Track N" header with ↑ / ↓ / ✕. A progress line runs
   along the card's top edge once an upload starts (red on error).
 - Footer (sticky): Clear all (confirm) · Cancel (confirm if dirty → `/admin`) · Publish.

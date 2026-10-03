@@ -35,7 +35,7 @@ export const PlayButton = styled.button`
 `;
 
 export const Title = styled.span`
-  font-family: ${({ theme }) => theme.fonts.display};
+  font-family: ${({ theme }) => theme.fonts.mono};
   font-weight: ${({ theme }) => theme.fontWeights.semibold};
   color: ${({ theme }) => theme.colors.text};
 `;

@@ -6,7 +6,7 @@ import {
   Heading, Text, Mono,
   Container, Stack, Row, Grid, Divider,
   Button, Link, Tag, Card,
-  Input, Textarea, Select, Checkbox, Radio, FormField,
+  Input, FileInput, Textarea, Select, Checkbox, Radio, FormField,
   Alert, Spinner, ToastProvider, useToast, Modal,
   Nav, NavBrand, NavLinks, Footer,
 } from '@/components';
@@ -54,7 +54,7 @@ export default function StyleGuidePage() {
             <Heading $level={2}>Heading level 2</Heading>
             <Heading $level={3}>Heading level 3</Heading>
             <Heading $level={4}>Heading level 4</Heading>
-            <Text>Body text in Space Grotesk — the sleek, modern voice for prose.</Text>
+            <Text>Body text in Dico Mono — headings above use Dico Mono too.</Text>
             <Text $variant="muted">Muted body text for secondary copy.</Text>
             <Text $variant="small">Small body text.</Text>
             <Mono>MONO_LABEL · 001 · the old-internet terminal voice</Mono>
@@ -128,6 +128,9 @@ export default function StyleGuidePage() {
                   <option value="electronic">Electronic</option>
                   <option value="ambient">Ambient</option>
                 </Select>
+              </FormField>
+              <FormField label="Audio" htmlFor="sg-audio" hint="MP3, up to 50 MB">
+                <FileInput id="sg-audio" buttonLabel="Choose MP3" accept=".mp3,audio/mpeg" />
               </FormField>
               <FormField label="Invite code" htmlFor="sg-invite" error="This code is invalid">
                 <Input id="sg-invite" $invalid defaultValue="XXXX" />

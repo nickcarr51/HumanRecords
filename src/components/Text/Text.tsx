@@ -5,7 +5,7 @@ import styled from 'styled-components';
 type Variant = 'body' | 'muted' | 'small';
 
 export const Text = styled.p<{ $variant?: Variant }>`
-  font-family: ${({ theme }) => theme.fonts.display};
+  font-family: ${({ theme }) => theme.fonts.mono};
   margin: 0;
   line-height: 1.6;
   color: ${({ theme, $variant }) =>
