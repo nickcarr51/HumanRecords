@@ -26,8 +26,15 @@ export function NewUserForm() {
     setPending(true);
     setError(null);
     setCreated(null);
-    const res = await createUser({ email, name, role });
-    setPending(false);
+    let res: Awaited<ReturnType<typeof createUser>>;
+    try {
+      res = await createUser({ email, name, role });
+    } catch {
+      setError('Something went wrong. Try again.');
+      return;
+    } finally {
+      setPending(false);
+    }
     if (res.error) {
       setError(res.error);
       return;
@@ -63,7 +70,7 @@ export function NewUserForm() {
             />
           </FormField>
           <FormField label="Name" htmlFor="new-user-name">
-            <Input id="new-user-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input id="new-user-name" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
           <FormField label="Role" htmlFor="new-user-role">
             <Select id="new-user-role" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>

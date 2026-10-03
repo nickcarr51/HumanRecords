@@ -31,6 +31,22 @@ here so future work doesn't contradict it.
 - The user merges PRs manually on GitHub. Never merge your own PR.
 - CI and Copilot review are planned but not set up yet.
 
+## Database safety
+
+- **Hosted databases (develop + production): never write to, wipe, or delete
+  without the user's explicit permission in the current conversation.** This
+  repo's Supabase CLI is linked to the hosted develop project, so `db push`,
+  any `--linked` / `--db-url` / `--project-ref` command, `migration repair`,
+  and psql against `*.supabase.co` reach real data. A PreToolUse hook
+  (`.claude/hooks/guard-db.sh`, wired in `.claude/settings.json`) forces a
+  permission prompt on these.
+- **Local:** apply new migrations with `yarn supabase migration up` — it runs
+  only pending migrations and keeps data. `yarn supabase db reset` (wipes and
+  re-seeds) is allowed when truly needed (e.g. an applied migration was
+  edited), but say so before running it; data tests never need it.
+  Optional backup first: `yarn supabase db dump --local --data-only -f backup.sql`
+  (`backup*.sql` is gitignored).
+
 ## Docs
 
 `docs/` is gitignored — it's for local working notes/specs/plans, not

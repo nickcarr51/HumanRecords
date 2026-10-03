@@ -25,9 +25,14 @@ export function InviteCell({ user }: { user: AdminUserRow }) {
     if (confirmText && !window.confirm(confirmText)) return;
     setPending(true);
     setError(null);
-    const res = await issueInvite(user.id);
-    setPending(false);
-    if (res.error) setError(res.error);
+    try {
+      const res = await issueInvite(user.id);
+      if (res.error) setError(res.error);
+    } catch {
+      setError('Something went wrong. Try again.');
+    } finally {
+      setPending(false);
+    }
   }
 
   async function copy(url: string) {

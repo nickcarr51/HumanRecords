@@ -42,4 +42,18 @@ describe("NewUserForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/already has an account/);
     expect(screen.getByLabelText("Email")).toHaveValue("dup@example.com");
   });
+  it("recovers when createUser throws (network drop)", async () => {
+    createUser.mockRejectedValue(new Error("network"));
+    renderWithTheme(<NewUserForm />);
+    await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+    expect(screen.getByLabelText("Email")).toHaveValue("a@b.co");
+  });
+
+  it("caps the name field at 100 characters", () => {
+    renderWithTheme(<NewUserForm />);
+    expect(screen.getByLabelText("Name")).toHaveAttribute("maxLength", "100");
+  });
 });

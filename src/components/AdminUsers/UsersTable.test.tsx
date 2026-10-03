@@ -105,4 +105,22 @@ describe("UsersTable", () => {
     await userEvent.click(within(row("me@x.co")).getByRole("button", { name: "Create link" }));
     expect(await within(row("me@x.co")).findByRole("alert")).toHaveTextContent(/couldn't create the link/i);
   });
+  it("recovers when issueInvite throws (network drop)", async () => {
+    issueInvite.mockRejectedValue(new Error("network"));
+    renderWithTheme(<UsersTable users={users} selfId="me" />);
+    const btn = within(row("me@x.co")).getByRole("button", { name: "Create link" });
+    await userEvent.click(btn);
+    expect(await within(row("me@x.co")).findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(btn).toBeEnabled();
+  });
+
+  it("recovers and reverts when setUserRole throws", async () => {
+    setUserRole.mockRejectedValue(new Error("network"));
+    renderWithTheme(<UsersTable users={users} selfId="me" />);
+    const select = within(row("new@x.co")).getByRole("combobox");
+    await userEvent.selectOptions(select, "artist");
+    expect(await within(row("new@x.co")).findByRole("alert")).toHaveTextContent(/something went wrong/i);
+    expect(select).toHaveValue("listener");
+    expect(select).toBeEnabled();
+  });
 });

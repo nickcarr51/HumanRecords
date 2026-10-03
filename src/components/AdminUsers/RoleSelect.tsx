@@ -25,13 +25,19 @@ export function RoleSelect({ userId, role, disabled, label }: RoleSelectProps) {
     setValue(next);
     setSaving(true);
     setMessage(null);
-    const res = await setUserRole(userId, next);
-    setSaving(false);
-    if (res.error) {
+    try {
+      const res = await setUserRole(userId, next);
+      if (res.error) {
+        setValue(previous);
+        setMessage({ tone: 'error', text: res.error });
+      } else {
+        setMessage({ tone: 'muted', text: 'Saved' });
+      }
+    } catch {
       setValue(previous);
-      setMessage({ tone: 'error', text: res.error });
-    } else {
-      setMessage({ tone: 'muted', text: 'Saved' });
+      setMessage({ tone: 'error', text: 'Something went wrong. Try again.' });
+    } finally {
+      setSaving(false);
     }
   }
 
