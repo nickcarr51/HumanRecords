@@ -3,14 +3,14 @@
 import React from 'react';
 import styled, { css, keyframes } from 'styled-components';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
-type Size = 'sm' | 'md' | 'lg';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const spin = keyframes`
   to { transform: rotate(360deg); }
 `;
 
-const sizeStyles: Record<Size, ReturnType<typeof css>> = {
+const sizeStyles: Record<ButtonSize, ReturnType<typeof css>> = {
   sm: css`
     font-size: ${({ theme }) => theme.fontSizes.xs};
     padding: 0.35rem 0.75rem;
@@ -25,7 +25,7 @@ const sizeStyles: Record<Size, ReturnType<typeof css>> = {
   `,
 };
 
-const variantStyles: Record<Variant, ReturnType<typeof css>> = {
+const variantStyles: Record<ButtonVariant, ReturnType<typeof css>> = {
   primary: css`
     background: ${({ theme }) => theme.colors.accent};
     color: ${({ theme }) => theme.colors.bg};
@@ -54,7 +54,10 @@ const variantStyles: Record<Variant, ReturnType<typeof css>> = {
   `,
 };
 
-const StyledButton = styled.button<{ $variant: Variant; $size: Size }>`
+// Shared so non-<button> elements can look like a Button (e.g. FileInput's
+// <label>). Disabled styling stays with each element: a <label> can't be
+// :disabled.
+export const buttonStyles = css<{ $variant: ButtonVariant; $size: ButtonSize }>`
   font-family: ${({ theme }) => theme.fonts.mono};
   font-weight: ${({ theme }) => theme.fontWeights.medium};
   letter-spacing: 0.05em;
@@ -80,12 +83,16 @@ const StyledButton = styled.button<{ $variant: Variant; $size: Size }>`
     outline: 2px solid ${({ theme }) => theme.colors.accent};
     outline-offset: 2px;
   }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`;
+
+const StyledButton = styled.button<{ $variant: ButtonVariant; $size: ButtonSize }>`
+  ${buttonStyles}
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
   }
 `;
 
@@ -103,8 +110,8 @@ const LoadingDot = styled.span`
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
 }
 

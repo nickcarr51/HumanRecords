@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@/components/Input';
+import { FileInput } from '@/components/FileInput';
 import { FormField } from '@/components/FormField';
 import type { ReleaseKind } from '@/lib/admin/types';
 import { ArtistCombobox } from './ArtistCombobox';
@@ -56,9 +57,9 @@ export function TrackWidget({
       ) : null}
 
       <FormField label="MP3 file" htmlFor={`${id}-file`} error={fileError} hint={track.file ? `${track.file.name} · ${(track.file.size / 1024 / 1024).toFixed(1)} MB` : 'MP3, up to 50 MB'}>
-        <Input
+        <FileInput
           id={`${id}-file`}
-          type="file"
+          buttonLabel={track.file ? 'Replace MP3' : 'Choose MP3'}
           accept=".mp3,audio/mpeg"
           disabled={disabled}
           $invalid={Boolean(fileError)}
