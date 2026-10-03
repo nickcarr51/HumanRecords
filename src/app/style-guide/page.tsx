@@ -54,7 +54,7 @@ export default function StyleGuidePage() {
             <Heading $level={2}>Heading level 2</Heading>
             <Heading $level={3}>Heading level 3</Heading>
             <Heading $level={4}>Heading level 4</Heading>
-            <Text>Body text in Space Grotesk — the sleek, modern voice for prose.</Text>
+            <Text>Body text in Dico Mono — headings above use Dico Mono too.</Text>
             <Text $variant="muted">Muted body text for secondary copy.</Text>
             <Text $variant="small">Small body text.</Text>
             <Mono>MONO_LABEL · 001 · the old-internet terminal voice</Mono>

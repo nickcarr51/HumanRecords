@@ -27,9 +27,9 @@ the HTML `<head>`, so the first paint is styled.
 | Raw values (palette, space, type, radii, motion, breakpoints, zIndex) | `src/lib/theme/tokens.ts` |
 | Semantic theme object + `AppTheme` / `SpaceKey` types | `src/lib/theme/theme.ts` |
 | `DefaultTheme` augmentation (typed `theme` in every template) | `src/lib/theme/styled.d.ts` |
-| Fonts (`--font-mono` IBM Plex Mono, `--font-display` Space Grotesk) | `src/lib/theme/fonts.ts` |
+| Fonts (Dico Mono via Adobe Fonts kit; `TYPEKIT_KIT_URL`) | `src/lib/theme/fonts.ts` |
 | SSR style registry + `ThemeProvider` | `src/lib/registry.tsx` |
-| Root layout: font variables on `<html>`, registry around `<body>` children | `src/app/layout.tsx` |
+| Root layout: Adobe Fonts `<link>` in `<head>`, registry around `<body>` children | `src/app/layout.tsx` |
 | Global reset + pre-hydration bg/text colors | `src/app/globals.css` |
 | SWC styled-components transform | `next.config.ts` (`compiler.styledComponents`) |
 | Component barrel | `src/components/index.ts` |

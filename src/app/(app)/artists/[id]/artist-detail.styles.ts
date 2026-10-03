@@ -197,7 +197,7 @@ export const TrackTitle = styled.span`
   grid-area: title;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-family: ${({ theme }) => theme.fonts.display};
+  font-family: ${({ theme }) => theme.fonts.mono};
   color: ${({ theme }) => theme.colors.text};
 `;
 
