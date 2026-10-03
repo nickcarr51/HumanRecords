@@ -31,10 +31,12 @@ plus `enable_signup = false`.
 | Session refresh, claims check, redirect + `?next=` | `src/lib/supabase/middleware.ts` (`updateSession`) |
 | Pure redirect rules | `src/lib/auth/route-guard.ts` (`authRedirectPath`, `PROTECTED_PREFIXES`) |
 | Open-redirect guard (default `/feed`) | `src/lib/auth/safe-next.ts` (`safeNextPath`) |
-| Server actions: request code, verify code, sign out | `src/lib/auth/actions.ts` |
+| Server actions: request code, verify code, sign out, `redeemInvite` | `src/lib/auth/actions.ts` |
+| Invite welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Current claims (server) | `src/lib/auth/session.ts` (`getSessionUser`) |
 | Own role + label-member gate | `src/lib/auth/role.ts` (`getCurrentRole`, `requireLabelMember`) |
-| Login UI (email step → code step) | `src/app/login/page.tsx` |
+| `/login` page (server component; invite branch) | `src/app/login/page.tsx` |
+| Login UI (email step → code step, invite welcome) | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
 | Magic-link / invite landing | `src/app/auth/confirm/route.ts` |
 | Signed-in shell guard | `src/app/(app)/layout.tsx` |
 | Signed-in 404 → `/feed` | `src/app/not-found.tsx` |
@@ -49,14 +51,15 @@ plus `enable_signup = false`.
   rules, `?next=` round-trip, `safeNextPath`, layout/page guards, the 404 bounce, and how to
   protect a new route.
 - [session-and-roles.md](References/session-and-roles.md) — `getClaims` vs `getUser`,
-  `getSessionUser`, `getCurrentRole`/`requireLabelMember`, role assignment and the
-  role-trigger landmine, inviting users.
+  `getSessionUser`, `getCurrentRole`/`requireLabelMember`, role assignment (from
+  `app_metadata`; landmine resolved), inviting users.
 - [testing.md](References/testing.md) — what each auth test covers and how they mock Supabase.
 
 ## Depends on
 
 - [[catalog-schema]] — `public.users`, the `handle_new_user` trigger that copies role from
   invite metadata, the hidden `role` column, `current_user_role()`, and the server client.
+- [[invites]] — the `/login?email=&invite=` welcome/Enter flow and `/admin/users`.
 - [[component-library]] — login screen uses `Card`, `FormField`, `Input`, `Button`, `Alert`,
   and `Screen`.
 
@@ -66,9 +69,8 @@ admin layers).
 
 ## Known deferrals (as of 2026-10-02)
 
-- No self-serve invites UI; invites go through the Supabase dashboard or
-  `scripts/invite-users.mts`. A hybrid `/login?email=&invite=` launch-event flow is sketched
-  in `docs/superpowers/ideas/2026-09-30-invites-and-nfc-hybrid-flow.md`.
+- Invites live at `/admin/users` ([[invites]]); sending email is a `mailto:` link (no provider
+  yet). `scripts/invite-users.mts` remains for hosted develop accounts.
 - No "artist" or "listener"-specific gating yet; only `label_member` is checked anywhere.
 - Navbar Admin link can be stale after a role change until a full reload.
 

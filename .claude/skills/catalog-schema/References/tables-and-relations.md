@@ -7,7 +7,8 @@ All tables are in `public`, have RLS enabled, and use `uuid` ids (`gen_random_uu
 
 | Table | Columns | Notes |
 |---|---|---|
-| `users` | `id` (PK → `auth.users.id`, cascade), `first_name`, `last_name`, `role user_role default 'listener'`, `created_at` | One row per auth user, created by the `handle_new_user` trigger. Email is **not** here — it stays in `auth.users`. |
+| `users` | `id` (PK → `auth.users.id`, cascade), `name` (nullable), `role user_role default 'listener'`, `created_at` | One row per auth user, created by the `handle_new_user` trigger. Email is **not** here — it stays in `auth.users`. Column grant to `authenticated`: `id, name, created_at` (not `role`). |
+| `invites` | `user_id` (PK → `auth.users`, cascade), `token text unique` (plaintext, null once used), `used_at`, `created_by`, `created_at`, `updated_at` | One row per user. **Service-role only**: RLS on, no policies, no grants. See [[invites]]. |
 | `artists` | `id`, `name not null`, `bio`, `profile_photo_url`, `user_id unique → users.id on delete set null`, `created_at` | `user_id` links an artist to a member account (nullable; at most one artist per account). Unique index `artists_name_ci_key` on `lower(trim(name))` — one artist per name, case/space-insensitive. |
 | `albums` | `id`, `title not null`, `album_art_url`, `created_at` | |
 | `tracks` | `id`, `title not null`, `track_art_url`, `audio_url not null`, `play_count int default 0`, `created_at` | |

@@ -1,6 +1,6 @@
 ---
 name: catalog-schema
-description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`), editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`), editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
 ---
 
 # Catalog Schema + Supabase Data Layer
@@ -33,6 +33,8 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | Hide `users.role` via column grants | `…20260916140001_hide_user_role_column.sql` |
 | `releases`, `position` columns, unique artist names, `current_user_role()` | `…20260929120000_create_releases.sql` |
 | `resolve_artist_refs` + `publish_release` | `…20260929120100_publish_release.sql` |
+| `users.name`, role from `app_metadata`, role-sync trigger | `…20261002120000_users_name_and_app_metadata_role.sql` |
+| `invites`, `admin_list_users`, `admin_set_user_role` | `…20261002120100_create_invites.sql` |
 | Local seed (users, 4 artists, 1 album, 1 single, releases) | `supabase/seed.sql` |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
 | Generated types (`Database`) | `src/lib/supabase/database.types.ts` |
@@ -50,8 +52,8 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
   "`audio_url` holds an R2 key, not a URL" rule.
 - [rls-model.md](References/rls-model.md) — read policies, the column grant hiding `role`,
   owner-only downloads, definer functions, and how to add a write path safely.
-- [functions.md](References/functions.md) — `handle_new_user`, `increment_play_count`,
-  `current_user_role`, `resolve_artist_refs`, `publish_release` (signatures, grants, callers).
+- [functions.md](References/functions.md) — `handle_new_user` + role-sync trigger, `increment_play_count`,
+  `current_user_role`, `admin_list_users`, `admin_set_user_role`, `resolve_artist_refs`, `publish_release` (signatures, grants, callers).
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
   dependency-injection convention for data functions, and regenerating `database.types.ts`.
 - [local-workflow.md](References/local-workflow.md) — `supabase start`/`db reset`, seed
@@ -61,13 +63,10 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 
 Nothing — this is foundational. Feature skills that build on it: [[auth]] (users table,
 role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timeline-player]]
-(`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[artists-read]].
+(`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[invites]] (`invites`, admin user functions), [[artists-read]].
 
 ## Known deferrals (as of 2026-10-02)
 
-- **Role-trigger landmine:** `handle_new_user` reads `role` from user-writable
-  `raw_user_meta_data`. Safe only while sign-up is disabled (`enable_signup = false`, and OFF
-  in each hosted dashboard). If self-signup is ever enabled, move role to `app_metadata` first.
 - No update/delete paths yet — edit/delete releases is the next branch ([[admin-upload]]).
 - `play_count` has an RPC but nothing in the app calls it yet.
 - No ORM. Raw supabase-js + SQL functions; revisit (likely Drizzle) with edit/delete.

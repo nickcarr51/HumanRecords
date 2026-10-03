@@ -40,10 +40,10 @@ signed-in test client, against real Postgres. Other conventions in these modules
 
 ```bash
 yarn supabase migration up      # or: yarn supabase db reset
-yarn supabase gen types typescript --local > src/lib/supabase/database.types.ts
+yarn -s supabase gen types typescript --local > src/lib/supabase/database.types.ts
 ```
 
-Use `yarn -s` if yarn's banner lands in the file. Commit the regenerated file with the
+The `-s` keeps yarn's banner out of the file. Commit the regenerated file with the
 migration. Handy aliases: `Database['public']['Enums']['user_role']` (see `UserRole` in
 `src/lib/auth/role.ts`), `Tables['tracks']['Row']`.
 

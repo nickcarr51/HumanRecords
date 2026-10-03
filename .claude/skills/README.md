@@ -38,4 +38,6 @@ Features:
 - **timeline-player** — the `/feed` listener timeline, the persistent music player, the
   album page, and the feed/album data. (First skill; template for the rest.)
 - **admin-upload** — releases model, label-member admin portal, and the single/album upload flow.
+- **invites** — `/admin/users`, single-use invite links (`/login?email=&invite=`), server-side
+  redeem → session, role editing, `invites` table.
 - **artists-read** — `/artists` browse/search/detail; present but retired (redirected to `/feed`).

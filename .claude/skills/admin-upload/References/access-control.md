@@ -12,19 +12,19 @@ check exists at four layers because each one alone has a hole.
 2. **Layout + page gates → 404 bounce** — `requireLabelMember()` in `src/lib/auth/role.ts`
    calls `notFound()` unless the role is `label_member`. It is called first in
    `src/app/(app)/admin/layout.tsx` **and** at the top of every admin page
-   (`admin/page.tsx`, `admin/upload/page.tsx`). The page call is required: on client-side
+   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`). The page call is required: on client-side
    (RSC) navigation Next can render a child page without re-running its layout, so a
    layout-only gate is bypassable. `notFound()` renders `src/app/not-found.tsx`, which
    redirects signed-in users to `/feed` — a non-member sees the same thing as for any
    unknown URL, so the route's existence isn't revealed.
    **Rule: any new `admin/**/page.tsx` must `await requireLabelMember()` first** (nothing
    enforces this automatically; add a page test like `admin/page.test.tsx`).
-3. **Per-action role check** — every server action in `src/lib/admin/actions.ts`
+3. **Per-action role check** — every server action in `src/lib/admin/actions.ts` and `src/lib/admin/users-actions.ts` (`createUser`, `issueInvite`, `setUserRole`)
    (`searchArtists`, `createUploadUrls`, `publishRelease`) starts with `isLabelMember()`
    and returns `"Only label members can do this."` otherwise. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
-   Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is
+   `admin_list_users` and `admin_set_user_role` re-check the same way. Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is
    refused. `releases` has no write policies, and `resolve_artist_refs` isn't executable
    through the API.
 
@@ -50,11 +50,13 @@ client navigation).
 
 ## Role assignment
 
-Roles are set from `user_metadata.role` when the account is created (seed's
-`pg_temp.seed_user`, or `scripts/invite-users.mts` on hosted). There's no UI for it. See
-the memory note on the role trigger: if self-signup is ever enabled, the trigger must read
-`app_metadata` instead, or anyone could sign up as a label member.
+Roles are set from `app_metadata.role` at account creation (`/admin/users`, the seed's
+`pg_temp.seed_user`, or `scripts/invite-users.mts` on hosted) and changed in `/admin/users`
+(`admin_set_user_role`, never your own). The role-trigger landmine is resolved: `user_metadata`
+no longer sets roles. See [[invites]].
 
 ## Rollout pre-check
 
-Before `db push` to develop/prod, confirm Supabase dashboard → Authentication → Allow new users to sign up is OFF. `handle_new_user` reads role from user-writable `user_metadata`; with signup on, anyone could self-register as label_member and publish.
+Before `db push` to develop/prod, confirm Dashboard → Authentication → Allow new users to sign
+up is OFF (the app is invite-only; role no longer reads `user_metadata`, but there's no reason
+to allow sign-up).

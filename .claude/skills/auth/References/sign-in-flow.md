@@ -3,7 +3,7 @@
 ## End to end
 
 1. **Invite.** An admin creates the auth user: Supabase dashboard "Invite user", or
-   `admin.createUser`/`inviteUserByEmail` with `user_metadata: { role, first_name, last_name }`.
+   `admin.createUser`/`inviteUserByEmail` with `app_metadata: { role }, user_metadata: { name }`.
    The `handle_new_user` trigger creates the `public.users` row ([[catalog-schema]]). A
    dashboard invite sends the **invite** email (link to `/auth/confirm?…&type=invite`);
    `scripts/invite-users.mts` sends nothing — the user just signs in.
@@ -40,13 +40,23 @@ All return `{ error: string | null }` and never surface raw GoTrue text.
 
 ## `/login` (`src/app/login/page.tsx`)
 
-Client component. `LoginForm` is wrapped in `<Suspense>` because `useSearchParams()` requires
-it under the App Router. State: `step: 'email' | 'code'`, `email`, `code`, `error`, `pending`.
-- Reads `?next=` (passed through to `submitOtp`) and `?error=auth` (shows "That link didn't
+Server component (reads `searchParams`; see Invite links below) rendering `LoginForm`
+(`src/components/Login/LoginForm.tsx`, client). State: `step: 'email' | 'code'`, `email`, `code`, `error`, `pending`.
+- Props: `next` (passed through to `submitOtp`) and `?error=auth` (shows "That link didn't
   work — request a new code below.").
 - Code step has **Resend code** (calls `requestOtp` again) and **Use a different email**
   (back to step 1, clears code/error).
 - Code input: `inputMode="numeric"`, `autoComplete="one-time-code"`.
+
+## Invite links (details in [[invites]])
+
+URL shape `/login?email=&invite=`. Page load is read-only (`getInviteGreeting`): a valid unused
+token shows `InviteWelcome`; anything else shows `LoginForm` with the email pre-filled and
+**never auto-sends** a code. **Enter** → `redeemInvite`: claim token → `admin.getUserById` →
+`admin.generateLink('magiclink')` → `verifyOtp({ token_hash, type: 'email' })` on the cookie
+client → `/feed`; on failure the claim is restored. A used/unknown token is ignored silently.
+`/login` sets `Referrer-Policy: no-referrer`. A signed-in visitor goes to `/feed` via
+middleware with the token untouched.
 
 ## `/auth/confirm` (`src/app/auth/confirm/route.ts`)
 

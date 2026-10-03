@@ -23,7 +23,7 @@ instead of per row — use that form in new policies.
 
 RLS filters rows, not columns. To hide `users.role` from peers while keeping names public,
 `20260916140001` revokes table-level select from `authenticated` and grants select on
-`(id, first_name, last_name, created_at)` only. Consequences:
+`(id, name, created_at)` only. Consequences:
 
 - `select('*')` or `select('role')` on `users` as `authenticated` → **permission denied error**
   (not empty). Always list columns.
@@ -46,6 +46,8 @@ Sanctioned write paths:
 | New `users` row | `handle_new_user` trigger (definer) on `auth.users` insert | Supabase Auth (invite-only) |
 | Increment `play_count` | `rpc('increment_play_count')` (definer) | `authenticated` only; `public`/`anon` revoked |
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
+| List users / change a role | `rpc('admin_list_users')`, `rpc('admin_set_user_role')` (definer) | `label_member`, else `42501`; own id → `22023` |
+| Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |
 | Test fixtures, scripts | service-role client | Never shipped to the browser |
 

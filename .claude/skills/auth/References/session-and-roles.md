@@ -36,22 +36,23 @@ every label-member page.
 
 ## How a user gets a role
 
-Only at account creation, from `user_metadata.role` via the `handle_new_user` trigger
-(defaults to `listener`). There's no in-app role editor. To change a role on a hosted project,
-update `public.users.role` with the service role (what `scripts/invite-users.mts` does when a
-role is wrong).
+At creation, from `app_metadata.role` via the `handle_new_user` trigger (default `listener`);
+`app_metadata` is admin-only. A second trigger applies it when it is set or changed.
+`public.users.role` is the truth afterwards. Label members change roles in `/admin/users`
+(`admin_set_user_role`; never their own) — see [[invites]]. That RPC doesn't update
+`app_metadata`, which can go stale.
 
-### Role-trigger landmine
+### Role-trigger landmine — resolved (2026-10-02)
 
-`user_metadata` is writable by the user. If sign-up is ever enabled, anyone could register
-with `{ role: 'label_member' }`. Before enabling any self-signup: move role to
-`app_metadata` (admin-only) and update the trigger. Until then, keep `enable_signup = false`
-locally and "Allow new users to sign up" OFF in every hosted dashboard.
+The trigger used to read role from user-writable `user_metadata`. It now reads only
+`app_metadata`, so enabling self-signup no longer allows self-assigned `label_member`. Keep
+`enable_signup = false` anyway (the app is invite-only).
 
 ## Inviting users
 
 | Target | How |
 |---|---|
+| Any (admin UI) | `/admin/users` — [[invites]] |
 | Local | `supabase/seed.sql` (`pg_temp.seed_user`) — see [[catalog-schema]] `References/local-workflow.md` |
 | Hosted develop | `node --env-file=.env.develop.local scripts/invite-users.mts --yes` — idempotent: creates missing users via `admin.createUser` (no email sent), fixes wrong roles, skips the rest. Refuses to run without `--yes`; prints the target URL first. |
 | Hosted production | By hand in the Supabase dashboard (decide deliberately; the script is meant for develop). |

@@ -12,7 +12,10 @@ All auth tests are **unit tests** (no local Supabase needed). They mock
 | `src/lib/auth/role.test.ts` | `getCurrentRole` returns the RPC role; `null` on error/no row/throw; `requireLabelMember` resolves for members. |
 | `src/lib/supabase/middleware.test.ts` | Signed-out on protected → `/login?next=…`; signed-in `/login` → `/feed`; pass-through cases. |
 | `src/app/auth/confirm/route.test.ts` | Success redirect to `next`; missing params / verify failure / unknown type → `/login?error=auth`; malicious `next` values neutralized; empty `next` → `/feed`. |
-| `src/app/login/page.test.tsx` | Email → code step; error display; "use a different email"; resend. |
+| `src/components/Login/LoginForm.test.tsx` | Email → code step; error display; "use a different email"; resend; pre-fill from `initialEmail`, no `requestOtp` on mount. |
+| `src/components/Login/InviteWelcome.test.tsx` | Name/fallback; Enter calls `redeemInvite`; error → email form with Alert. |
+| `src/app/login/page.test.tsx` | Server page: welcome vs form, token ignored when unknown/used, `?error=auth`. |
+| `src/lib/auth/invite.test.ts`, `redeem-invite.test.ts` | `getInviteGreeting`; `redeemInvite` claim/sign-in/restore (see [[invites]]). |
 | `src/app/not-found.test.tsx` | Signed-in redirect to `/feed`; signed-out no redirect. |
 
 Mocking `redirect`: tests make the mocked `redirect` throw (like the real one) or record the
