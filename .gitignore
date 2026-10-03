@@ -49,3 +49,6 @@ docs/
 
 # skill walkthroughs are local human-onboarding notes, not committed skill surface
 .claude/skills/**/Walkthrough/
+
+# local database backups (supabase db dump) — real data, never commit
+backup*.sql

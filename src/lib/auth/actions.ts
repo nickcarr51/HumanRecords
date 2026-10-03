@@ -2,6 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { claimInvite, restoreInvite, type InviteClaim } from "@/lib/invites/store";
+import { INVITE_TOKEN_RE } from "@/lib/invites/token";
 import { safeNextPath } from "./safe-next";
 
 type Result = { error: string | null };
@@ -57,4 +60,69 @@ export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+// Log only code/message: PostgREST `details` can echo the token filter value.
+const describe = (e: unknown) =>
+  e && typeof e === "object"
+    ? { code: (e as { code?: unknown }).code, message: (e as { message?: unknown }).message }
+    : String(e);
+
+const INVITE_USED = "That link has already been used — sign in with your email below.";
+const INVITE_FAILED = "Couldn't sign you in — try again, or use your email below.";
+
+// The Enter button on the invite welcome screen. Supabase only issues a
+// session after a verified login, so after claiming our single-use token we
+// perform a magic-link sign-in server-side: generateLink (sends nothing) →
+// verifyOtp on the cookie-bound client, which writes the session cookies.
+// The Supabase hash never leaves the server.
+export async function redeemInvite(token: string): Promise<Result> {
+  if (typeof token !== "string" || !INVITE_TOKEN_RE.test(token)) return { error: INVITE_USED };
+
+  const service = createServiceClient();
+  let claim: InviteClaim | null;
+  try {
+    claim = await claimInvite(service, token);
+  } catch (err) {
+    console.error("claimInvite failed", describe(err));
+    return { error: INVITE_FAILED };
+  }
+  if (!claim) return { error: INVITE_USED };
+
+  try {
+    const { data: userData, error: userError } = await service.auth.admin.getUserById(claim.userId);
+    const email = userData?.user?.email;
+    if (userError || !email) throw userError ?? new Error("Invited user has no email");
+
+    const { data: link, error: linkError } = await service.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+    if (linkError || !link) throw linkError ?? new Error("generateLink returned no data");
+
+    const supabase = await createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: link.properties.hashed_token,
+      type: "email",
+    });
+    if (verifyError) throw verifyError;
+  } catch (err) {
+    console.error("redeemInvite sign-in failed", describe(err));
+    try {
+      await restoreInvite(service, claim, token);
+    } catch (restoreErr) {
+      console.error("restoreInvite failed", describe(restoreErr));
+    }
+    return { error: INVITE_FAILED };
+  }
+
+  // redirect() throws to navigate; keep it outside any try/catch.
+  redirect("/feed");
+}
+
+// Form-action wrapper so the Enter <form> works before hydration (progressive
+// enhancement). The signature is what useActionState expects.
+export async function redeemInviteForm(_prev: Result | null, formData: FormData): Promise<Result> {
+  const token = formData.get("token");
+  return redeemInvite(typeof token === "string" ? token : "");
 }

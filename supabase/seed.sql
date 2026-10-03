@@ -16,8 +16,7 @@ create extension if not exists "pgcrypto";
 create or replace function pg_temp.seed_user(
   p_email text,
   p_role public.user_role,
-  p_first_name text,
-  p_last_name text
+  p_name text
 ) returns uuid
 language plpgsql
 as $$
@@ -37,8 +36,8 @@ begin
     p_email,
     crypt(gen_random_uuid()::text, gen_salt('bf')),
     now(),
-    '{"provider":"email","providers":["email"]}',
-    jsonb_build_object('role', p_role, 'first_name', p_first_name, 'last_name', p_last_name),
+    jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', p_role),
+    jsonb_build_object('name', p_name),
     now(),
     now(),
     '', '', '', ''
@@ -76,14 +75,14 @@ declare
   v_album_track_2 uuid;
   v_single_id uuid;
 begin
-  v_listener_id := pg_temp.seed_user('listener@example.com', 'listener', 'Lena', 'Listener');
-  v_artist_user_id := pg_temp.seed_user('artist@example.com', 'artist', 'Ada', 'Artist');
-  v_label_member_id := pg_temp.seed_user('label@example.com', 'label_member', 'Lou', 'LabelMember');
+  v_listener_id := pg_temp.seed_user('listener@example.com', 'listener', 'Lena Listener');
+  v_artist_user_id := pg_temp.seed_user('artist@example.com', 'artist', 'Ada Artist');
+  v_label_member_id := pg_temp.seed_user('label@example.com', 'label_member', 'Lou LabelMember');
 
   -- Real accounts for local testing of the admin portal. Sign in via OTP from
   -- the app and read the code in Mailpit (http://127.0.0.1:54324).
-  perform pg_temp.seed_user('quinoajonesmusic@gmail.com', 'label_member', 'Quinoa', 'Jones');
-  perform pg_temp.seed_user('nick.carr84@gmail.com', 'listener', 'Nick', 'Carr');
+  perform pg_temp.seed_user('quinoajonesmusic@gmail.com', 'label_member', 'Quinoa Jones');
+  perform pg_temp.seed_user('nick.carr84@gmail.com', 'listener', 'Nick Carr');
 
   -- Four artists. Track 1 is credited to two of them (Castillonaire & Sawcy),
   -- which the many-to-many track_artists table supports directly.

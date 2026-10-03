@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, or the invite-users script.
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, or the invite-users script. (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -50,6 +50,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
+| Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
 
 ## References
@@ -77,6 +78,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 - [[catalog-schema]] — `artists`/`tracks`/`albums` and the link tables that
   `publish_release` writes; RLS "authenticated can read" policies.
 - [[component-library]] — `Button`, `Input`, `FormField`, `Alert`, `Heading`, theme tokens.
+- [[invites]] — `/admin/users`; its page and actions follow the same gates.
 - [[auth]] — session/middleware layer under the label-member gate; `getCurrentRole` and
   `requireLabelMember` live in `src/lib/auth/role.ts`.
 

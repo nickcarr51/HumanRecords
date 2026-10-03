@@ -25,7 +25,7 @@ Auth settings that matter locally: `enable_signup = false` (invite-only), email
 ## Seed (`supabase/seed.sql`)
 
 Local only — never run against hosted. Creates users through `pg_temp.seed_user(email, role,
-first, last)`, which inserts `auth.users` + `auth.identities` (so the trigger makes the
+name)` (role goes into `raw_app_meta_data`, name into `raw_user_meta_data`), which inserts `auth.users` + `auth.identities` (so the trigger makes the
 `public.users` row) with a **random unknown password** — seeded accounts are OTP-only, never a
 password backdoor.
 
@@ -64,7 +64,7 @@ yarn supabase db push
 ```
 
 **Before any hosted push:** confirm Dashboard → Authentication → "Allow new users to sign up"
-is OFF (role-trigger landmine; see [functions.md](functions.md)). Hosted accounts come from
+is OFF (the app is invite-only; role no longer reads `user_metadata`, see [functions.md](functions.md)). Hosted accounts come from
 `scripts/invite-users.mts` (develop) or by hand (production) — never from the seed.
 
 ## Data / schema tests
@@ -73,7 +73,7 @@ is OFF (role-trigger landmine; see [functions.md](functions.md)). Hosted account
   (schema + RLS). All need the local stack running.
 - `test-helpers.ts` **throws at import** unless `NEXT_PUBLIC_SUPABASE_URL` is
   `127.0.0.1`/`localhost` — these tests create and delete real rows.
-- `createAdminClient()` (service role) seeds fixtures; `createTestUser({ role })` creates a
+- `createAdminClient()` (service role) seeds fixtures; `createTestUser({ role, name })` (role in `app_metadata`, name in `user_metadata`) creates a
   confirmed auth user and returns `{ id, email, signIn, cleanup }`. `signIn()` uses
   `admin.generateLink('magiclink')` + `verifyOtp({ token_hash, type: 'email' })` — the real
   OTP path, no password.

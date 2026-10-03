@@ -156,6 +156,33 @@ export type Database = {
           },
         ]
       }
+      invites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          token: string | null
+          updated_at: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          token?: string | null
+          updated_at?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          token?: string | null
+          updated_at?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       releases: {
         Row: {
           album_id: string | null
@@ -291,23 +318,20 @@ export type Database = {
       users: {
         Row: {
           created_at: string
-          first_name: string | null
           id: string
-          last_name: string | null
+          name: string | null
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           created_at?: string
-          first_name?: string | null
           id: string
-          last_name?: string | null
+          name?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           created_at?: string
-          first_name?: string | null
           id?: string
-          last_name?: string | null
+          name?: string | null
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
@@ -317,6 +341,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          invite_token: string
+          invite_used_at: string
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
+        }[]
+      }
+      admin_set_user_role: {
+        Args: {
+          new_role: Database["public"]["Enums"]["user_role"]
+          target: string
+        }
+        Returns: undefined
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
