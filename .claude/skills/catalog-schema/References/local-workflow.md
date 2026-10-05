@@ -35,8 +35,6 @@ password backdoor.
 | `listener@example.com` | listener |
 | `artist@example.com` | artist |
 | `label@example.com` | label_member |
-| `quinoajonesmusic@gmail.com` | label_member |
-| `nick.carr84@gmail.com` | listener |
 
 Sign in as any of them via the real `/login` flow; read the code in Mailpit.
 

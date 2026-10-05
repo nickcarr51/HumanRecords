@@ -23,7 +23,7 @@ Run: `yarn test --run src/lib/invites src/lib/auth src/lib/admin src/components/
 
 ## Manual smoke (~10 min; `yarn supabase migration up && yarn dev`)
 
-1. Sign in at `http://127.0.0.1:3000/login` as `quinoajonesmusic@gmail.com` (code in Mailpit,
+1. Sign in at `http://127.0.0.1:3000/login` as `label@example.com` (code in Mailpit,
    `http://127.0.0.1:54324`).
 2. `/admin` → Users → create `guest+1@example.com`, name "Guest", Listener → success alert;
    row shows "Not used yet". Copy.

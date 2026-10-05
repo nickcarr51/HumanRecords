@@ -13,7 +13,10 @@ create extension if not exists "pgcrypto";
 -- To sign in as a seeded user locally, use the real product flow: trigger
 -- email OTP for their address from the app and read the code from Mailpit
 -- at http://127.0.0.1:54324.
-create or replace function pg_temp.seed_user(
+-- A real (not pg_temp) schema so supabase/seed.local.sql, which may run in
+-- a separate session, can call the same helper. Local DB only.
+create schema if not exists seed_helpers;
+create or replace function seed_helpers.seed_user(
   p_email text,
   p_role public.user_role,
   p_name text
@@ -75,14 +78,9 @@ declare
   v_album_track_2 uuid;
   v_single_id uuid;
 begin
-  v_listener_id := pg_temp.seed_user('listener@example.com', 'listener', 'Lena Listener');
-  v_artist_user_id := pg_temp.seed_user('artist@example.com', 'artist', 'Ada Artist');
-  v_label_member_id := pg_temp.seed_user('label@example.com', 'label_member', 'Lou LabelMember');
-
-  -- Real accounts for local testing of the admin portal. Sign in via OTP from
-  -- the app and read the code in Mailpit (http://127.0.0.1:54324).
-  perform pg_temp.seed_user('quinoajonesmusic@gmail.com', 'label_member', 'Quinoa Jones');
-  perform pg_temp.seed_user('nick.carr84@gmail.com', 'listener', 'Nick Carr');
+  v_listener_id := seed_helpers.seed_user('listener@example.com', 'listener', 'Lena Listener');
+  v_artist_user_id := seed_helpers.seed_user('artist@example.com', 'artist', 'Ada Artist');
+  v_label_member_id := seed_helpers.seed_user('label@example.com', 'label_member', 'Lou LabelMember');
 
   -- Four artists. Track 1 is credited to two of them (Castillonaire & Sawcy),
   -- which the many-to-many track_artists table supports directly.
