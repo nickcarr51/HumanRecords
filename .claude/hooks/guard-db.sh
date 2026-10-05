@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PreToolUse(Bash) guard for the HOSTED databases (develop + production).
-# Any command that could write to, wipe, or delete a hosted Supabase database
-# needs the user's explicit approval: emits permissionDecision "ask" (forces a
-# prompt even in auto mode). Local-only commands (`supabase db reset`,
+# PreToolUse(Bash) guard for HOSTED data: databases, R2 buckets, prod resource names.
+# Any command that could write to, wipe, or delete a hosted Supabase database or R2 bucket,
+# or name a production resource, needs the user's explicit approval: emits permissionDecision "ask"
+# (forces a prompt even in auto mode). Local-only commands (`supabase db reset`,
 # `migration up`, psql to 127.0.0.1) pass through untouched.
 #
 # Why hosted matters even from a laptop: this repo's Supabase CLI is linked to
@@ -29,11 +29,17 @@ elif has 'supabase' && has 'migration[[:space:]]+repair' && ! has '--local'; the
 # psql / pg tools pointed at anything that isn't the local stack.
 elif has '(psql|pg_dump|pg_restore|dropdb)' && has 'supabase\.(co|com)|pooler\.supabase'; then
   reason="Direct Postgres command against a HOSTED Supabase database."
+# R2 deletions (any bucket) — prod media is locked, but dev/local data matters too.
+elif has '(aws[[:space:]]+s3[[:space:]]+(rm|rb)|aws[[:space:]]+s3api[[:space:]]+delete-(object|objects|bucket)|rclone[[:space:]]+(delete|deletefile|purge|rmdir|rmdirs)|wrangler[[:space:]]+r2[[:space:]]+(object|bucket)[[:space:]]+delete)'; then
+  reason="Deletes R2 objects or buckets."
+# Anything naming production resources.
+elif has '(media-prod|humanrecords-backups|gglrarflzvfxhdnjbnvt)'; then
+  reason="Command references a PRODUCTION resource (prod media bucket, backups bucket, or prod Supabase project)."
 fi
 
 [ -z "$reason" ] && exit 0
 
-jq -n --arg r "HOSTED DATABASE GUARD: $reason Never run this without the user's explicit permission in this conversation." '{
+jq -n --arg r "HOSTED DATA GUARD: $reason Never run this without the user's explicit permission in this conversation." '{
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "ask",
