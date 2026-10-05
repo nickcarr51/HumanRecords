@@ -1,0 +1,8 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # 0 disables version-bump PRs; security updates (enabled in repo settings) still open.
+    open-pull-requests-limit: 0

@@ -1,0 +1,44 @@
+name: Backup prod DB
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # ~2am Pacific
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production-preflight
+    env:
+      DB_URL: ${{ secrets.DB_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # R2 rejects the AWS CLI's newer default checksum headers on some ops.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Dump roles, schema, data
+        run: |
+          mkdir dump
+          yarn -s supabase db dump --db-url "$DB_URL" --role-only -f dump/roles.sql
+          yarn -s supabase db dump --db-url "$DB_URL" -f dump/schema.sql
+          yarn -s supabase db dump --db-url "$DB_URL" --data-only --use-copy -f dump/data.sql
+          test -s dump/schema.sql
+          gzip dump/*.sql
+      - name: Upload to locked backup bucket
+        run: |
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          aws s3 cp dump/ "s3://humanrecords-backups/prod/$ts/" --recursive --endpoint-url "$R2_ENDPOINT"
+          echo "Backed up prod to humanrecords-backups/prod/$ts/" >> "$GITHUB_STEP_SUMMARY"
