@@ -26,15 +26,18 @@ jobs:
       AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
       R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
     steps:
-      # Schema must match prod, so build it from main's migrations.
+      # Scripts and config come from the workflow's own ref (they may not be on
+      # main yet); only the schema is taken from main, since it must match prod.
       - uses: actions/checkout@v4
-        with:
-          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: yarn
       - run: yarn install --frozen-lockfile
+      - name: Use prod's schema (main's migrations)
+        run: |
+          git fetch --depth=1 origin main
+          git checkout FETCH_HEAD -- supabase/migrations
       - name: Download newest backup
         run: |
           stamp=$(aws s3 ls s3://humanrecords-backups/prod/ --endpoint-url "$R2_ENDPOINT" | node scripts/latest-backup.mts)
