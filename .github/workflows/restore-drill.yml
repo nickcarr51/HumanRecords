@@ -1,0 +1,55 @@
+name: Restore drill
+
+# Weekly proof that the newest prod backup actually restores. Runs entirely on
+# a throwaway Supabase inside the runner; backup credentials never leave GitHub.
+on:
+  schedule:
+    - cron: "0 12 * * 1" # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    environment: production-preflight
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+    steps:
+      # Schema must match prod, so build it from main's migrations.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Download newest backup
+        run: |
+          stamp=$(aws s3 ls s3://humanrecords-backups/prod/ --endpoint-url "$R2_ENDPOINT" | node scripts/latest-backup.mts)
+          echo "Drilling backup $stamp" >> "$GITHUB_STEP_SUMMARY"
+          aws s3 cp "s3://humanrecords-backups/prod/$stamp/data.sql.gz" data.sql.gz --endpoint-url "$R2_ENDPOINT"
+          gunzip data.sql.gz
+      - run: yarn supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      # Throwaway DB on the runner: drop the seed so only prod data is present.
+      - run: yarn supabase db reset --no-seed
+      - name: Load prod data
+        run: |
+          { echo "set session_replication_role = replica;"; cat data.sql; } | \
+            docker exec -i supabase_db_HumanRecords psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction
+      - name: Check accounts and catalog
+        run: |
+          docker exec supabase_db_HumanRecords psql -U postgres -d postgres -tA -F, -c \
+            "select (select count(*) from auth.users), (select count(*) from public.users), (select count(*) from public.tracks), (select count(*) from public.releases);" \
+            | node scripts/restore-check.mts | tee -a "$GITHUB_STEP_SUMMARY"
