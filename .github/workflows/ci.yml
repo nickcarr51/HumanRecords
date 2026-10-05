@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Fake values: CI never touches real buckets or hosted projects.
+  R2_ACCOUNT_ID: ci
+  R2_ACCESS_KEY_ID: ci
+  R2_SECRET_ACCESS_KEY: ci
+  R2_BUCKET_NAME: humanrecords-media-ci
+  R2_ENDPOINT: https://ci.r2.cloudflarestorage.com
+  SITE_URL: http://127.0.0.1:3000
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_SECRET_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+      - run: yarn typecheck
+      - run: yarn build
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      # Fresh stack: every migration + seed.sql (no seed.local.sql in CI).
+      - run: yarn supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Point tests at the local stack
+        run: |
+          eval "$(yarn -s supabase status -o env 2>/dev/null)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+            echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+          } >> "$GITHUB_ENV"
+      - run: yarn test
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-migrations.mts "origin/${{ github.base_ref }}"
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Generated types match the committed file
+        run: |
+          yarn -s supabase gen types typescript --local > /tmp/database.types.ts
+          diff -u src/lib/supabase/database.types.ts /tmp/database.types.ts || {
+            echo "::error::database.types.ts is stale. Run: yarn -s supabase gen types typescript --local > src/lib/supabase/database.types.ts"
+            exit 1
+          }
+
+  main-source:
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: PRs into main must come from develop
+        if: github.head_ref != 'develop'
+        # Branch names are attacker-controlled on a public repo: pass via env, never interpolate into run.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "::error::PRs into main must come from develop (got $HEAD_REF)."
+          exit 1
+      - run: echo "Source branch OK."

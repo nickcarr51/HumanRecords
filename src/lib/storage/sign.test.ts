@@ -77,7 +77,7 @@ describe("headObject", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("returns the size when the object exists", async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200, headers: { "content-length": "1234" } }));
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => new Response(null, { status: 200, headers: { "content-length": "1234" } }));
     vi.stubGlobal("fetch", fetchMock);
     expect(await headObject("tracks/abc.mp3")).toEqual({ size: 1234 });
     const req = fetchMock.mock.calls[0][0] as Request;

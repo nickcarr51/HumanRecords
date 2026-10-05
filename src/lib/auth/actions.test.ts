@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInWithOtp = vi.fn();
 const verifyOtp = vi.fn();
-const redirect = vi.fn(() => {
+const redirect = vi.fn((_url: string): never => {
   throw new Error("NEXT_REDIRECT");
 });
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({ auth: { signInWithOtp, verifyOtp } })),
 }));
-vi.mock("next/navigation", () => ({ redirect: (...a: unknown[]) => redirect(...a) }));
+vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 
 import { requestOtp, submitOtp } from "./actions";
 
