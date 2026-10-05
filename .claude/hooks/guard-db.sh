@@ -30,8 +30,8 @@ elif has 'supabase' && has 'migration[[:space:]]+repair' && ! has '--local'; the
 elif has '(psql|pg_dump|pg_restore|dropdb)' && has 'supabase\.(co|com)|pooler\.supabase'; then
   reason="Direct Postgres command against a HOSTED Supabase database."
 # R2 deletions (any bucket) — prod media is locked, but dev/local data matters too.
-elif has '(aws[[:space:]]+s3[[:space:]]+(rm|rb)|aws[[:space:]]+s3api[[:space:]]+delete-(object|objects|bucket)|rclone[[:space:]]+(delete|deletefile|purge|rmdir|rmdirs)|wrangler[[:space:]]+r2[[:space:]]+(object|bucket)[[:space:]]+delete)'; then
-  reason="Deletes R2 objects or buckets."
+elif has '(aws[^|;&]*[[:space:]]+s3[[:space:]]+(rm|rb|mv)|aws[^|;&]*[[:space:]]+s3[[:space:]]+sync.*--delete|aws[^|;&]*[[:space:]]+s3api[^|;&]*[[:space:]]+delete-(object|objects|bucket)|rclone[^|;&]*[[:space:]]+(delete|deletefile|purge|rmdir|rmdirs)|wrangler[^|;&]*[[:space:]]+r2[^|;&]*[[:space:]]+(object|bucket)[[:space:]]+delete)'; then
+  reason="Deletes or moves R2 objects or buckets."
 # Anything naming production resources.
 elif has '(media-prod|humanrecords-backups|gglrarflzvfxhdnjbnvt)'; then
   reason="Command references a PRODUCTION resource (prod media bucket, backups bucket, or prod Supabase project)."
