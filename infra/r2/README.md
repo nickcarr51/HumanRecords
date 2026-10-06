@@ -9,6 +9,6 @@ uploads only from its own environment's site.
 
 | File | Bucket | Status |
 |---|---|---|
-| `cors.local.json` | `humanrecords-media-local` | to apply when the bucket is created |
+| `cors.local.json` | `humanrecords-media-local` | applied 2026-10-05 |
 | `cors.dev.json` | `humanrecords-media-dev` | applied 2026-10-02; will switch to the develop Vercel URL only |
 | `cors.prod.json` | `humanrecords-media-prod` | to write once the prod Vercel URL is confirmed |
