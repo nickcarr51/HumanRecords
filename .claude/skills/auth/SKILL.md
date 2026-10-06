@@ -6,7 +6,7 @@ description: Use when working on sign-in, sign-out, or session handling — the 
 # Auth: Invite-only Passwordless Sign-in
 
 Human Services has no passwords and no sign-up. A member is **invited** (an `auth.users` row
-created by an admin), then signs in with an **8-character email code** (OTP) or by clicking
+created by an admin), then signs in with an **6-digit email code** (OTP) or by clicking
 the **magic link** in the same email. Sessions live in Supabase cookies, refreshed by
 middleware on every request. Signed-in users land on `/feed`.
 

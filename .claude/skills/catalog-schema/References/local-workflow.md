@@ -20,7 +20,7 @@ yarn supabase stop
 ```
 
 Auth settings that matter locally: `enable_signup = false` (invite-only), email
-`otp_length = 8`, `otp_expiry = 3600`, custom `invite`/`magic_link` templates in
+`otp_length = 6`, `otp_expiry = 3600`, custom `invite`/`magic_link` templates in
 `supabase/templates/` (see [[auth]]).
 
 ## Seed (`supabase/seed.sql` + `supabase/seed.local.sql`)

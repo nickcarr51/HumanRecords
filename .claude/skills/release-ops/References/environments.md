@@ -36,7 +36,7 @@ The prod R2 token lives only in Vercel Production. The backup token lives only i
 ## Hosted Auth settings (both Supabase projects; match `config.toml`)
 
 - Sign-up OFF (Authentication → "Allow new users to sign up").
-- Email OTP length 8, OTP expiry 3600.
+- Email OTP length 6, OTP expiry 3600.
 - Custom `invite` and `magic_link` templates pasted from `supabase/templates/`.
 - Site URL and redirect URLs set per environment (change at domain cut-over).
 - Custom SMTP = Resend: host `smtp.resend.com`, port 465, user `resend`, password = Resend API
