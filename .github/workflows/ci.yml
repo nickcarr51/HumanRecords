@@ -11,6 +11,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
   # Fake values: CI never touches real buckets or hosted projects.
   R2_ACCOUNT_ID: ci
@@ -53,6 +57,7 @@ jobs:
       - name: Point tests at the local stack
         run: |
           eval "$(yarn -s supabase status -o env 2>/dev/null)"
+          test -n "$API_URL" && test -n "$SECRET_KEY"
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "SUPABASE_URL=$API_URL"

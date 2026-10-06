@@ -54,8 +54,14 @@ jobs:
       - run: yarn supabase db reset --no-seed
       - name: Load prod data
         run: |
-          { echo "set session_replication_role = replica;"; cat data.sql; } | \
-            docker exec -i supabase_db_HumanRecords psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction
+          # Repo is public: a COPY failure echoes row data (emails, hashes), so
+          # psql output goes to a file that is never printed.
+          if ! { echo "set session_replication_role = replica;"; cat data.sql; } | \
+            docker exec -i supabase_db_HumanRecords psql -U postgres -d postgres \
+              -v ON_ERROR_STOP=1 -v VERBOSITY=terse --single-transaction > load.log 2>&1; then
+            echo "::error::Restore load failed (output withheld: it can contain user data). Re-run locally from the Cloudflare-downloaded backup to debug."
+            exit 1
+          fi
       - name: Check accounts and catalog
         run: |
           docker exec supabase_db_HumanRecords psql -U postgres -d postgres -tA -F, -c \

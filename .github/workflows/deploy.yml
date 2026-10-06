@@ -64,4 +64,15 @@ jobs:
       - name: Apply migrations
         run: yarn -s supabase db push --db-url "$DB_URL" --yes
       - name: Trigger Vercel deploy
-        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK" > /dev/null
+        env:
+          BRANCH: ${{ github.ref_name }}
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          # The hook builds the branch tip. If a newer commit is queued behind
+          # this run, its migrations haven't run yet: let that run deploy it.
+          tip=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [ "$tip" != "$RUN_SHA" ]; then
+            echo "::notice::Newer commit on $BRANCH; skipping deploy — the queued run will migrate and deploy it."
+            exit 0
+          fi
+          curl -fsS -X POST "$VERCEL_DEPLOY_HOOK" > /dev/null
