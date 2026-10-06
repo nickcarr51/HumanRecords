@@ -77,23 +77,12 @@ navigation isn't mistaken for a failure.
 
 ## R2 CORS rule
 
-The browser PUTs cross-origin to the R2 endpoint, so the bucket needs a CORS rule. **Not
-yet applied** as of 2026-09-30 — until it is, every browser upload fails at the PUT step
-(the preflight is rejected). Apply in Cloudflare → R2 → `humanrecords-media-dev` →
-Settings → CORS policy:
+The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
+upload fails at the PUT step (the preflight is rejected). The rules live in the repo as
+`infra/r2/cors.local.json`, `cors.dev.json`, `cors.prod.json` (one per bucket: local =
+localhost origins, dev = develop domain, prod = prod domain). The user pastes the matching file
+into Cloudflare → R2 → bucket → Settings → CORS policy; update the file and re-paste when a
+domain changes ([[release-ops]] `References/domain-cutover.md`).
 
-```json
-[
-  {
-    "AllowedOrigins": ["http://localhost:3000", "https://<develop-vercel-domain>"],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["content-type"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-**Unverified:** whether R2 accepts a wildcard origin for Vercel ephemeral previews (e.g.
-`https://*-<team>.vercel.app`). If it doesn't, list the develop domain explicitly and
-accept that ephemeral preview deployments can't upload. Update this section with the rule
-actually applied.
+**Unverified:** whether R2 accepts a wildcard origin for Vercel ephemeral previews. If not,
+only the listed develop domain can upload; ephemeral previews cannot.

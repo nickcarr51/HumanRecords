@@ -53,7 +53,7 @@ The trigger used to read role from user-writable `user_metadata`. It now reads o
 | Target | How |
 |---|---|
 | Any (admin UI) | `/admin/users` — [[invites]] |
-| Local | `supabase/seed.sql` (`pg_temp.seed_user`) — see [[catalog-schema]] `References/local-workflow.md` |
+| Local | `supabase/seed.sql` (`seed_helpers.seed_user`) — see [[catalog-schema]] `References/local-workflow.md` |
 | Hosted develop | `node --env-file=.env.develop.local scripts/invite-users.mts --yes` — idempotent: creates missing users via `admin.createUser` (no email sent), fixes wrong roles, skips the rest. Refuses to run without `--yes`; prints the target URL first. |
 | Hosted production | By hand in the Supabase dashboard (decide deliberately; the script is meant for develop). |
 

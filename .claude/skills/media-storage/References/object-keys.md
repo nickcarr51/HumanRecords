@@ -44,6 +44,9 @@ object with no row pointing at it. Accepted for now; cleanup is planned with Del
 Streaming via `<audio src>` and downloads via navigation don't need CORS. **Browser PUT
 uploads do** (cross-origin XHR with a custom Content-Type → preflight). The bucket needs a CORS
 rule allowing `PUT` (and `GET`/`HEAD`) from the app origins with `Content-Type` as an allowed
-header. The exact JSON and status are in [[admin-upload]] `References/upload-flow.md` → "R2
-CORS rule". Symptom when missing: every upload fails at the PUT step with a CORS error in the
+header. The rules are committed as `infra/r2/cors.local.json`, `cors.dev.json`, `cors.prod.json`
+(local: localhost origins; dev: develop domain; prod: prod domain). The user pastes each into
+Cloudflare → R2 → the bucket → Settings → CORS policy, and re-pastes after a domain change
+([[release-ops]] `References/domain-cutover.md`). Background: [[admin-upload]]
+`References/upload-flow.md`. Symptom when missing: every upload fails at the PUT step with a CORS error in the
 browser console.

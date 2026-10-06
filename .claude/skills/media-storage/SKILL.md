@@ -7,8 +7,16 @@ description: Use when working with audio or image files in Cloudflare R2 — sig
 
 All audio (and, later, artwork) lives in a **private** Cloudflare R2 bucket. Nothing in the
 bucket is public. The server hands the browser short-lived **presigned URLs**, signed with
-SigV4 by `aws4fetch`, for exactly one operation on one object. Buckets: `humanrecords-media-dev`
-locally/develop (set by `R2_BUCKET_NAME`).
+SigV4 by `aws4fetch`, for exactly one operation on one object. Three media buckets, one
+bucket-scoped token each, chosen by `R2_BUCKET_NAME`: `humanrecords-media-local` (local),
+`humanrecords-media-dev` (develop), `humanrecords-media-prod` (production). A fourth bucket,
+`humanrecords-backups`, holds DB backups and is never touched by app code
+([[release-ops]] `References/backups-and-restore.md`).
+
+**Prod bucket is locked indefinitely (R2 bucket lock): prod code never deletes R2 objects.**
+Upload keys are fresh UUIDs so overwrite is never needed. Releases are soft-deleted
+(`deleted_at`) — any edit/delete feature must honor that. Hard removal (e.g. a takedown) means
+deliberately lifting the lock in the Cloudflare dashboard.
 
 ## The one thing to understand first
 
@@ -28,6 +36,8 @@ importing either from a client component is a build error. Actions always return
 | Session-gated server actions | `src/lib/storage/actions.ts` (`getTrackStreamUrl`, `getTrackDownloadUrl`) |
 | Service-role client (download recording) | `src/lib/supabase/service.ts` |
 | Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts` ([[admin-upload]]) |
+| Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
+| CORS rule per bucket | `infra/r2/cors.{local,dev,prod}.json` (user pastes into Cloudflare) |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
 | Tests | `src/lib/storage/{config,sign,actions}.test.ts` |
 
@@ -56,6 +66,7 @@ Used by: [[timeline-player]] (player calls `getTrackStreamUrl`), [[admin-upload]
 - No artwork upload; art columns are null, so image signing is unused.
 - Orphaned objects (failed/replaced uploads) are not cleaned up — lands with Delete.
 - R2 CORS rule must be applied per bucket before browser uploads work (see
-  [object-keys.md](References/object-keys.md)).
+  [object-keys.md](References/object-keys.md); committed files in `infra/r2/`).
+- Orphan cleanup must never delete from the prod bucket (lock + soft-delete rule above).
 
 A code guide is in `Walkthrough/walkthrough.md` (gitignored).

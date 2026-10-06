@@ -35,7 +35,8 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | `resolve_artist_refs` + `publish_release` | `…20260929120100_publish_release.sql` |
 | `users.name`, role from `app_metadata`, role-sync trigger | `…20261002120000_users_name_and_app_metadata_role.sql` |
 | `invites`, `admin_list_users`, `admin_set_user_role` | `…20261002120100_create_invites.sql` |
-| Local seed (users, 4 artists, 1 album, 1 single, releases) | `supabase/seed.sql` |
+| Local seed (example users, 4 artists, 1 album, 1 single, releases; `seed_helpers.seed_user`) | `supabase/seed.sql` |
+| Optional gitignored real-account seed (template: `supabase/seed-local.example.sql`) | `supabase/seed.local.sql` (`sql_paths` globs `./seed.local*.sql`) |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
 | Generated types (`Database`) | `src/lib/supabase/database.types.ts` |
 | Browser client | `src/lib/supabase/client.ts` |
@@ -57,13 +58,17 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
   dependency-injection convention for data functions, and regenerating `database.types.ts`.
 - [local-workflow.md](References/local-workflow.md) — `supabase start`/`db reset`, seed
-  accounts, Mailpit, adding a migration, pushing to hosted, and the data-test conventions.
+  accounts + `seed.local.sql`, Mailpit, adding a migration, hosted rollout (via `deploy.yml`
+  only), and the data-test conventions.
+- [[release-ops]] `References/migrations.md` — the add-only rule and expand/contract (two-release
+  rename/drop). Read before any migration that renames, drops, or tightens something.
 
 ## Depends on
 
 Nothing — this is foundational. Feature skills that build on it: [[auth]] (users table,
 role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timeline-player]]
-(`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[invites]] (`invites`, admin user functions), [[artists-read]].
+(`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[invites]] (`invites`, admin user functions), [[artists-read]], [[release-ops]] (how migrations
+reach hosted databases).
 
 ## Known deferrals (as of 2026-10-02)
 

@@ -64,11 +64,15 @@ The server pages `/login` and `/admin/users` import components per folder
 
 ## Known deferrals (as of 2026-10-02)
 
-- **No email provider.** **Email** is a `mailto:` link with placeholder copy.
+- **Invite email is still a `mailto:` link** with placeholder copy. (Hosted OTP/magic-link
+  emails go through Resend SMTP: 30/hour cap, 60s per-email frequency; sender
+  `onboarding@resend.dev` delivers only to the Resend account owner until the domain is
+  verified — see [[release-ops]].)
 - **No token expiry, Revoke, CSV export, search, or pagination** (under ~50 invitees).
-- **Hosted setup pending** the deployment session: `SITE_URL` per Vercel environment, and
-  custom SMTP so OTP emails reach real users (Supabase's built-in SMTP only delivers to team
-  members).
+- **Per-environment `SITE_URL`** must be set in each Vercel environment and changed at domain
+  cut-over ([[release-ops]] `References/domain-cutover.md`). Hosted develop test accounts come
+  from `scripts/invite-users.mts` + gitignored `scripts/users.local.json`. NFC: write the
+  final-domain invite URL, verify a tap, then lock the tag.
 - **Crash between claim and sign-in** leaves the token used (no restore ran). Fallback: the
   invitee signs in with the email code, or an admin presses New link.
 - **`RoleSelect` doesn't re-sync from props** after another admin changes the role; reload.
