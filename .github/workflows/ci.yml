@@ -57,7 +57,9 @@ jobs:
       - name: Point tests at the local stack
         run: |
           eval "$(yarn -s supabase status -o env 2>/dev/null)"
-          test -n "$API_URL" && test -n "$SECRET_KEY"
+          # Separate lines: under `bash -e`, a failing non-final `&&` operand doesn't exit.
+          test -n "$API_URL"
+          test -n "$SECRET_KEY"
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "SUPABASE_URL=$API_URL"

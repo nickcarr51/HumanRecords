@@ -42,8 +42,13 @@ fail. The preferred path therefore replays migrations first, exactly as the week
 2. Download `data.sql.gz` of the chosen backup from the Cloudflare dashboard; gunzip it.
 3. Get the new project's **Session pooler** connection string (percent-encoded) as `NEW_DB_URL`.
 4. Apply `main`'s migrations to the new project through the pipeline: point the `production` and
-   `production-preflight` `DB_URL` secrets at `NEW_DB_URL` and run Deploy (or, with the owner's
-   explicit permission, a `db push --db-url` of main's migrations). Do not use `--include-seed`.
+   `production-preflight` `DB_URL` secrets at `NEW_DB_URL`, then **re-run the latest `main` Deploy
+   run** (Actions → Deploy → newest run on `main` → Re-run all jobs; `deploy.yml` has no manual
+   trigger, and an older run would skip the Vercel hook). Or, with the owner's explicit
+   permission, a `db push --db-url` of main's migrations. Do not use `--include-seed`.
+   Heads-up: that run's `backup` job dumps the new, still-empty project, so it becomes the newest
+   backup — the next restore drill goes red ("no accounts") until the following nightly backup
+   runs after step 5. Expected; don't chase it.
 5. Load the data:
    ```bash
    { echo 'set session_replication_role = replica;'; cat data.sql; } | \
