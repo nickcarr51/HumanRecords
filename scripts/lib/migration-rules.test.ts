@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkMigrationChanges, findIncludeSeed } from "./migration-rules.mts";
+import { checkMigrationChanges, findIncludeSeed, parseMigrationList } from "./migration-rules.mts";
 
 const M = "supabase/migrations/";
 const base = [`${M}20260915004137_create_users.sql`, `${M}20261002120100_create_invites.sql`];
@@ -51,5 +51,17 @@ describe("findIncludeSeed", () => {
 
   it("passes clean workflows", () => {
     expect(findIncludeSeed([{ path: ".github/workflows/deploy.yml", content: "supabase db push" }])).toEqual([]);
+  });
+});
+
+describe("parseMigrationList", () => {
+  it("returns [] when the base has no migrations dir (empty ls-tree output)", () => {
+    expect(parseMigrationList("")).toEqual([]);
+    expect(parseMigrationList("\n")).toEqual([]);
+  });
+
+  it("keeps full .sql paths under supabase/migrations/", () => {
+    const out = `${M}20260915004137_create_users.sql\n${M}.gitkeep\nsupabase/config.toml\n`;
+    expect(parseMigrationList(out)).toEqual([`${M}20260915004137_create_users.sql`]);
   });
 });

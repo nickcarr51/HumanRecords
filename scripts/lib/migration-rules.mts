@@ -35,3 +35,9 @@ export function findIncludeSeed(files: { path: string; content: string }[]): str
     .filter((f) => f.content.includes("--include-seed"))
     .map((f) => `${f.path}: never seed a hosted database (--include-seed)`);
 }
+
+// Parses `git ls-tree --name-only <base> -- supabase/migrations/` output
+// (full paths; empty when the base has no migrations dir yet).
+export function parseMigrationList(lsTreeOutput: string): string[] {
+  return lsTreeOutput.split("\n").filter((p) => p.startsWith(DIR) && p.endsWith(".sql"));
+}

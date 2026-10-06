@@ -2,7 +2,7 @@
 // Needs full history (actions/checkout fetch-depth: 0).
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
-import { checkMigrationChanges, findIncludeSeed } from "./lib/migration-rules.mts";
+import { checkMigrationChanges, findIncludeSeed, parseMigrationList } from "./lib/migration-rules.mts";
 
 const base = process.argv[2];
 if (!base) {
@@ -11,8 +11,8 @@ if (!base) {
 }
 const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" });
 
-const baseFiles = git("ls-tree", "--name-only", `${base}:supabase/migrations/`)
-  .split("\n").filter(Boolean).map((f) => `supabase/migrations/${f}`);
+// Path-limited form: empty output (not an error) when base has no migrations yet.
+const baseFiles = parseMigrationList(git("ls-tree", "--name-only", base, "--", "supabase/migrations/"));
 // --no-renames: a rename shows as D + A, so it is caught as a deletion.
 const changes = git("diff", "--name-status", "--no-renames", `${base}...HEAD`)
   .split("\n").filter(Boolean)
