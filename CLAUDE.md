@@ -76,5 +76,6 @@ migrations, backups/restore, prod onboarding, and the domain cut-over.
 
 ## Out of scope so far
 
-dashboard UI (the auth/invite flow now exists; see the `auth` and `invites` skills). See `docs/superpowers/specs/2026-09-12-project-bootstrap-design.md`
-for the full bootstrap design rationale.
+Dashboard UI is out of scope so far (the auth/invite flow now exists; see the `auth` and
+`invites` skills). See `docs/superpowers/specs/2026-09-12-project-bootstrap-design.md` for the
+full bootstrap design rationale.

@@ -45,6 +45,8 @@ calls `seed_helpers.seed_user(...)`. `config.toml` loads
 your local file. The local file is optional: when it is absent (CI, fresh clones) the reset
 still seeds the committed catalog without error. Never commit it (repo is public).
 
+Warning: `seed.sql` creates a local-only `seed_helpers` schema; never let `supabase db diff` capture it into a migration.
+
 Catalog: artists Castillonaire, Sawcy, Quinoa Jones, Daye; album "The Breaks" (2 tracks, one
 co-credited); single "LET EM KNOW" (newest); a release row for each; one download and two play
 counts. `audio_url` values are object keys. Locally they point at the `humanrecords-media-local`

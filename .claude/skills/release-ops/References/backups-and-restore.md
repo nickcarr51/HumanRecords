@@ -33,24 +33,34 @@ Known causes of a red drill:
 
 ## Prod restore runbook (new project, preferred)
 
+`supabase db dump` excludes the `supabase_migrations` schema, so restoring roles + schema + data
+leaves **no migration history**: the next deploy would treat every migration as pending and
+fail. The preferred path therefore replays migrations first, exactly as the weekly drill does.
+
 1. Pause and leave the old project alone. Create a new Supabase project (free tier allows two
    active; delete or pause another if needed).
-2. Download `roles.sql.gz`, `schema.sql.gz`, `data.sql.gz` of the chosen backup from the
-   Cloudflare dashboard; gunzip them.
+2. Download `data.sql.gz` of the chosen backup from the Cloudflare dashboard; gunzip it.
 3. Get the new project's **Session pooler** connection string (percent-encoded) as `NEW_DB_URL`.
-4. Restore:
+4. Apply `main`'s migrations to the new project through the pipeline: point the `production` and
+   `production-preflight` `DB_URL` secrets at `NEW_DB_URL` and run Deploy (or, with the owner's
+   explicit permission, a `db push --db-url` of main's migrations). Do not use `--include-seed`.
+5. Load the data:
    ```bash
-   psql --single-transaction -v ON_ERROR_STOP=1 \
-     -f roles.sql -f schema.sql \
-     -c 'set session_replication_role = replica' \
-     -f data.sql "$NEW_DB_URL"
+   { echo 'set session_replication_role = replica;'; cat data.sql; } | \
+     psql -v ON_ERROR_STOP=1 --single-transaction "$NEW_DB_URL"
    ```
-5. Re-apply hosted Auth settings ([environments.md](environments.md)) and email templates.
-6. Repoint Vercel Production `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, publishable key,
-   `SUPABASE_SECRET_KEY`; update the `production` / `production-preflight` `DB_URL` secrets and the
-   `PROD_*` health variables; redeploy. Smoke test sign-in.
-7. R2 media is unaffected (separate, locked bucket).
+6. Re-apply hosted Auth settings ([environments.md](environments.md)) and email templates.
+7. Repoint Vercel Production `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, publishable key,
+   `SUPABASE_SECRET_KEY`; update the `PROD_*` health variables; redeploy. Smoke test sign-in.
+8. R2 media is unaffected (separate, locked bucket).
+
+**Fallback (roles.sql + schema.sql):** instead of steps 4-5, run
+`psql --single-transaction -v ON_ERROR_STOP=1 -f roles.sql -f schema.sql -c 'set session_replication_role = replica' -f data.sql "$NEW_DB_URL"`.
+This leaves no migration history, so afterwards `supabase migration repair --status applied <versions>`
+is required for every migration version in `main` (needs the user's explicit permission; the
+guard hook prompts) before the next deploy.
 
 **In place** (restoring into the existing prod project) overwrites live data: only with an
-explicit decision from the owner, after taking a fresh backup. Every command here names prod or the
-backups bucket, so the guard hook will prompt; that is expected.
+explicit decision from the owner, after taking a fresh backup. Commands that name prod or the
+backups bucket directly trip the guard hook, but not all do: `psql ... "$NEW_DB_URL"` hides the
+target inside a variable, and the hook can't see inside variables; you are the guard here.

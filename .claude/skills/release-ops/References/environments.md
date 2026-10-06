@@ -11,7 +11,7 @@
 
 One Vercel project linked to the GitHub repo; production branch `main`. `develop` has
 branch-scoped Preview env vars. Feature-branch previews use the develop Supabase + dev bucket
-(the default Preview env vars) and keep Vercel's automatic deploys. Free Supabase pauses after
+(the default Preview env vars, scope "Preview (all branches)", with `NEXT_PUBLIC_APP_ENV=preview`) and keep Vercel's automatic deploys. Free Supabase pauses after
 7 idle days; the daily `health.yml` ping prevents it (see pipeline.md for the 60-day catch).
 
 ## Vercel env-var matrix

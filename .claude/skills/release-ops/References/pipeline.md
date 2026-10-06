@@ -24,6 +24,8 @@ main:    plan (env production-preflight) -> backup (backup.yml) ->
 - `plan` runs `supabase db push --dry-run` and writes the pending list to the job summary, so
   the approver sees exactly what will run. It uses `production-preflight` (no reviewer) so the
   single approval comes after the dry run, on `release`.
+- The `release` deploy step calls the Vercel hook only if its commit is still the branch tip; a
+  newer queued run migrates and deploys instead (the hook builds the tip, so migrations must run first).
 - Any failure stops later jobs. `concurrency: deploy-<branch>`, no cancel-in-progress.
 - All workflows set `defaults.run.shell: bash` (so pipes fail on error).
 
@@ -32,8 +34,10 @@ main:    plan (env production-preflight) -> backup (backup.yml) ->
 | Environment | Reviewer | Holds |
 |---|---|---|
 | `develop` | none | `DB_URL` (develop **Session pooler** string), `VERCEL_DEPLOY_HOOK` |
-| `production-preflight` | none | prod `DB_URL` for plan/backup/drill, backup R2 secrets; var `R2_ENDPOINT` |
+| `production-preflight` | none | prod `DB_URL` for plan/backup/drill, backup R2 secrets |
 | `production` | repo owner (required) | prod `DB_URL`, prod `VERCEL_DEPLOY_HOOK` |
+
+`R2_ENDPOINT` is a **repository** variable (plan B6), not an environment item.
 
 Deployment-branch policy for `production-preflight` is set during setup (see plan Task B6);
 it must have no required reviewer and must permit the branches that run scheduled workflows.
@@ -52,6 +56,9 @@ deployments -> Approve. Reject to stop; nothing has changed yet.
   Stop; do not `migration repair` without the user's permission ([migrations.md](migrations.md)).
 - `backup` fails: prod is not migrated; fix and re-run (see
   [backups-and-restore.md](backups-and-restore.md)).
+- A failing prod `db push` can echo constraint-violation values (e.g. `Key (email)=(...)`) into
+  the public Actions log. Treat such logs as sensitive and delete the run's logs in GitHub if it
+  happens. The restore drill withholds its load output for the same reason.
 - `release` fails mid-push: the Vercel hook did not run, so old code is still live. Fix forward
   with a new migration (never edit an applied one) and merge again.
 - A CI `migrations` failure is a rule violation, not flakiness.
