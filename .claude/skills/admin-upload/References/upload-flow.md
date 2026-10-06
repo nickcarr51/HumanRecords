@@ -78,11 +78,27 @@ navigation isn't mistaken for a failure.
 ## R2 CORS rule
 
 The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
-upload fails at the PUT step (the preflight is rejected). The rules live in the repo as
-`infra/r2/cors.local.json`, `cors.dev.json`, `cors.prod.json` (one per bucket: local =
-localhost origins, dev = develop domain, prod = prod domain). The user pastes the matching file
-into Cloudflare → R2 → bucket → Settings → CORS policy; update the file and re-paste when a
-domain changes ([[release-ops]] `References/domain-cutover.md`).
+upload fails at the PUT step (the preflight is rejected). One rule per bucket, pasted by the user
+into Cloudflare -> R2 -> bucket -> Settings -> CORS policy:
+
+```json
+[
+  {
+    "AllowedOrigins": ["<origin(s) for this environment>"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["content-type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Origins: local = `http://localhost:3000` (and `http://127.0.0.1:3000`); dev = the develop domain;
+prod = the prod domain. The files will be committed as `infra/r2/cors.{local,dev,prod}.json`
+during setup (Task B2, pending); until then this JSON is the reference.
+
+Status: not yet applied to the local or prod buckets. The dev rule was applied 2026-10-02; its
+exact content is to be recorded in `infra/r2/cors.dev.json`. Re-paste after a domain change
+([[release-ops]] `References/domain-cutover.md`).
 
 **Unverified:** whether R2 accepts a wildcard origin for Vercel ephemeral previews. If not,
 only the listed develop domain can upload; ephemeral previews cannot.

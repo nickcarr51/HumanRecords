@@ -37,7 +37,7 @@ importing either from a client component is a build error. Actions always return
 | Service-role client (download recording) | `src/lib/supabase/service.ts` |
 | Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts` ([[admin-upload]]) |
 | Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
-| CORS rule per bucket | `infra/r2/cors.{local,dev,prod}.json` (user pastes into Cloudflare) |
+| CORS rule per bucket | `infra/r2/cors.{local,dev,prod}.json` (to be committed during setup, Task B2 pending; user pastes into Cloudflare) |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
 | Tests | `src/lib/storage/{config,sign,actions}.test.ts` |
 
@@ -66,7 +66,7 @@ Used by: [[timeline-player]] (player calls `getTrackStreamUrl`), [[admin-upload]
 - No artwork upload; art columns are null, so image signing is unused.
 - Orphaned objects (failed/replaced uploads) are not cleaned up — lands with Delete.
 - R2 CORS rule must be applied per bucket before browser uploads work (see
-  [object-keys.md](References/object-keys.md); committed files in `infra/r2/`).
+  [object-keys.md](References/object-keys.md); files to be committed in `infra/r2/` during setup, Task B2 pending).
 - Orphan cleanup must never delete from the prod bucket (lock + soft-delete rule above).
 
 A code guide is in `Walkthrough/walkthrough.md` (gitignored).
