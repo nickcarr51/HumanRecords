@@ -4,7 +4,7 @@
 // Idempotent: skips keys that already exist.
 import { readdir, readFile } from "node:fs/promises";
 import { AwsClient } from "aws4fetch";
-import { assertLocalBucket, missingSeedFiles, SEED_MEDIA_KEYS } from "./lib/r2-local.mts";
+import { assertLocalBucket, missingSeedFiles, SEED_MEDIA } from "./lib/r2-local.mts";
 
 const bucket = assertLocalBucket(process.env.R2_BUCKET_NAME);
 const { R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = process.env;
@@ -19,14 +19,15 @@ if (missing.length) {
 }
 
 const r2 = new AwsClient({ accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, service: "s3", region: "auto" });
-for (const key of SEED_MEDIA_KEYS) {
-  const url = new URL(`${R2_ENDPOINT}/${bucket}/${key}`); // URL percent-encodes spaces, like sign.ts
+for (const { file, key } of SEED_MEDIA) {
+  const url = new URL(`${R2_ENDPOINT}/${bucket}/${key}`);
   if ((await r2.fetch(url, { method: "HEAD" })).ok) {
-    console.log(`exists   ${key}`);
+    console.log(`exists   ${key}  (${file})`);
     continue;
   }
-  const body = await readFile(new URL(key, dir));
+  // encodeURIComponent: song filenames contain spaces and "&".
+  const body = await readFile(new URL(encodeURIComponent(file), dir));
   const res = await r2.fetch(url, { method: "PUT", body, headers: { "Content-Type": "audio/mpeg" } });
   if (!res.ok) throw new Error(`PUT ${key} → ${res.status} ${await res.text()}`);
-  console.log(`uploaded ${key}`);
+  console.log(`uploaded ${key}  (${file})`);
 }

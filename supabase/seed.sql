@@ -98,22 +98,23 @@ begin
     returning id into v_artist_daye;
 
   -- Album "The Breaks" with two tracks. audio_url holds the R2 OBJECT KEY
-  -- (the exact object name in the humanrecords-media-dev bucket), not a URL.
+  -- (tracks/<uuid>.mp3, same shape as admin uploads), not a URL. Upload the
+  -- files to the local bucket with `yarn r2:seed-local` (scripts/lib/r2-local.mts).
   insert into public.albums (id, title, album_art_url, created_at)
     values (gen_random_uuid(), 'The Breaks', null, now() - interval '1 hour')
     returning id into v_album_id;
 
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'ASSUMPTIONS', 'Castillonaire & sawcy - ASSUMPTIONS.mp3', null, now() - interval '1 hour')
+    values (gen_random_uuid(), 'ASSUMPTIONS', 'tracks/5e3c1a2b-7d4e-4f60-9a1b-2c3d4e5f6a71.mp3', null, now() - interval '1 hour')
     returning id into v_album_track_1;
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'JERK CLUB TOOL', 'JERK CLUB TOOL.mp3', null, now() - interval '1 hour')
+    values (gen_random_uuid(), 'JERK CLUB TOOL', 'tracks/8f2a6b1c-3e4d-4a5b-8c6d-7e8f9a0b1c22.mp3', null, now() - interval '1 hour')
     returning id into v_album_track_2;
 
   -- One standalone track, published below as a single release.
   -- Newer timestamp so it sorts above the album in the timeline.
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'LET EM KNOW', 'DAYE. - LET EM KNOW.mp3', null, now())
+    values (gen_random_uuid(), 'LET EM KNOW', 'tracks/c41d7e9f-2a3b-4c5d-b6e7-f8091a2b3c43.mp3', null, now())
     returning id into v_single_id;
 
   -- Credit artists to tracks: ASSUMPTIONS -> Castillonaire + Sawcy,
