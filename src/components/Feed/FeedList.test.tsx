@@ -26,17 +26,17 @@ vi.mock('next/link', () => ({
 import { FeedList } from './FeedList';
 
 const items: FeedItem[] = [
-  { kind: 'track', id: 's1', title: 'Newest Single', trackArtUrl: null, artistNames: ['Daye'], createdAt: '2026-01-03' },
+  { kind: 'track', id: 's1', title: 'Newest Single', trackArtUrl: null, artistNames: ['Nova'], createdAt: '2026-01-03' },
   {
     kind: 'album',
     id: 'a1',
-    title: 'The Breaks',
+    title: 'Sample Album',
     albumArtUrl: null,
     artistNames: [],
     createdAt: '2026-01-02',
     tracks: [
-      { id: 'a1t1', title: 'ASSUMPTIONS', artistNames: ['Castillonaire'] },
-      { id: 'a1t2', title: 'JERK CLUB TOOL', artistNames: ['Quinoa Jones'] },
+      { id: 'a1t1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
+      { id: 'a1t2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
     ],
   },
   { kind: 'track', id: 's2', title: 'Older Single', trackArtUrl: null, artistNames: [], createdAt: '2026-01-01' },
@@ -73,7 +73,7 @@ describe('FeedList playback queue', () => {
   it('playing a track inside an expanded album starts at that track in the feed queue', () => {
     renderWithTheme(<FeedList items={items} />);
     fireEvent.click(screen.getByRole('button', { name: 'Expand tracks' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Play JERK CLUB TOOL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play NIGHT SHIFT' }));
     expect(queuedIds()).toEqual(feedIds);
     expect(playQueue.mock.calls.at(-1)![1]).toBe(2);
   });
@@ -106,8 +106,8 @@ describe('FeedList play/pause state', () => {
     expect(toggle).toHaveBeenCalledTimes(1);
     expect(playQueue).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Expand tracks' }));
-    expect(screen.getByRole('button', { name: 'Pause JERK CLUB TOOL' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play ASSUMPTIONS' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pause NIGHT SHIFT' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play FIRST LIGHT' })).toBeInTheDocument();
   });
 
   it('while the current track is loading, shows pause and ignores clicks', () => {

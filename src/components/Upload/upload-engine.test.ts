@@ -17,7 +17,7 @@ function readyAlbum(): UploadState {
   s = r(s, { type: "setAlbumTitle", title: "LP" });
   for (const id of ["t1", "t2"]) {
     s = r(s, { type: "setTrackFile", clientId: id, file: mp3(`${id}.mp3`) });
-    s = r(s, { type: "addTrackArtist", clientId: id, chip: newChip("Daye") });
+    s = r(s, { type: "addTrackArtist", clientId: id, chip: newChip("Nova") });
   }
   return s;
 }

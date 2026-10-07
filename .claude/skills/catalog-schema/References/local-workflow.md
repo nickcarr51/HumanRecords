@@ -47,8 +47,8 @@ still seeds the committed catalog without error. Never commit it (repo is public
 
 Warning: `seed.sql` creates a local-only `seed_helpers` schema; never let `supabase db diff` capture it into a migration.
 
-Catalog: artists Castillonaire, Sawcy, Quinoa Jones, Daye; album "The Breaks" (2 tracks, one
-co-credited); single "LET EM KNOW" (newest); a release row for each; one download and two play
+Catalog: artists Halcyon, Ember, Juno Park, Nova; album "Sample Album" (2 tracks, one
+co-credited); single "SLOW BLOOM" (newest); a release row for each; one download and two play
 counts. `audio_url` values are object keys. Locally they point at the `humanrecords-media-local`
 bucket: put the seed MP3s in gitignored `supabase/seed-media/` and run `yarn r2:seed-local`
 (see [[media-storage]]).

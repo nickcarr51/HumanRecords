@@ -88,8 +88,8 @@ describe("UploadForm", () => {
     fireEvent.change(screen.getByLabelText("MP3 file"), {
       target: { files: [new File(["x"], "My_Song.mp3", { type: "audio/mpeg" })] },
     });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Daye" } });
-    fireEvent.mouseDown(await screen.findByRole("option", { name: 'Create "Daye"' }));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Nova" } });
+    fireEvent.mouseDown(await screen.findByRole("option", { name: 'Create "Nova"' }));
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
@@ -102,6 +102,6 @@ describe("UploadForm", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(screen.getByRole("radio", { name: "Album" })).toBeDisabled();
     expect(screen.getByRole("combobox")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Remove Daye" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Nova" })).toBeDisabled();
   });
 });

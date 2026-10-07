@@ -73,12 +73,12 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 2. Sign in as `listener@example.com` (OTP from Mailpit `http://127.0.0.1:54324`): no Admin
    link; visiting `/admin/upload` lands on `/feed`.
 3. Sign out; sign in as `label@example.com`: Admin link → `/admin` → Upload a release.
-4. Publish a **single**: pick an MP3, pick existing artist "Daye" + create a new artist.
+4. Publish a **single**: pick an MP3, pick existing artist "Nova" + create a new artist.
    Progress fills, redirect to `/feed`, the single is the top row and plays.
 5. Publish an **album**: 2 tracks, reorder with ↑/↓, create the same new artist in both
    tracks (the second should be offered from the dropdown), leave album artists empty. Feed
    shows the album first with "Various Artists" and your track order; `/albums/[id]` matches.
-6. The seeded "The Breaks" and "LET EM KNOW" still show, and the player keeps playing across
+6. The seeded "Sample Album" and "SLOW BLOOM" still show, and the player keeps playing across
    `/feed` ↔ `/admin`.
 
 A PUT failing with CORS or `SignatureDoesNotMatch` → check the bucket CORS rule and that

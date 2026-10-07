@@ -69,10 +69,10 @@ declare
   v_listener_id uuid;
   v_artist_user_id uuid;
   v_label_member_id uuid;
-  v_artist_castillonaire uuid;
-  v_artist_sawcy uuid;
-  v_artist_quinoa uuid;
-  v_artist_daye uuid;
+  v_artist_halcyon uuid;
+  v_artist_ember uuid;
+  v_artist_juno uuid;
+  v_artist_nova uuid;
   v_album_id uuid;
   v_album_track_1 uuid;
   v_album_track_2 uuid;
@@ -82,52 +82,52 @@ begin
   v_artist_user_id := seed_helpers.seed_user('artist@example.com', 'artist', 'Ada Artist');
   v_label_member_id := seed_helpers.seed_user('label@example.com', 'label_member', 'Lou LabelMember');
 
-  -- Four artists. Track 1 is credited to two of them (Castillonaire & Sawcy),
+  -- Four artists. Track 1 is credited to two of them (Halcyon & Ember),
   -- which the many-to-many track_artists table supports directly.
   insert into public.artists (id, name, bio)
-    values (gen_random_uuid(), 'Castillonaire', 'Human Records artist.')
-    returning id into v_artist_castillonaire;
+    values (gen_random_uuid(), 'Halcyon', 'Human Records artist.')
+    returning id into v_artist_halcyon;
   insert into public.artists (id, name, bio)
-    values (gen_random_uuid(), 'Sawcy', 'Human Records artist.')
-    returning id into v_artist_sawcy;
+    values (gen_random_uuid(), 'Ember', 'Human Records artist.')
+    returning id into v_artist_ember;
   insert into public.artists (id, name, bio)
-    values (gen_random_uuid(), 'Quinoa Jones', 'Human Records artist.')
-    returning id into v_artist_quinoa;
+    values (gen_random_uuid(), 'Juno Park', 'Human Records artist.')
+    returning id into v_artist_juno;
   insert into public.artists (id, name, bio)
-    values (gen_random_uuid(), 'Daye', 'Human Records artist.')
-    returning id into v_artist_daye;
+    values (gen_random_uuid(), 'Nova', 'Human Records artist.')
+    returning id into v_artist_nova;
 
-  -- Album "The Breaks" with two tracks. audio_url holds the R2 OBJECT KEY
+  -- Album "Sample Album" with two tracks. audio_url holds the R2 OBJECT KEY
   -- (tracks/<uuid>.mp3, same shape as admin uploads), not a URL. Upload the
   -- files to the local bucket with `yarn r2:seed-local` (scripts/lib/r2-local.mts).
   insert into public.albums (id, title, album_art_url, created_at)
-    values (gen_random_uuid(), 'The Breaks', null, now() - interval '1 hour')
+    values (gen_random_uuid(), 'Sample Album', null, now() - interval '1 hour')
     returning id into v_album_id;
 
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'ASSUMPTIONS', 'tracks/5e3c1a2b-7d4e-4f60-9a1b-2c3d4e5f6a71.mp3', null, now() - interval '1 hour')
+    values (gen_random_uuid(), 'FIRST LIGHT', 'tracks/5e3c1a2b-7d4e-4f60-9a1b-2c3d4e5f6a71.mp3', null, now() - interval '1 hour')
     returning id into v_album_track_1;
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'JERK CLUB TOOL', 'tracks/8f2a6b1c-3e4d-4a5b-8c6d-7e8f9a0b1c22.mp3', null, now() - interval '1 hour')
+    values (gen_random_uuid(), 'NIGHT SHIFT', 'tracks/8f2a6b1c-3e4d-4a5b-8c6d-7e8f9a0b1c22.mp3', null, now() - interval '1 hour')
     returning id into v_album_track_2;
 
   -- One standalone track, published below as a single release.
   -- Newer timestamp so it sorts above the album in the timeline.
   insert into public.tracks (id, title, audio_url, track_art_url, created_at)
-    values (gen_random_uuid(), 'LET EM KNOW', 'tracks/c41d7e9f-2a3b-4c5d-b6e7-f8091a2b3c43.mp3', null, now())
+    values (gen_random_uuid(), 'SLOW BLOOM', 'tracks/c41d7e9f-2a3b-4c5d-b6e7-f8091a2b3c43.mp3', null, now())
     returning id into v_single_id;
 
-  -- Credit artists to tracks: ASSUMPTIONS -> Castillonaire + Sawcy,
-  -- JERK CLUB TOOL -> Quinoa Jones, LET EM KNOW -> Daye.
-  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_castillonaire, 1);
-  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_sawcy, 2);
-  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_2, v_artist_quinoa, 1);
-  insert into public.track_artists (track_id, artist_id, position) values (v_single_id, v_artist_daye, 1);
+  -- Credit artists to tracks: FIRST LIGHT -> Halcyon + Ember,
+  -- NIGHT SHIFT -> Juno Park, SLOW BLOOM -> Nova.
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_halcyon, 1);
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_1, v_artist_ember, 2);
+  insert into public.track_artists (track_id, artist_id, position) values (v_album_track_2, v_artist_juno, 1);
+  insert into public.track_artists (track_id, artist_id, position) values (v_single_id, v_artist_nova, 1);
 
   -- Album membership + album credit (the three artists who appear on it).
-  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_castillonaire, 1);
-  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_sawcy, 2);
-  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_quinoa, 3);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_halcyon, 1);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_ember, 2);
+  insert into public.album_artists (album_id, artist_id, position) values (v_album_id, v_artist_juno, 3);
   insert into public.track_albums (track_id, album_id, position) values (v_album_track_1, v_album_id, 1);
   insert into public.track_albums (track_id, album_id, position) values (v_album_track_2, v_album_id, 2);
 
