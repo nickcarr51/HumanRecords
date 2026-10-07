@@ -9,9 +9,11 @@
 | R2 token scope | local bucket only | dev bucket only | prod bucket only |
 | Email | Mailpit (`http://127.0.0.1:54324`) | Resend | Resend |
 
-One Vercel project linked to the GitHub repo; production branch `main`. `develop` has
-branch-scoped Preview env vars. Feature-branch previews use the develop Supabase + dev bucket
-(the default Preview env vars, scope "Preview (all branches)", with `NEXT_PUBLIC_APP_ENV=preview`) and keep Vercel's automatic deploys. Free Supabase pauses after
+One Vercel project (`nick-carrs-projects/human-records`) linked to the GitHub repo; production
+branch `main` → `https://humanservices.vercel.app`; `develop` (branch-scoped Preview env vars) →
+`https://humanservices-dev.vercel.app`. `vercel.json` sets `git.deploymentEnabled: false`, so NO
+branch deploys on push — feature branches get no preview sites (decided 2026-10-06); develop and
+main deploy only via `deploy.yml`'s deploy hooks. Free Supabase pauses after
 7 idle days; the daily `health.yml` ping prevents it (see pipeline.md for the 60-day catch).
 
 ## Vercel env-var matrix

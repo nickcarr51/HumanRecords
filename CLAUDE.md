@@ -17,13 +17,13 @@ here so future work doesn't contradict it.
 
 ## Environments
 
-- `main` branch → Vercel Production, tied to the "production" Supabase project
-- `develop` branch → Vercel Preview/staging, tied to the "develop" Supabase project
-- Feature branches get Vercel's automatic ephemeral previews (develop Supabase + dev bucket)
+- `main` branch → Vercel Production (`https://humanservices.vercel.app`), "production" Supabase project
+- `develop` branch → Vercel Preview/staging (`https://humanservices-dev.vercel.app`), "develop" Supabase project
+- Feature branches get no Vercel previews (`vercel.json` disables all git-triggered deploys)
 - Three R2 media buckets, one bucket-scoped token each: `humanrecords-media-local`
   (local), `-dev` (develop), `-prod` (production, locked: prod code never deletes objects).
   `humanrecords-backups` holds nightly prod DB dumps (GitHub-only access).
-- Vercel git auto-deploy is off for `main`/`develop` (`vercel.json`). `deploy.yml`
+- Vercel git auto-deploy is off for every branch (`vercel.json`). `deploy.yml`
   migrates the hosted DB, then calls a Vercel deploy hook; prod waits for an Approve click.
   Details: `.claude/skills/release-ops/`
 
