@@ -37,7 +37,7 @@ touches hosted data without explicit permission in the moment (guard hook enforc
 | R2 CORS per bucket | `infra/r2/cors.{local,dev,prod}.json` (files created during setup; not in the repo as of 2026-10-05) |
 | Sentry (errors only) | `instrumentation-client.ts`, `src/instrumentation.ts`, `sentry.{server,edge}.config.ts`, `src/lib/observability/errors-only-integrations.ts`, `withSentryConfig` in `next.config.ts` |
 | Typecheck | `yarn typecheck` (CI runs it) |
-| Secrets: DB URLs + Vercel hooks | GitHub environment secrets (`develop`, `production`; prod DB URL also in `production-preflight`) |
+| Secrets: DB URLs + Vercel hooks | GitHub environment secrets (`develop`, `production-release`; prod DB URL also in `production-preflight`) |
 | Secrets: backup R2 token | GitHub secrets (`BACKUP_R2_*`), never on a laptop |
 | Secrets: app (`R2_*`, Supabase keys, `SITE_URL`, Sentry) | Vercel env vars per environment; the owner pastes them, never Claude |
 | Health-check URLs/keys | GitHub repository variables `{DEV,PROD}_{SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,SITE_URL}` |

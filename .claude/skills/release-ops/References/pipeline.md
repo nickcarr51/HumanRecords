@@ -18,7 +18,7 @@ deletion). CI uses fake R2 values; no test reaches a real bucket.
 ```
 develop: plan (env develop) -> release (env develop): db push, Vercel develop hook
 main:    plan (env production-preflight) -> backup (backup.yml) ->
-         release (env production, Approve click): db push, Vercel prod hook
+         release (env production-release, Approve click): db push, Vercel prod hook
 ```
 
 - `plan` runs `supabase db push --dry-run` and writes the pending list to the job summary, so
@@ -35,7 +35,7 @@ main:    plan (env production-preflight) -> backup (backup.yml) ->
 |---|---|---|
 | `develop` | none | `DB_URL` (develop **Session pooler** string), `VERCEL_DEPLOY_HOOK` |
 | `production-preflight` | none | prod `DB_URL` for plan/backup/drill, backup R2 secrets |
-| `production` | repo owner (required) | prod `DB_URL`, prod `VERCEL_DEPLOY_HOOK` |
+| `production-release` | repo owner (required) | prod `DB_URL`, prod `VERCEL_DEPLOY_HOOK` |
 
 `R2_ENDPOINT` is a **repository** variable (plan B6), not an environment item.
 

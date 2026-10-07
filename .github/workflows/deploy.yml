@@ -49,8 +49,10 @@ jobs:
     # backup is skipped on develop; still require plan success and no failed backup.
     if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.backup.result == 'success' || needs.backup.result == 'skipped') }}
     runs-on: ubuntu-latest
-    # production has a required reviewer: this job waits for the Approve click.
-    environment: ${{ github.ref_name == 'main' && 'production' || 'develop' }}
+    # production-release has a required reviewer: this job waits for the Approve click.
+    # (Not named "production": Vercel auto-creates a GitHub "Production" environment and
+    # GitHub environment names are case-insensitive.)
+    environment: ${{ github.ref_name == 'main' && 'production-release' || 'develop' }}
     env:
       DB_URL: ${{ secrets.DB_URL }}
       VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}

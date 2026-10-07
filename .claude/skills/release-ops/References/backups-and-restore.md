@@ -41,7 +41,7 @@ fail. The preferred path therefore replays migrations first, exactly as the week
    active; delete or pause another if needed).
 2. Download `data.sql.gz` of the chosen backup from the Cloudflare dashboard; gunzip it.
 3. Get the new project's **Session pooler** connection string (percent-encoded) as `NEW_DB_URL`.
-4. Apply `main`'s migrations to the new project through the pipeline: point the `production` and
+4. Apply `main`'s migrations to the new project through the pipeline: point the `production-release` and
    `production-preflight` `DB_URL` secrets at `NEW_DB_URL`, then **re-run the latest `main` Deploy
    run** (Actions → Deploy → newest run on `main` → Re-run all jobs; `deploy.yml` has no manual
    trigger, and an older run would skip the Vercel hook). Or, with the owner's explicit
