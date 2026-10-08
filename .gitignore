@@ -52,3 +52,8 @@ docs/
 
 # local database backups (supabase db dump) — real data, never commit
 backup*.sql
+
+# real personal accounts for local seeding / the develop invite script
+supabase/seed.local.sql
+scripts/users.local.json
+supabase/seed-media/

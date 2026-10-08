@@ -51,12 +51,12 @@ client navigation).
 ## Role assignment
 
 Roles are set from `app_metadata.role` at account creation (`/admin/users`, the seed's
-`pg_temp.seed_user`, or `scripts/invite-users.mts` on hosted) and changed in `/admin/users`
+`seed_helpers.seed_user`, or `scripts/invite-users.mts` on hosted) and changed in `/admin/users`
 (`admin_set_user_role`, never your own). The role-trigger landmine is resolved: `user_metadata`
 no longer sets roles. See [[invites]].
 
 ## Rollout pre-check
 
-Before `db push` to develop/prod, confirm Dashboard → Authentication → Allow new users to sign
+Before a migration reaches develop/prod (via `deploy.yml`, see [[release-ops]]), confirm Dashboard → Authentication → Allow new users to sign
 up is OFF (the app is invite-only; role no longer reads `user_metadata`, but there's no reason
 to allow sign-up).

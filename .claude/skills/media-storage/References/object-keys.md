@@ -17,21 +17,21 @@ expires) and never render a key directly.
 
 | Source | Shape | Example |
 |---|---|---|
-| Local seed (pre-existing dev objects) | the original filename | `DAYE. - LET EM KNOW.mp3` |
+| Local seed (`yarn r2:seed-local`, fixed ids in `scripts/lib/r2-local.mts`) | `tracks/<uuid v4>.mp3` | `tracks/c41d7e9f-2a3b-4c5d-b6e7-f8091a2b3c43.mp3` |
 | Admin upload | `tracks/<uuid v4>.mp3` | `tracks/3f2b…c1.mp3` |
 
 Upload keys are minted server-side by `createUploadUrls` and validated against `AUDIO_KEY_RE`
 (`src/lib/admin/rules.ts`) by `publishRelease`, so a client can't make a track point at an
 arbitrary object. Details in [[admin-upload]] `References/upload-flow.md`.
 
-Spaces and punctuation in seed keys work because `new URL()` percent-encodes the path before
-signing. When artwork lands, follow the upload pattern (`<kind>/<uuid>.<ext>`).
+Every audio key, seed or upload, is `tracks/<uuid>.mp3`. When artwork lands, follow the same
+pattern (`<kind>/<uuid>.<ext>`).
 
 ## Buckets and environments
 
-`R2_BUCKET_NAME` selects the bucket (`.env.example` default: `humanrecords-media-dev`).
-Local `.env.local` and the develop deployment point at the dev bucket. Seed keys only exist
-in that bucket. Pointed at a bucket without them, signing still succeeds (it never checks the
+`R2_BUCKET_NAME` selects the bucket: `humanrecords-media-local` (laptop), `-dev` (develop
+deployment), `-prod` (production). Seed objects exist only in the local bucket, put there by
+`yarn r2:seed-local`. Pointed at a bucket without them, signing still succeeds (it never checks the
 object exists); the **browser** gets a 404 fetching the URL and the player shows its error state.
 
 ## Orphans
@@ -44,6 +44,9 @@ object with no row pointing at it. Accepted for now; cleanup is planned with Del
 Streaming via `<audio src>` and downloads via navigation don't need CORS. **Browser PUT
 uploads do** (cross-origin XHR with a custom Content-Type → preflight). The bucket needs a CORS
 rule allowing `PUT` (and `GET`/`HEAD`) from the app origins with `Content-Type` as an allowed
-header. The exact JSON and status are in [[admin-upload]] `References/upload-flow.md` → "R2
-CORS rule". Symptom when missing: every upload fails at the PUT step with a CORS error in the
+header. The rules will be committed as `infra/r2/cors.local.json`, `cors.dev.json`, `cors.prod.json`
+during setup (Task B2, pending) (local: localhost origins; dev: develop domain; prod: prod domain). The user pastes each into
+Cloudflare → R2 → the bucket → Settings → CORS policy, and re-pastes after a domain change
+([[release-ops]] `References/domain-cutover.md`). Background: [[admin-upload]]
+`References/upload-flow.md`. Symptom when missing: every upload fails at the PUT step with a CORS error in the
 browser console.

@@ -18,7 +18,7 @@ describe("audioFileError", () => {
 describe("AUDIO_KEY_RE", () => {
   it("matches only keys minted by createUploadUrls", () => {
     expect(AUDIO_KEY_RE.test("tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3")).toBe(true);
-    expect(AUDIO_KEY_RE.test("DAYE. - LET EM KNOW.mp3")).toBe(false);
+    expect(AUDIO_KEY_RE.test("NOVA. - SLOW BLOOM.mp3")).toBe(false);
     expect(AUDIO_KEY_RE.test("tracks/../secret.mp3")).toBe(false);
   });
 });

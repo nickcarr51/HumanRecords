@@ -6,7 +6,7 @@ description: Use when working on sign-in, sign-out, or session handling — the 
 # Auth: Invite-only Passwordless Sign-in
 
 Human Services has no passwords and no sign-up. A member is **invited** (an `auth.users` row
-created by an admin), then signs in with an **8-character email code** (OTP) or by clicking
+created by an admin), then signs in with an **6-digit email code** (OTP) or by clicking
 the **magic link** in the same email. Sessions live in Supabase cookies, refreshed by
 middleware on every request. Signed-in users land on `/feed`.
 
@@ -69,8 +69,13 @@ admin layers).
 
 ## Known deferrals (as of 2026-10-02)
 
-- Invites live at `/admin/users` ([[invites]]); sending email is a `mailto:` link (no provider
-  yet). `scripts/invite-users.mts` remains for hosted develop accounts.
+- Invites live at `/admin/users` ([[invites]]); sending the invite is still a `mailto:` link.
+  `scripts/invite-users.mts` (reads gitignored `scripts/users.local.json`; template
+  `scripts/users.example.json`) remains for hosted develop accounts.
+- **Hosted auth email is Resend SMTP** (`smtp.resend.com`, port 465, user `resend`). Sender is
+  `onboarding@resend.dev` until the domain is verified (it delivers only to the Resend account
+  owner). Caps: 30 emails/hour, 60s OTP frequency per email. Settings list:
+  [[release-ops]] `References/environments.md`.
 - No "artist" or "listener"-specific gating yet; only `label_member` is checked anywhere.
 - Navbar Admin link can be stale after a role change until a full reload.
 

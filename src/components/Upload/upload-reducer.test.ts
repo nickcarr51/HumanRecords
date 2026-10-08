@@ -81,11 +81,11 @@ describe("tracks", () => {
 
 describe("files and titles", () => {
   it("auto-fills the title from the filename until the user types one", () => {
-    let s = r(init(), { type: "setTrackFile", clientId: "t1", file: mp3("DAYE. - LET EM KNOW.mp3") });
-    expect(t(s).title).toBe("DAYE. - LET EM KNOW");
-    s = r(s, { type: "setTrackTitle", clientId: "t1", title: "Let Em Know" });
+    let s = r(init(), { type: "setTrackFile", clientId: "t1", file: mp3("NOVA. - SLOW BLOOM.mp3") });
+    expect(t(s).title).toBe("NOVA. - SLOW BLOOM");
+    s = r(s, { type: "setTrackTitle", clientId: "t1", title: "Slow Bloom" });
     s = r(s, { type: "setTrackFile", clientId: "t1", file: mp3("other_take.mp3") });
-    expect(t(s).title).toBe("Let Em Know");
+    expect(t(s).title).toBe("Slow Bloom");
   });
 
   it("titleFromFilename strips the extension and underscores", () => {
@@ -109,15 +109,15 @@ describe("files and titles", () => {
 
 describe("artist chips", () => {
   it("adds chips in order, ignores duplicates by id or name, moves and removes", () => {
-    let s = r(init(), { type: "addTrackArtist", clientId: "t1", chip: existingChip({ id: "a1", name: "Castillonaire" }) });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Sawcy") });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" sawcy ") });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: existingChip({ id: "a1", name: "Castillonaire" }) });
-    expect(t(s).artists.map((c) => c.name)).toEqual(["Castillonaire", "Sawcy"]);
-    s = r(s, { type: "moveTrackArtist", clientId: "t1", key: newChip("Sawcy").key, dir: -1 });
-    expect(t(s).artists.map((c) => c.name)).toEqual(["Sawcy", "Castillonaire"]);
+    let s = r(init(), { type: "addTrackArtist", clientId: "t1", chip: existingChip({ id: "a1", name: "Halcyon" }) });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Ember") });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" ember ") });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: existingChip({ id: "a1", name: "Halcyon" }) });
+    expect(t(s).artists.map((c) => c.name)).toEqual(["Halcyon", "Ember"]);
+    s = r(s, { type: "moveTrackArtist", clientId: "t1", key: newChip("Ember").key, dir: -1 });
+    expect(t(s).artists.map((c) => c.name)).toEqual(["Ember", "Halcyon"]);
     s = r(s, { type: "removeTrackArtist", clientId: "t1", key: "id:a1" });
-    expect(t(s).artists.map((c) => c.name)).toEqual(["Sawcy"]);
+    expect(t(s).artists.map((c) => c.name)).toEqual(["Ember"]);
   });
 
   it("album artists work the same way", () => {
@@ -132,11 +132,11 @@ describe("artist chips", () => {
 
   it("pendingNewArtists lists each new name once across the whole form", () => {
     let s = album();
-    s = r(s, { type: "addAlbumArtist", chip: newChip("Sawcy") });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" SAWCY") });
+    s = r(s, { type: "addAlbumArtist", chip: newChip("Ember") });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" EMBER") });
     s = r(s, { type: "addTrackArtist", clientId: "t2", chip: newChip("Feat") });
     s = r(s, { type: "addTrackArtist", clientId: "t2", chip: existingChip({ id: "a1", name: "Old" }) });
-    expect(pendingNewArtists(s).map((c) => c.name)).toEqual(["Sawcy", "Feat"]);
+    expect(pendingNewArtists(s).map((c) => c.name)).toEqual(["Ember", "Feat"]);
   });
 });
 
@@ -193,7 +193,7 @@ describe("validate", () => {
 
   it("passes a complete single", () => {
     let s = r(init(), { type: "setTrackFile", clientId: "t1", file: mp3() });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Daye") });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Nova") });
     expect(hasErrors(validate(s))).toBe(false);
   });
 });
@@ -201,26 +201,26 @@ describe("validate", () => {
 describe("buildPayload", () => {
   it("maps chips to refs and uses the uploaded keys, in order", () => {
     let s = album();
-    s = r(s, { type: "setAlbumTitle", title: "  The Breaks " });
-    s = r(s, { type: "addAlbumArtist", chip: existingChip({ id: "a1", name: "Castillonaire" }) });
-    s = r(s, { type: "setTrackTitle", clientId: "t1", title: "ASSUMPTIONS" });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" Sawcy ") });
-    s = r(s, { type: "setTrackTitle", clientId: "t2", title: "JERK CLUB TOOL" });
-    s = r(s, { type: "addTrackArtist", clientId: "t2", chip: existingChip({ id: "a2", name: "Quinoa Jones" }) });
+    s = r(s, { type: "setAlbumTitle", title: "  Sample Album " });
+    s = r(s, { type: "addAlbumArtist", chip: existingChip({ id: "a1", name: "Halcyon" }) });
+    s = r(s, { type: "setTrackTitle", clientId: "t1", title: "FIRST LIGHT" });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip(" Ember ") });
+    s = r(s, { type: "setTrackTitle", clientId: "t2", title: "NIGHT SHIFT" });
+    s = r(s, { type: "addTrackArtist", clientId: "t2", chip: existingChip({ id: "a2", name: "Juno Park" }) });
 
     expect(buildPayload(s, { t1: "tracks/1.mp3", t2: "tracks/2.mp3" })).toEqual({
       kind: "album",
-      album: { title: "The Breaks", artists: [{ id: "a1" }] },
+      album: { title: "Sample Album", artists: [{ id: "a1" }] },
       tracks: [
-        { title: "ASSUMPTIONS", audioKey: "tracks/1.mp3", artists: [{ newName: "Sawcy" }] },
-        { title: "JERK CLUB TOOL", audioKey: "tracks/2.mp3", artists: [{ id: "a2" }] },
+        { title: "FIRST LIGHT", audioKey: "tracks/1.mp3", artists: [{ newName: "Ember" }] },
+        { title: "NIGHT SHIFT", audioKey: "tracks/2.mp3", artists: [{ id: "a2" }] },
       ],
     });
   });
 
   it("omits album for a single and throws when a key is missing", () => {
     let s = r(init(), { type: "setTrackTitle", clientId: "t1", title: "Solo" });
-    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Daye") });
+    s = r(s, { type: "addTrackArtist", clientId: "t1", chip: newChip("Nova") });
     expect(buildPayload(s, { t1: "tracks/1.mp3" })).not.toHaveProperty("album");
     expect(() => buildPayload(s, {})).toThrow("Track 1 has no uploaded file.");
   });

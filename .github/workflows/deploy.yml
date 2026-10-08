@@ -1,0 +1,80 @@
+name: Deploy
+
+on:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production-preflight' || 'develop' }}
+    env:
+      DB_URL: ${{ secrets.DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Pending migrations (dry run)
+        run: |
+          yarn -s supabase db push --db-url "$DB_URL" --dry-run 2>&1 | tee plan.txt
+          {
+            echo "### Pending migrations → ${{ github.ref_name }}"
+            echo '```'
+            cat plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  backup:
+    if: github.ref_name == 'main'
+    needs: plan
+    uses: ./.github/workflows/backup.yml
+    secrets: inherit
+
+  release:
+    needs: [plan, backup]
+    # backup is skipped on develop; still require plan success and no failed backup.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.backup.result == 'success' || needs.backup.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    # production-release has a required reviewer: this job waits for the Approve click.
+    # (Not named "production": Vercel auto-creates a GitHub "Production" environment and
+    # GitHub environment names are case-insensitive.)
+    environment: ${{ github.ref_name == 'main' && 'production-release' || 'develop' }}
+    env:
+      DB_URL: ${{ secrets.DB_URL }}
+      VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Apply migrations
+        run: yarn -s supabase db push --db-url "$DB_URL" --yes
+      - name: Trigger Vercel deploy
+        env:
+          BRANCH: ${{ github.ref_name }}
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          # The hook builds the branch tip. If a newer commit is queued behind
+          # this run, its migrations haven't run yet: let that run deploy it.
+          tip=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [ "$tip" != "$RUN_SHA" ]; then
+            echo "::notice::Newer commit on $BRANCH; skipping deploy — the queued run will migrate and deploy it."
+            exit 0
+          fi
+          curl -fsS -X POST "$VERCEL_DEPLOY_HOOK" > /dev/null

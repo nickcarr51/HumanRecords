@@ -1,4 +1,5 @@
-// Ensures the two test accounts exist on a HOSTED Supabase project with the
+// Ensures the accounts listed in scripts/users.local.json (gitignored; copy
+// scripts/users.example.json) exist on a HOSTED Supabase project with the
 // right role. Idempotent: creates missing users, fixes wrong roles, skips the
 // rest. Uses admin.createUser (no email is sent); users sign in with OTP.
 //
@@ -7,13 +8,13 @@
 // .env.develop.local needs SUPABASE_URL + SUPABASE_SECRET_KEY for the develop
 // project. Never point this at production without deciding to on purpose.
 
+import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
+import { parseUsersFile } from "./lib/users-file.mts";
 
-type Role = "listener" | "artist" | "label_member";
-const USERS: Array<{ email: string; role: Role; name: string }> = [
-  { email: "quinoajonesmusic@gmail.com", role: "label_member", name: "Quinoa Jones" },
-  { email: "nick.carr84@gmail.com", role: "listener", name: "Nick Carr" },
-];
+const USERS = parseUsersFile(
+  JSON.parse(await readFile(new URL("./users.local.json", import.meta.url), "utf8")),
+);
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY;

@@ -29,7 +29,7 @@ import type { ReleasePayload } from "./types";
 const KEY = "tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3";
 const single: ReleasePayload = {
   kind: "single",
-  tracks: [{ title: "Song", audioKey: KEY, artists: [{ newName: "Daye" }] }],
+  tracks: [{ title: "Song", audioKey: KEY, artists: [{ newName: "Nova" }] }],
 };
 
 beforeEach(() => {
@@ -54,13 +54,13 @@ describe("role gate", () => {
 
 describe("searchArtists", () => {
   it("searches by escaped substring, ordered, capped at 8", async () => {
-    limit.mockResolvedValue({ data: [{ id: "a1", name: "Daye" }], error: null });
+    limit.mockResolvedValue({ data: [{ id: "a1", name: "Nova" }], error: null });
     const res = await searchArtists("  da_  ");
     expect(from).toHaveBeenCalledWith("artists");
     expect(ilike).toHaveBeenCalledWith("name", "%da\\_%");
     expect(order).toHaveBeenCalledWith("name", { ascending: true });
     expect(limit).toHaveBeenCalledWith(8);
-    expect(res).toEqual({ artists: [{ id: "a1", name: "Daye" }], error: null });
+    expect(res).toEqual({ artists: [{ id: "a1", name: "Nova" }], error: null });
   });
 
   it("logs and reports a failed search; ignores non-string queries", async () => {
@@ -126,7 +126,7 @@ describe("publishRelease", () => {
   it("refuses keys it didn't mint", async () => {
     const res = await publishRelease({
       ...single,
-      tracks: [{ ...single.tracks[0], audioKey: "DAYE. - LET EM KNOW.mp3" }],
+      tracks: [{ ...single.tracks[0], audioKey: "NOVA. - SLOW BLOOM.mp3" }],
     });
     expect(res).toEqual({ error: "Invalid audio file reference." });
     expect(rpc).not.toHaveBeenCalled();

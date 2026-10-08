@@ -1,5 +1,7 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
+import { useEffect } from 'react';
 import styled from 'styled-components';
 import { Button } from '@/components';
 
@@ -28,7 +30,10 @@ const Msg = styled.p`
   margin: 0;
 `;
 
-export default function AppError({ reset }: { error: Error; reset: () => void }) {
+export default function AppError({ error, reset }: { error: Error; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
   return (
     <Wrap>
       <Title>Something went wrong.</Title>

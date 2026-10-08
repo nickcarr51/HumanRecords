@@ -4,33 +4,33 @@ import { existingChip, newChip } from "./upload-reducer";
 
 describe("buildOptions", () => {
   it("returns nothing for a blank query", () => {
-    expect(buildOptions("  ", [{ id: "a1", name: "Daye" }], [], [])).toEqual([]);
+    expect(buildOptions("  ", [{ id: "a1", name: "Nova" }], [], [])).toEqual([]);
   });
 
   it("lists DB matches, then a Create row when there's no exact match", () => {
-    const opts = buildOptions("day", [{ id: "a1", name: "Daye" }], [], []);
+    const opts = buildOptions("nov", [{ id: "a1", name: "Nova" }], [], []);
     expect(opts).toEqual([
-      { kind: "existing", chip: existingChip({ id: "a1", name: "Daye" }) },
-      { kind: "create", name: "day" },
+      { kind: "existing", chip: existingChip({ id: "a1", name: "Nova" }) },
+      { kind: "create", name: "nov" },
     ]);
   });
 
   it("hides Create when a DB match is exact ignoring case/spaces", () => {
-    const opts = buildOptions(" DAYE ", [{ id: "a1", name: "Daye" }], [], []);
+    const opts = buildOptions(" NOVA ", [{ id: "a1", name: "Nova" }], [], []);
     expect(opts.some((o) => o.kind === "create")).toBe(false);
   });
 
   it("offers pending new artists from elsewhere in the form instead of a second Create", () => {
-    const opts = buildOptions("saw", [], [newChip("Sawcy")], []);
+    const opts = buildOptions("emb", [], [newChip("Ember")], []);
     expect(opts).toEqual([
-      { kind: "existing", chip: newChip("Sawcy") },
-      { kind: "create", name: "saw" },
+      { kind: "existing", chip: newChip("Ember") },
+      { kind: "create", name: "emb" },
     ]);
-    expect(buildOptions("sawcy", [], [newChip("Sawcy")], []).some((o) => o.kind === "create")).toBe(false);
+    expect(buildOptions("ember", [], [newChip("Ember")], []).some((o) => o.kind === "create")).toBe(false);
   });
 
   it("excludes artists already chipped on this field, and hides Create for them", () => {
-    const opts = buildOptions("daye", [{ id: "a1", name: "Daye" }], [], [existingChip({ id: "a1", name: "Daye" })]);
+    const opts = buildOptions("nova", [{ id: "a1", name: "Nova" }], [], [existingChip({ id: "a1", name: "Nova" })]);
     expect(opts).toEqual([]);
   });
 });

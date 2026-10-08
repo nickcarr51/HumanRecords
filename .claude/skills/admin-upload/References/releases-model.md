@@ -102,5 +102,6 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 
 - Tracks/albums inserted by hand (SQL editor) don't appear on `/feed` without a matching
   `releases` row — `getFeed` reads `releases`, not `tracks`/`albums`.
-- Prod deploy order: push the migrations to the hosted project (`supabase db push`)
-  **before** merging develop → main; the new `getFeed` needs the `releases` table.
+- Prod deploy order is automatic: `deploy.yml` applies migrations to prod (after the Approve
+  click) and only then triggers the Vercel deploy, so the new `getFeed` always finds the
+  `releases` table. Never push migrations by hand ([[release-ops]]).

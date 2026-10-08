@@ -42,7 +42,7 @@ explicitly: `track_artists(artist_id)`, `album_artists(artist_id)`, `track_album
 
 `tracks.audio_url`, `tracks.track_art_url`, `albums.album_art_url`,
 `artists.profile_photo_url` store the **object key** in the private R2 bucket (e.g.
-`DAYE. - LET EM KNOW.mp3` from the seed, or `tracks/<uuid>.mp3` for admin uploads). The `_url` suffix is
+`tracks/<uuid>.mp3` — the seed and admin uploads use the same shape). The `_url` suffix is
 historical. Never render them directly — sign them server-side (see [[media-storage]]).
 Artwork columns are currently always null (no artwork upload yet).
 

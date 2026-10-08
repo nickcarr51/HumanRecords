@@ -77,23 +77,28 @@ navigation isn't mistaken for a failure.
 
 ## R2 CORS rule
 
-The browser PUTs cross-origin to the R2 endpoint, so the bucket needs a CORS rule. **Not
-yet applied** as of 2026-09-30 — until it is, every browser upload fails at the PUT step
-(the preflight is rejected). Apply in Cloudflare → R2 → `humanrecords-media-dev` →
-Settings → CORS policy:
+The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
+upload fails at the PUT step (the preflight is rejected). One rule per bucket, pasted by the user
+into Cloudflare -> R2 -> bucket -> Settings -> CORS policy:
 
 ```json
 [
   {
-    "AllowedOrigins": ["http://localhost:3000", "https://<develop-vercel-domain>"],
-    "AllowedMethods": ["PUT"],
+    "AllowedOrigins": ["<origin(s) for this environment>"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedHeaders": ["content-type"],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
 
-**Unverified:** whether R2 accepts a wildcard origin for Vercel ephemeral previews (e.g.
-`https://*-<team>.vercel.app`). If it doesn't, list the develop domain explicitly and
-accept that ephemeral preview deployments can't upload. Update this section with the rule
-actually applied.
+Origins: local = `http://localhost:3000` (and `http://127.0.0.1:3000`); dev = the develop domain;
+prod = the prod domain. The files will be committed as `infra/r2/cors.{local,dev,prod}.json`
+during setup (Task B2, pending); until then this JSON is the reference.
+
+Status: applied to all three buckets 2026-10-06; the exact rules live in `infra/r2/cors.*.json`
+(local: localhost + 127.0.0.1; dev: `https://humanservices-dev.vercel.app`; prod:
+`https://humanservices.vercel.app`). Re-paste after a domain change
+([[release-ops]] `References/domain-cutover.md`).
+
+Feature-branch preview deployments are turned off (`vercel.json`), so no other origins exist.

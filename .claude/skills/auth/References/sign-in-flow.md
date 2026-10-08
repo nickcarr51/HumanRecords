@@ -8,7 +8,7 @@
    dashboard invite sends the **invite** email (link to `/auth/confirm?…&type=invite`);
    `scripts/invite-users.mts` sends nothing — the user just signs in.
 2. **Request a code.** `/login` email step → `requestOtp(email)` → Supabase sends the
-   **magic_link** email containing both an 8-character code and a link.
+   **magic_link** email containing both a 6-digit code and a link.
 3. **Either** type the code → `submitOtp(email, code, next)` → `verifyOtp({ type: 'email' })`
    → session cookies set → `redirect(safeNextPath(next))`.
    **Or** click the link → `GET /auth/confirm?token_hash=…&type=magiclink` →
@@ -70,7 +70,7 @@ middleware with the token untouched.
 
 `supabase/config.toml` (local; mirror these in each hosted dashboard):
 - `[auth] enable_signup = false`, `site_url = http://127.0.0.1:3000`.
-- `[auth.email] otp_length = 8`, `otp_expiry = 3600` (1h), `max_frequency = 1m`.
+- `[auth.email] otp_length = 6`, `otp_expiry = 3600` (1h), `max_frequency = 1m`.
 - `[auth.email.template.invite]` → `supabase/templates/invite.html` — link to
   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite`.
 - `[auth.email.template.magic_link]` → `supabase/templates/magic_link.html` — shows
@@ -82,6 +82,6 @@ Locally, emails land in Mailpit at `http://127.0.0.1:54324`.
 
 ## Changing the flow — watch-outs
 
-- The `/login` hint says "8-character code"; keep it in sync with `otp_length`.
+- The `/login` hint says "6-digit code"; keep it in sync with `otp_length`.
 - Adding an email link type means adding it to `ALLOWED_OTP_TYPES` **and** a template.
 - Any new redirect target from user input must go through `safeNextPath`.

@@ -13,12 +13,12 @@ describe("namesFrom", () => {
   it("returns names in credit order, deduped, skipping null artists", () => {
     expect(
       namesFrom([
-        { position: 2, artists: { name: "Sawcy" } },
-        { position: 1, artists: { name: "Castillonaire" } },
+        { position: 2, artists: { name: "Ember" } },
+        { position: 1, artists: { name: "Halcyon" } },
         { position: 3, artists: null },
-        { position: 4, artists: { name: "Sawcy" } },
+        { position: 4, artists: { name: "Ember" } },
       ]),
-    ).toEqual(["Castillonaire", "Sawcy"]);
+    ).toEqual(["Halcyon", "Ember"]);
   });
 
   it("handles null", () => {

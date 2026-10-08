@@ -10,10 +10,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "r2:seed-local": "node --env-file=.env.local scripts/r2-seed-local.mts"
   },
   "dependencies": {
+    "@sentry/nextjs": "^11.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "aws4fetch": "^1.0.20",

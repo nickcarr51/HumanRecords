@@ -99,21 +99,21 @@ describe("publish_release", () => {
 
   it("reuses an existing artist when a 'new' name differs only by case/spaces, and creates one row for a repeated new name", async () => {
     const t = newTag();
-    await admin.from("artists").insert({ name: `${t}Daye` });
+    await admin.from("artists").insert({ name: `${t}Nova` });
     const client = await labelClient();
     const { error } = await client.rpc("publish_release", {
       payload: {
         kind: "album",
         album: { title: `${t}Album`, artists: [] },
         tracks: [
-          { title: `${t}One`, audioKey: "tracks/1.mp3", artists: [{ newName: `  ${t}daye ` }, { newName: `${t}Sawcy` }] },
-          { title: `${t}Two`, audioKey: "tracks/2.mp3", artists: [{ newName: ` ${t}SAWCY` }] },
+          { title: `${t}One`, audioKey: "tracks/1.mp3", artists: [{ newName: `  ${t}nova ` }, { newName: `${t}Ember` }] },
+          { title: `${t}Two`, audioKey: "tracks/2.mp3", artists: [{ newName: ` ${t}EMBER` }] },
         ],
       },
     });
     expect(error).toBeNull();
     const { data: artists } = await admin.from("artists").select("name").ilike("name", `${t}%`);
-    expect(artists!.map((a) => a.name).sort()).toEqual([`${t}Daye`, `${t}Sawcy`].sort());
+    expect(artists!.map((a) => a.name).sort()).toEqual([`${t}Nova`, `${t}Ember`].sort());
   });
 
   it("allows an album with no album artists", async () => {

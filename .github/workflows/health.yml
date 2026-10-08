@@ -1,0 +1,39 @@
+name: Health
+
+on:
+  schedule:
+    - cron: "0 16 * * *" # daily; also keeps free-tier Supabase from pausing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: develop
+            supabase_url: DEV_SUPABASE_URL
+            key: DEV_SUPABASE_PUBLISHABLE_KEY
+            site: DEV_SITE_URL
+          - name: production
+            supabase_url: PROD_SUPABASE_URL
+            key: PROD_SUPABASE_PUBLISHABLE_KEY
+            site: PROD_SITE_URL
+    env:
+      SB_URL: ${{ vars[matrix.supabase_url] }}
+      SB_KEY: ${{ vars[matrix.key] }}
+      SITE: ${{ vars[matrix.site] }}
+    steps:
+      - name: Supabase API + database answer
+        run: |
+          curl -fsS -o /dev/null "$SB_URL/rest/v1/releases?select=id&limit=1" -H "apikey: $SB_KEY"
+      - name: Site answers
+        run: curl -fsSL -o /dev/null "$SITE/login"

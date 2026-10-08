@@ -22,7 +22,7 @@ export interface LoginFormProps {
   initialError?: string | null;
 }
 
-// Email → 8-character code. Never sends a code on its own: a pre-filled
+// Email → 6-digit code. Never sends a code on its own: a pre-filled
 // email (from ?email=) still needs a human to press "Send code", so link
 // scanners can't trigger code emails.
 export function LoginForm({ initialEmail, next, linkFailed, initialError }: LoginFormProps) {
@@ -115,7 +115,7 @@ export function LoginForm({ initialEmail, next, linkFailed, initialError }: Logi
               <FormField
                 label="Code"
                 htmlFor="code"
-                hint="8-character code from your email"
+                hint="6-digit code from your email"
               >
                 <Input
                   id="code"
