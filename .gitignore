@@ -34,3 +34,26 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# next.js scaffold artifact
+AGENTS.md
+
+# local working docs (specs/plans) - exceptions are committed explicitly
+docs/
+
+# superpowers subagent-driven-development scratch workspace (ledgers, briefs, review packages)
+.superpowers/
+
+# git worktrees (native tool creates these here)
+.claude/worktrees/
+
+# skill walkthroughs are local human-onboarding notes, not committed skill surface
+.claude/skills/**/Walkthrough/
+
+# local database backups (supabase db dump) — real data, never commit
+backup*.sql
+
+# real personal accounts for local seeding / the develop invite script
+supabase/seed.local.sql
+scripts/users.local.json
+supabase/seed-media/

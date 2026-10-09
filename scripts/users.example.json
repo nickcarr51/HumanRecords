@@ -1,0 +1,4 @@
+[
+  { "email": "label@example.com", "role": "label_member", "name": "Lou LabelMember" },
+  { "email": "listener@example.com", "role": "listener", "name": "Lena Listener" }
+]

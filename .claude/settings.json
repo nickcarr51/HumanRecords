@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(supabase db push:*)",
+      "Bash(yarn supabase db push:*)",
+      "Bash(npx supabase db push:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-db.sh",
+            "timeout": 10,
+            "statusMessage": "Checking for commands that touch hosted databases"
+          }
+        ]
+      }
+    ]
+  }
+}

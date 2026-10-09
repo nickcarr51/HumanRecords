@@ -1,0 +1,8 @@
+[
+  {
+    "AllowedOrigins": ["https://humanservices-dev.vercel.app"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["content-type"],
+    "MaxAgeSeconds": 3600
+  }
+]

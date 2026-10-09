@@ -1,0 +1,50 @@
+{
+  "name": "human-services",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "r2:seed-local": "node --env-file=.env.local scripts/r2-seed-local.mts"
+  },
+  "dependencies": {
+    "@sentry/nextjs": "^11.4.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "aws4fetch": "^1.0.20",
+    "next": "15.5.25",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "server-only": "^0.0.1",
+    "styled-components": "^6.5.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/styled-components": "^5.1.36",
+    "@vitejs/plugin-react": "4",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.25",
+    "happy-dom": "^20.14.5",
+    "jsdom": "24",
+    "supabase": "^2.117.0",
+    "typescript": "^5",
+    "vite": "7.0.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^5.0.0"
+  }
+}
