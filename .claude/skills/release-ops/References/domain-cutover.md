@@ -20,7 +20,11 @@ Cargo gotchas: Name is the bare label (`services`, not `humanrecords.co.services
 blocked publishing of the whole zone until deleted). Values pasted through chat apps can pick up
 invisible non-breaking spaces; verify with `dig +short TXT <name>.humanrecords.co @ns1.cargo.site`.
 
-Checklist (as run; reuse for a dev subdomain or a future move):
+Checklist (as run for **prod**; reuse for a future prod move). Every step below targets
+production. For a develop host, swap each target for its develop counterpart — never run these
+as written: `cors.dev.json` + `humanrecords-media-dev`; Vercel Preview (develop) `SITE_URL` +
+rerun the latest **develop** Deploy run; the develop Supabase project (`vpmloqanmmafchsucgkl`);
+`DEV_SITE_URL`; and the Vercel domain assigned to the `develop` branch, not Production.
 
 1. Back up: screenshot the existing DNS records.
 2. Resend: add the domain, add its records, verify; switch the SMTP sender in both Supabase projects

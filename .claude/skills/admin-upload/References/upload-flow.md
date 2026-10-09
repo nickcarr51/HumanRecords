@@ -79,22 +79,9 @@ navigation isn't mistaken for a failure.
 
 The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
 upload fails at the PUT step (the preflight is rejected). One rule per bucket, pasted by the user
-into Cloudflare -> R2 -> bucket -> Settings -> CORS policy:
-
-```json
-[
-  {
-    "AllowedOrigins": ["<origin(s) for this environment>"],
-    "AllowedMethods": ["GET", "HEAD", "PUT"],
-    "AllowedHeaders": ["content-type"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-Origins: local = `http://localhost:3000` (and `http://127.0.0.1:3000`); dev = the develop domain;
-prod = the prod domain. The files will be committed as `infra/r2/cors.{local,dev,prod}.json`
-during setup (Task B2, pending); until then this JSON is the reference.
+into Cloudflare -> R2 -> bucket -> Settings -> CORS policy. The source of truth is
+`infra/r2/cors.{local,dev,prod}.json` (only `PUT` with `content-type`; streaming, downloads and
+artwork don't need CORS — see `infra/r2/README.md`).
 
 Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09); the exact rules live in
 `infra/r2/cors.*.json` (local: localhost + 127.0.0.1; dev: `https://humanservices-dev.vercel.app`;
