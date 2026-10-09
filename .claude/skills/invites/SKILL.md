@@ -66,10 +66,10 @@ The server pages `/login` and `/admin/users` import components per folder
 
 - **Invite email is still a `mailto:` link** with placeholder copy. (Hosted OTP/magic-link
   emails go through Resend SMTP: 30/hour cap, 60s per-email frequency; sender
-  `onboarding@resend.dev` delivers only to the Resend account owner until the domain is
-  verified — see [[release-ops]].)
+  `noreply@humanrecords.co` — see [[release-ops]].)
 - **No token expiry, Revoke, CSV export, search, or pagination** (under ~50 invitees).
-- **Per-environment `SITE_URL`** must be set in each Vercel environment and changed at domain
+- **Per-environment `SITE_URL`** must be set in each Vercel environment (prod:
+  `https://services.humanrecords.co`; develop: `https://humanservices-dev.vercel.app`); see the domain
   cut-over ([[release-ops]] `References/domain-cutover.md`). Hosted develop test accounts come
   from `scripts/invite-users.mts` + gitignored `scripts/users.local.json`. NFC: write the
   final-domain invite URL, verify a tap, then lock the tag.

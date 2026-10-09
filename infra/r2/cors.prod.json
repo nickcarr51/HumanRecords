@@ -1,6 +1,6 @@
 [
   {
-    "AllowedOrigins": ["https://humanservices.vercel.app"],
+    "AllowedOrigins": ["https://services.humanrecords.co", "https://humanservices.vercel.app"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["content-type"],
     "MaxAgeSeconds": 3600

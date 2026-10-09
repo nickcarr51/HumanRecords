@@ -3,14 +3,15 @@
 | | Local | Develop | Prod |
 |---|---|---|---|
 | Git branch | any | `develop` | `main` |
-| App | `yarn dev` | Vercel Preview for `develop`, fixed alias; later `dev.<domain>` | Vercel Production; later `<domain>` |
+| App | `yarn dev` | Vercel Preview for `develop`, fixed alias `humanservices-dev.vercel.app` | Vercel Production, `services.humanrecords.co` |
 | Supabase | Docker (`yarn supabase start`) | `HumanRecordsDev` (`vpmloqanmmafchsucgkl`) | `Human Services` (`gglrarflzvfxhdnjbnvt`) |
 | R2 bucket | `humanrecords-media-local` | `humanrecords-media-dev` | `humanrecords-media-prod` (locked) |
 | R2 token scope | local bucket only | dev bucket only | prod bucket only |
 | Email | Mailpit (`http://127.0.0.1:54324`) | Resend | Resend |
 
 One Vercel project (`nick-carrs-projects/human-records`) linked to the GitHub repo; production
-branch `main` → `https://humanservices.vercel.app`; `develop` (branch-scoped Preview env vars) →
+branch `main` → `https://services.humanrecords.co` (since 2026-10-09; `https://humanservices.vercel.app`
+still serves prod too); `develop` (branch-scoped Preview env vars) →
 `https://humanservices-dev.vercel.app`. `vercel.json` sets `git.deploymentEnabled: false`, so NO
 branch deploys on push — feature branches get no preview sites (decided 2026-10-06); develop and
 main deploy only via `deploy.yml`'s deploy hooks. Free Supabase pauses after
@@ -40,10 +41,11 @@ The prod R2 token lives only in Vercel Production. The backup token lives only i
 - Sign-up OFF (Authentication → "Allow new users to sign up").
 - Email OTP length 6, OTP expiry 3600.
 - Custom `invite` and `magic_link` templates pasted from `supabase/templates/`.
-- Site URL and redirect URLs set per environment (change at domain cut-over).
+- Site URL and redirect URLs set per environment. Prod Site URL `https://services.humanrecords.co`;
+  prod redirects allow both `https://services.humanrecords.co/**` and `https://humanservices.vercel.app/**`.
 - Custom SMTP = Resend: host `smtp.resend.com`, port 465, user `resend`, password = Resend API
-  key (pasted by the owner). Sender `onboarding@resend.dev` until the domain is verified; that
-  sender delivers only to the Resend account owner, so real invitees cannot receive codes yet.
+  key (pasted by the owner). Sender `noreply@humanrecords.co` in both projects (Resend domain
+  `humanrecords.co` verified 2026-10-09; DKIM/SPF/DMARC records in Cargo DNS).
 - OTP minimum per-email frequency 60s; emails-per-hour cap 30 (protects the Resend quota:
   3,000/month, 100/day on the free plan).
 

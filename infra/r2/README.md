@@ -11,4 +11,4 @@ uploads only from its own environment's site.
 |---|---|---|
 | `cors.local.json` | `humanrecords-media-local` | applied 2026-10-05 |
 | `cors.dev.json` | `humanrecords-media-dev` | applied 2026-10-06 (develop site only) |
-| `cors.prod.json` | `humanrecords-media-prod` | applied 2026-10-06 (add the custom domain when bought) |
+| `cors.prod.json` | `humanrecords-media-prod` | applied 2026-10-09 (services.humanrecords.co + vercel.app) |
