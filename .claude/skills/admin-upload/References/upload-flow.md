@@ -96,9 +96,9 @@ Origins: local = `http://localhost:3000` (and `http://127.0.0.1:3000`); dev = th
 prod = the prod domain. The files will be committed as `infra/r2/cors.{local,dev,prod}.json`
 during setup (Task B2, pending); until then this JSON is the reference.
 
-Status: applied to all three buckets 2026-10-06; the exact rules live in `infra/r2/cors.*.json`
-(local: localhost + 127.0.0.1; dev: `https://humanservices-dev.vercel.app`; prod:
-`https://humanservices.vercel.app`). Re-paste after a domain change
+Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09); the exact rules live in
+`infra/r2/cors.*.json` (local: localhost + 127.0.0.1; dev: `https://humanservices-dev.vercel.app`;
+prod: `https://services.humanrecords.co` + `https://humanservices.vercel.app`). Re-paste after a domain change
 ([[release-ops]] `References/domain-cutover.md`).
 
 Feature-branch preview deployments are turned off (`vercel.json`), so no other origins exist.

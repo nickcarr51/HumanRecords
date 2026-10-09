@@ -53,17 +53,17 @@ touches hosted data without explicit permission in the moment (guard hook enforc
 - [backups-and-restore.md](References/backups-and-restore.md) — backup layout, lock and
   lifecycle, the weekly drill, the prod restore runbook.
 - [onboarding.md](References/onboarding.md) — first prod admin, then `/admin/users`; develop accounts.
-- [domain-cutover.md](References/domain-cutover.md) — checklist when the domain is bought; NFC card writing and locking.
+- [domain-cutover.md](References/domain-cutover.md) — cut-over checklist (done 2026-10-09 for prod) and DNS records; NFC card writing and locking.
 
 ## Depends on
 
 [[catalog-schema]] (migrations, seed, types), [[media-storage]] (buckets, tokens, CORS),
 [[auth]] (hosted settings, templates), [[invites]] (`/admin/users`, `SITE_URL`, NFC links).
 
-## Known deferrals (as of 2026-10-05)
+## Known deferrals (as of 2026-10-09)
 
-- The domain is not bought yet (D6): environments use `*.vercel.app`; Resend sends from
-  `onboarding@resend.dev` (delivers only to the Resend account owner).
+- Prod is on `https://services.humanrecords.co`; develop stays on `humanservices-dev.vercel.app`
+  (no dev subdomain, decided). Auth email sends from `noreply@humanrecords.co`.
 - No develop DB backups and no backup encryption (deliberate).
 - No edit/delete releases yet; when built it must soft-delete (prod bucket is locked).
 - Copilot review not set up. `infra/r2/cors.*.json` are user-pasted into Cloudflare.

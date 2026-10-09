@@ -17,7 +17,7 @@ here so future work doesn't contradict it.
 
 ## Environments
 
-- `main` branch → Vercel Production (`https://humanservices.vercel.app`), "production" Supabase project
+- `main` branch → Vercel Production (`https://services.humanrecords.co`; `humanservices.vercel.app` also works), "production" Supabase project
 - `develop` branch → Vercel Preview/staging (`https://humanservices-dev.vercel.app`), "develop" Supabase project
 - Feature branches get no Vercel previews (`vercel.json` disables all git-triggered deploys)
 - Three R2 media buckets, one bucket-scoped token each: `humanrecords-media-local`
