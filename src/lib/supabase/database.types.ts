@@ -383,6 +383,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_artist: { Args: { target: string }; Returns: undefined }
       admin_list_users: {
         Args: never
         Returns: {

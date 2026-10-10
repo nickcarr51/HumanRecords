@@ -39,7 +39,15 @@ RLS filters rows, not columns. To hide `users.role` from peers while keeping nam
 
 ## Writes
 
-No insert/update/delete policy exists on any table. Under RLS, a write that no policy allows
+The only write policies are on `artists`, for label members (`/admin/artists`):
+
+| Policy | Rule |
+|---|---|
+| `"label members insert artists"` | `with check (current_user_role() = 'label_member' and length(trim(name)) > 0)` |
+| `"label members update artists"` | `using (current_user_role() = 'label_member')`, `with check` adds `length(trim(name)) > 0` (blank name → `42501`) — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
+
+No delete policy: deletes go through `admin_delete_artist`. No other table has an insert/update/delete
+policy. Under RLS, a write that no policy allows
 is **silently a no-op** (zero rows, `error: null`) — tests assert the value is unchanged, not
 that the call errored (see `catalog.test.ts`).
 
@@ -52,6 +60,8 @@ Sanctioned write paths:
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
 | Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
 | Search the feed | `rpc('search_feed')` (**invoker**, so RLS applies) | `authenticated` only |
+| Create / edit an artist | cookie client `insert`/`update` on `artists` (RLS policies above) | `label_member`; insert by others → `42501`, update by others → 0 rows (no error). Duplicate name or `user_id` → `23505` (`artists_name_ci_key` / `artists_user_id_key`) |
+| Delete an artist | `rpc('admin_delete_artist')` (definer) | `label_member`, else `42501`; unknown id `P0002`; still credited → `23503` (FK restrict); queues `profile_photo_url` in `r2_cleanup_queue` |
 | List users / change a role | `rpc('admin_list_users')`, `rpc('admin_set_user_role')` (definer) | `label_member`, else `42501`; own id → `22023` |
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |
