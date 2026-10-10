@@ -17,6 +17,10 @@ export default async function AdminPage() {
         <Heading $level={3}>Users</Heading>
         <Text $variant="muted">Invite people and manage roles.</Text>
       </ActionCard>
+      <ActionCard href="/admin/artists">
+        <Heading $level={3}>Artists</Heading>
+        <Text $variant="muted">Add and edit artists, link them to accounts.</Text>
+      </ActionCard>
     </Page>
   );
 }
