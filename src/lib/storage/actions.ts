@@ -14,10 +14,10 @@ export async function getTrackStreamUrl(trackId: string): Promise<UrlResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tracks")
-    .select("audio_url")
+    .select("audio_url, archived_at")
     .eq("id", trackId)
     .single();
-  if (error || !data) return { url: null, error: "Track not found." };
+  if (error || !data || data.archived_at) return { url: null, error: "Track not found." };
 
   // Signing can throw on server misconfig (missing R2 env). Keep the
   // { url, error } contract instead of rejecting the action so the UI can
@@ -39,10 +39,10 @@ export async function getTrackDownloadUrl(trackId: string): Promise<UrlResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tracks")
-    .select("title, audio_url")
+    .select("title, audio_url, archived_at")
     .eq("id", trackId)
     .single();
-  if (error || !data) return { url: null, error: "Track not found." };
+  if (error || !data || data.archived_at) return { url: null, error: "Track not found." };
 
   const ext = data.audio_url.split(".").pop() ?? "bin";
   const filename = `${data.title}.${ext}`;

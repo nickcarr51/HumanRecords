@@ -19,11 +19,11 @@ null render on empty queue; title/artist; controls call actions; play vs pause i
 (integration, `*.data.test.ts` convention). These require a **local Supabase** running
 (`yarn supabase start`); `test-helpers.ts` refuses non-local URLs. They self-seed rows with
 `createAdminClient`/`createTestUser`, sign in, exercise real queries, and clean up in
-`afterEach`. Covers: releases newest first with album tracks + credits in `position`
+`afterEach`. Covers: releases pinned first, then `sort_at` with album tracks + credits in `position`
 order; tracks without a release excluded; uncredited single → empty `artistNames`;
 pagination (`pageSize`/`hasMore`) — the tests give `releases.created_at` values that
 contradict track creation order, proving ordering comes from `releases`; `getAlbum`
-positive + null (missing + non-UUID) paths and position (not title) track order.
+positive + null (missing + non-UUID + archived) paths and position (not title) track order; feed pinned/`sort_at` order and archived items hidden; `feed-page-size.test.ts` (unit) for `FEED_PAGE_SIZE`.
 
 **Auth redirects** — `route-guard.test.ts`, `safe-next.test.ts`, `not-found.test.tsx`,
 `middleware.test.ts`, `auth/confirm/route.test.ts` all assert the `/feed` targets.
@@ -46,6 +46,7 @@ components, add tests for the logic (not just render).
 ## Running
 
 - Unit only (no DB): `yarn test --run src/components/Player src/components/Feed`
+- Vitest runs two projects: `unit` (parallel) and `db` (serial; every `*.data.test.ts` plus the `dbTests` list in `vitest.config.mts`). See [[catalog-schema]] `References/local-workflow.md`.
 - Data layer: ensure `yarn supabase start` is up, then
   `yarn test --run src/lib/supabase/feed.data.test.ts src/lib/supabase/albums.data.test.ts`
 - Everything: `yarn test --run` (data tests fail on connection if Supabase is down — that's

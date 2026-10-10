@@ -24,7 +24,8 @@ which is invoker but only reachable from inside `publish_release`.
 
 - Migration `20261002120100_create_invites.sql`. Definer, `stable`. Raises `42501` unless
   `current_user_role() = 'label_member'`.
-- Returns `id, email, name, role, created_at, invite_token, invite_used_at`, newest first.
+- Returns `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`, newest first.
+  `banned_until` (from `auth.users`) was added in `20261010120500` (drop + recreate, since the return type changed; the deployed code ignores the extra column). Nothing renders it yet; the user-admin branch will.
   Generated types mark `name`/`invite_token`/`invite_used_at` non-null though they can be null.
 - Grants: revoked from `public`/`anon`, granted to `authenticated`. Caller: [[invites]].
 
@@ -68,6 +69,42 @@ which is invoker but only reachable from inside `publish_release`.
   raise rolls back everything.
 - Full contract, payload shape, and SQLSTATE → UI mapping: [[admin-upload]]
   (`References/releases-model.md`).
+
+## `move_release(target uuid, direction text)` → void
+
+- Migration `20261010120100_move_release.sql`. Definer, `search_path = public`; revoked from
+  `public`/`anon`, granted to `authenticated`.
+- Errors: `42501` not a label member; `22023` direction not `up`/`down`, or the release is archived;
+  `P0002` no such release. Already at the edge of its pinned group: silent no-op.
+- Locks the target and its neighbour (`for update`), finds the neighbour in the **same pinned group**
+  (live only) by `(sort_at, id)`, then swaps their `sort_at`.
+  Fast path: one indexed EXISTS looks for any other live row in the group sharing the target's or
+  neighbour's `sort_at` (or the two tie with each other); if none, it is a plain swap writing only
+  those 2 rows. Otherwise it first normalizes the whole pinned group (live rows): with rows
+  numbered `i` in feed order, `v_i = min over j<=i of (s_j + j*1ms) - i*1ms`, writing only rows
+  where `v_i <> s_i`. Values only move down, are strictly 1 ms+ apart, and keep feed order, so
+  nothing collides and the neighbour stays adjacent; then it swaps. 1 ms because JS `Date` keeps
+  only milliseconds. One click always moves exactly one spot.
+- Two concurrent opposite moves can deadlock (`40P01`): callers should show a "try again" message.
+- Caller: the future release-admin UI ([[content-lifecycle]], `References/ordering.md`).
+
+## `search_feed(q text)` → `setof releases`
+
+- Migration `20261010120200_search_feed.sql`. `sql`, `stable`, **security invoker**; `authenticated` only.
+- Case-insensitive substring match on track titles, album titles and credited artist names (an album
+  also matches through its live tracks); `%`, `_` and `\` in `q` are escaped, so `100%` is literal.
+  Excludes archived releases and archived tracks.
+- **An empty `q` matches everything**, so callers skip the RPC for an empty query.
+- Returns plain `releases` rows so the caller chains the same embedded select, order and `range` as
+  `getFeed`. PostgREST orders an RPC result only by columns in the select projection, so the select
+  must include `pinned, sort_at` (as `RELEASE_SELECT` does).
+- Not wired to UI yet.
+
+## Triggers `releases_default_sort_at()` and `keep_created_at()`
+
+- Migration `20261010120000`. `releases_default_sort_at` (before insert on `releases`): sets
+  `sort_at := created_at` when null. `keep_created_at` (before update of `created_at` on `releases`,
+  `tracks`, `albums`): resets `created_at` to the old value. Plain invoker triggers, not callable via the API.
 
 ## Writing a new function
 

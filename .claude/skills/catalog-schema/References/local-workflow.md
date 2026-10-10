@@ -89,6 +89,11 @@ The local CLI stays linked to the develop project, so `db push` and any `--linke
 
 - Files: `*.data.test.ts` (query functions) and `users|artists|catalog|catalog-relations.test.ts`
   (schema + RLS). All need the local stack running.
+- **Two Vitest projects** (`vitest.config.mts`): `unit` (parallel, excludes DB tests) and `db`
+  (`fileParallelism: false`). DB-backed files share one local database and some assert on global
+  ordering (top of the feed), so they must run serially. The `db` project includes
+  `src/**/*.data.test.ts` plus the `dbTests` list. **A new DB-backed test not named
+  `*.data.test.ts` must be added to `dbTests`**, or it runs in parallel in `unit`.
 - `test-helpers.ts` **throws at import** unless `NEXT_PUBLIC_SUPABASE_URL` is
   `127.0.0.1`/`localhost` — these tests create and delete real rows.
 - `createAdminClient()` (service role) seeds fixtures; `createTestUser({ role, name })` (role in `app_metadata`, name in `user_metadata`) creates a

@@ -122,3 +122,22 @@ describe("getTrackDownloadUrl", () => {
     errorSpy.mockRestore();
   });
 });
+
+describe("archived tracks", () => {
+  it("refuses to stream an archived track", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: "tracks/a.mp3", archived_at: "2026-10-10T00:00:00Z" }, error: null });
+    const res = await getTrackStreamUrl("track-1");
+    expect(res).toEqual({ url: null, error: "Track not found." });
+    expect(signStreamUrl).not.toHaveBeenCalled();
+  });
+
+  it("refuses to download an archived track and records nothing", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { title: "T", audio_url: "tracks/a.mp3", archived_at: "2026-10-10T00:00:00Z" }, error: null });
+    const res = await getTrackDownloadUrl("track-1");
+    expect(res).toEqual({ url: null, error: "Track not found." });
+    expect(signDownloadUrl).not.toHaveBeenCalled();
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+});

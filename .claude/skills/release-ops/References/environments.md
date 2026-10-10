@@ -29,6 +29,7 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 | `R2_ACCOUNT_ID`, `R2_ENDPOINT` | same | same | same |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | local token | dev token | prod token |
 | `R2_BUCKET_NAME` | `humanrecords-media-local` | `humanrecords-media-dev` | `humanrecords-media-prod` |
+| `FEED_PAGE_SIZE` (optional) | blank or small (e.g. 3) to test paging | unset | unset |
 | `SITE_URL` | `http://127.0.0.1:3000` | develop URL | prod URL |
 | `NEXT_PUBLIC_APP_ENV` | `local` | `develop` | `production` |
 | `NEXT_PUBLIC_SENTRY_DSN` | blank | DSN | DSN |

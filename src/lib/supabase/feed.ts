@@ -36,17 +36,27 @@ export type FeedPage = {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+// FEED_PAGE_SIZE lets local dev use tiny pages (e.g. 3) to exercise paging
+// and auto-advance with a small catalog. Production leaves it unset.
+export function feedPageSize(): number {
+  const raw = process.env.FEED_PAGE_SIZE;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : DEFAULT_PAGE_SIZE;
+}
+
+// pinned and sort_at are selected only so PostgREST can order by them: it
+// orders an RPC result (search_feed, chained later) only by projected columns.
 const RELEASE_SELECT = `
-  id, kind, created_at,
-  track:tracks ( id, title, track_art_url, track_artists ( position, artists ( name ) ) ),
+  id, kind, created_at, pinned, sort_at,
+  track:tracks ( id, title, track_art_url, archived_at, track_artists ( position, artists ( name ) ) ),
   album:albums (
     id, title, album_art_url,
     album_artists ( position, artists ( name ) ),
-    track_albums ( position, tracks ( id, title, track_artists ( position, artists ( name ) ) ) )
+    track_albums ( position, tracks ( id, title, archived_at, track_artists ( position, artists ( name ) ) ) )
   )
 `;
 
-type TrackRel = { id: string; title: string; track_art_url?: string | null; track_artists: ArtistNameRel };
+type TrackRel = { id: string; title: string; track_art_url?: string | null; archived_at?: string | null; track_artists: ArtistNameRel };
 type ReleaseRow = {
   kind: "single" | "album";
   created_at: string;
@@ -62,6 +72,7 @@ type ReleaseRow = {
 
 function toFeedItem(row: ReleaseRow): FeedItem | null {
   if (row.kind === "single" && row.track) {
+    if (row.track.archived_at) return null;
     return {
       kind: "track",
       id: row.track.id,
@@ -74,8 +85,9 @@ function toFeedItem(row: ReleaseRow): FeedItem | null {
   if (row.kind === "album" && row.album) {
     const tracks: FeedTrack[] = byPosition(row.album.track_albums ?? [])
       .map((r) => r.tracks)
-      .filter((t): t is TrackRel => t !== null)
+      .filter((t): t is TrackRel => t !== null && !t.archived_at)
       .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
+    if (tracks.length === 0) return null; // never show an empty album
     return {
       kind: "album",
       id: row.album.id,
@@ -94,14 +106,18 @@ export async function getFeed(
   opts: { page?: number; pageSize?: number } = {},
 ): Promise<FeedPage> {
   const page = Math.max(1, opts.page ?? 1);
-  const pageSize = Math.max(1, opts.pageSize ?? DEFAULT_PAGE_SIZE);
+  const pageSize = Math.max(1, opts.pageSize ?? feedPageSize());
   const from = (page - 1) * pageSize;
 
   // One extra row past the page tells us whether another page exists.
   const { data, error } = await supabase
     .from("releases")
     .select(RELEASE_SELECT)
-    .order("created_at", { ascending: false })
+    // RLS already hides archived rows from listeners; label members can read
+    // them, so the feed filters explicitly.
+    .is("archived_at", null)
+    .order("pinned", { ascending: false })
+    .order("sort_at", { ascending: false })
     .order("id", { ascending: false })
     .range(from, from + pageSize);
   if (error) throw error;

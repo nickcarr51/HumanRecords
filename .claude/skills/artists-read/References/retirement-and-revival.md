@@ -34,3 +34,6 @@ Retired when the listener timeline became the home (`/feed`, PR #7).
 6. Optionally link artist names in the feed and album pages to `/artists/{id}`.
 7. Run `yarn test --run src/app/\(app\)/artists src/lib/supabase/artists` (data tests need
    `yarn supabase start`), then `yarn lint` and `yarn build`.
+8. Fix two known data-layer gaps in `src/lib/supabase/artists.ts`: `getArtist` does not filter
+   archived tracks for label members (RLS shows them), and `track_artists(count)` counts archived
+   tracks. Filter on `tracks.archived_at` and count only live tracks.

@@ -34,10 +34,23 @@ deployment), `-prod` (production). Seed objects exist only in the local bucket, 
 `yarn r2:seed-local`. Pointed at a bucket without them, signing still succeeds (it never checks the
 object exists); the **browser** gets a 404 fetching the URL and the player shows its error state.
 
-## Orphans
+## Orphans and `r2_cleanup_queue`
 
 A publish that fails after upload, or a file replaced in the form after uploading, leaves an
-object with no row pointing at it. Accepted for now; cleanup is planned with Delete.
+object with no row pointing at it. Accepted for now.
+
+`r2_cleanup_queue` (service-role only) records keys that may later be deletable:
+
+| `reason` | Key comes from | `source_table` |
+|---|---|---|
+| `archived` | an archived track's `audio_url`/`track_art_url`, an archived album's `album_art_url` | `tracks` / `albums` |
+| `replaced` | a file swapped out in the admin UI (MP3 or image) | `tracks` / `albums` / `artists` |
+| `archived` | the photo of an uncredited artist that was hard-deleted (queued as `archived` because the check constraint allows only `archived` / `replaced`) | `artists` |
+
+**Nothing deletes from R2 now.** The future cleanup job may delete a key only when it was queued
+30+ days ago **and** no live row still references it (album/track art can be shared), then sets
+`cleaned_at`. It never runs against the locked prod bucket without the lock being deliberately
+lifted. Full rules: [[content-lifecycle]] `References/r2-cleanup-queue.md`.
 
 ## CORS
 
