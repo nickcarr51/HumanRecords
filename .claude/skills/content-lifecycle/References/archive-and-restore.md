@@ -34,7 +34,7 @@ sources (`cleaned_at is null`) so the job doesn't remove a live file. If a match
 row is already `cleaned_at`, the file is gone from R2: both functions refuse with `22023`.
 `restore_track` refuses a single ("Restore the single instead.") and an archived album ("Restore
 the album first."). Restoring the album whose last track was removed brings that track back
-(same timestamp). Archive/restore on something already in that state is a no-op.
+(same timestamp). Archive/restore on something already in that state is a no-op. `archive_track` locks the release, rejects singles, then locks the track and returns if it is already archived; only then does it refuse an archived album. So removing an album's last track twice (double-click) is a no-op the second time.
 `move_release` refuses archived releases (`22023`), so restore before reordering.
 
 ## Why not hard delete

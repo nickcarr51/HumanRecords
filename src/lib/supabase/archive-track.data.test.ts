@@ -58,11 +58,25 @@ describe("archive_track", () => {
     expect(tracks.get(trackIds[0])).not.toBeNull();
   });
 
+  it("removing the last live track twice is a no-op the second time", async () => {
+    tag = newTag("ATR");
+    const { releaseId, trackIds } = await makeAlbum(tag, 2);
+    const client = await signedIn();
+    expect((await client.rpc("archive_track", { p_track_id: trackIds[0] })).error).toBeNull();
+    expect((await client.rpc("archive_track", { p_track_id: trackIds[1] })).error).toBeNull();
+    const before = (await queueRows(tag)).length;
+    expect((await client.rpc("archive_track", { p_track_id: trackIds[1] })).error).toBeNull();
+    expect((await archivedAt("releases", [releaseId])).get(releaseId)).not.toBeNull();
+    expect((await queueRows(tag)).length).toBe(before);
+  });
+
   it("refuses a track on an archived album", async () => {
     tag = newTag("ATR");
     const { releaseId, trackIds } = await makeAlbum(tag, 2);
     const client = await signedIn();
     await client.rpc("archive_release", { p_release_id: releaseId });
+    // archive_release archives the live tracks too; force one live again so the guard is what refuses.
+    await admin.from("tracks").update({ archived_at: null }).eq("id", trackIds[0]);
     const { error } = await client.rpc("archive_track", { p_track_id: trackIds[0] });
     expect(error?.code).toBe("22023");
     expect(error?.message).toBe("This album is archived.");

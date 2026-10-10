@@ -1,6 +1,6 @@
 ---
 name: content-lifecycle
-description: Use when archiving, restoring, or removing releases, tracks, or artists; replacing an uploaded MP3 or image; working with archived_at, r2_cleanup_queue, the artist-delete FK block, move_release / pinned / sort_at ordering, or a future R2 cleanup job. Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
+description: Use when archiving, restoring, or removing releases, tracks, or artists (`archive_release`, `restore_release`, `archive_track`, `restore_track`, `add_album_track`, `replace_track_audio`, `update_release`); replacing an uploaded MP3 or image; working with archived_at, r2_cleanup_queue, the artist-delete FK block, move_release / pinned / sort_at ordering, or a future R2 cleanup job. Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
 ---
 
 # Content Lifecycle (archive, order, cleanup)

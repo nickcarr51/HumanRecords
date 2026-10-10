@@ -132,11 +132,11 @@ Callers: the release-admin server actions ([[content-lifecycle]]). Tests:
 |---|---|---|
 | `archive_release(p_release_id uuid)` | void | none; already archived is a silent no-op |
 | `restore_release(p_release_id uuid)` | void | `22023` a same-timestamp track/album key was already `cleaned_at`; not archived is a no-op |
-| `archive_track(p_track_id uuid)` | void | `22023` track is on a single ("Archive the single instead.") or the album is archived; already archived is a no-op |
+| `archive_track(p_track_id uuid)` | void | `22023` track is on a single ("Archive the single instead.") or the album is archived (checked after the track's own state); already archived is a no-op, even if the album was archived with it |
 | `restore_track(p_track_id uuid)` | void | `22023` single, album archived ("Restore the album first."), or its key was already `cleaned_at`; not archived is a no-op |
-| `add_album_track(p_release_id uuid, payload jsonb)` | uuid (new track id) | `22023` not an album, album archived, missing title / `audioKey` / artists |
+| `add_album_track(p_release_id uuid, payload jsonb)` | uuid (new track id) | `22023` not an album, album archived, missing title / `audioKey` / artists; from `resolve_artist_refs`: "Unknown artist.", "Artist name is empty.", "artists must be a list". A malformed artist `{id}` raises raw `22P02`, so callers must pre-validate UUIDs |
 | `replace_track_audio(p_track_id uuid, p_audio_key text)` | void | `22023` track archived, empty key, or same key as current |
-| `update_release(p_release_id uuid, payload jsonb)` | void | `22023` release archived, `tracks` not a list, single given `album`, blank album/track title, track without artist, stale draft |
+| `update_release(p_release_id uuid, payload jsonb)` | void | `22023` release archived, `tracks` not a list, single given `album`, blank album/track title, track without artist, stale draft; plus the same `resolve_artist_refs` `22023` messages as `add_album_track`. A malformed artist `{id}` or track id raises raw `22P02`, so callers must pre-validate UUIDs |
 
 - `archive_release` sets `releases.archived_at` and archives the release's live tracks with the
   **same timestamp**, queuing track audio/art keys and the album art key (`archived`).

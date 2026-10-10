@@ -26,13 +26,13 @@ begin
   if rel.kind = 'single' then
     raise exception 'Archive the single instead.' using errcode = '22023';
   end if;
-  if rel.archived_at is not null then
-    raise exception 'This album is archived.' using errcode = '22023';
-  end if;
 
   select * into trk from public.tracks where id = p_track_id for update;
   if trk.archived_at is not null then
     return;
+  end if;
+  if rel.archived_at is not null then
+    raise exception 'This album is archived.' using errcode = '22023';
   end if;
 
   update public.tracks set archived_at = v_at where id = trk.id;
