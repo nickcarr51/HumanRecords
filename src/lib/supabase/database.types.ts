@@ -383,6 +383,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_album_track: {
+        Args: { p_release_id: string; payload: Json }
+        Returns: string
+      }
       admin_delete_artist: { Args: { target: string }; Returns: undefined }
       admin_list_users: {
         Args: never
@@ -404,6 +408,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      archive_release: { Args: { p_release_id: string }; Returns: undefined }
+      archive_track: { Args: { p_track_id: string }; Returns: undefined }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -414,7 +420,14 @@ export type Database = {
         Returns: undefined
       }
       publish_release: { Args: { payload: Json }; Returns: string }
+      release_for_track: { Args: { p_track_id: string }; Returns: string }
+      replace_track_audio: {
+        Args: { p_audio_key: string; p_track_id: string }
+        Returns: undefined
+      }
       resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
+      restore_release: { Args: { p_release_id: string }; Returns: undefined }
+      restore_track: { Args: { p_track_id: string }; Returns: undefined }
       search_feed: {
         Args: { q: string }
         Returns: {
@@ -433,6 +446,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      update_release: {
+        Args: { p_release_id: string; payload: Json }
+        Returns: undefined
       }
     }
     Enums: {

@@ -118,6 +118,51 @@ which is invoker but only reachable from inside `publish_release`.
   `sort_at := created_at` when null. `keep_created_at` (before update of `created_at` on `releases`,
   `tracks`, `albums`): resets `created_at` to the old value. Plain invoker triggers, not callable via the API.
 
+## Release admin functions (archive, restore, edit, add/replace track)
+
+Migrations `20261010140000`..`20261010140300`. All are definer with `search_path = public`; the
+seven public ones are revoked from `public`/`anon` and granted to `authenticated`. Each checks
+`current_user_role()` first (`42501`), then locks the owning `releases` row `for update` before
+other reads/writes. Rule violations are `22023` with the UI message; missing rows `P0002`.
+Callers: the release-admin server actions ([[content-lifecycle]]). Tests:
+`src/lib/supabase/{archive-release,archive-track,add-track-replace-audio,update-release}.data.test.ts`
+(fixtures in `release-admin-fixtures.ts`).
+
+| Function | Returns | Errors (besides `42501` / `P0002`) |
+|---|---|---|
+| `archive_release(p_release_id uuid)` | void | `22023` a track on the release also belongs to another release ("A track on this release also belongs to another release."); already archived is a silent no-op (checked before the shared-track guard) |
+| `restore_release(p_release_id uuid)` | void | `22023` a same-timestamp track/album key was already `cleaned_at`; not archived is a no-op (checked before the shared-track guard); `22023` shared track ("A track on this release also belongs to another release.") |
+| `archive_track(p_track_id uuid)` | void | `22023` track is on a single ("Archive the single instead.") or the album is archived (checked after the track's own state); `22023` track belongs to more than one release ("This track belongs to more than one release.", from `release_for_track`); already archived is a no-op, even if the album was archived with it |
+| `restore_track(p_track_id uuid)` | void | `22023` single, album archived ("Restore the album first."), its key was already `cleaned_at`, or the track belongs to more than one release ("This track belongs to more than one release."); not archived is a no-op |
+| `add_album_track(p_release_id uuid, payload jsonb)` | uuid (new track id) | `22023` not an album, album archived, missing title / `audioKey` / artists; from `resolve_artist_refs`: "Unknown artist.", "Artist name is empty.", "artists must be a list". A malformed artist `{id}` raises raw `22P02`, so callers must pre-validate UUIDs |
+| `replace_track_audio(p_track_id uuid, p_audio_key text)` | void | `P0002` track not found or has no release; `22023` track archived, empty key, same key as current, or track belongs to more than one release |
+| `update_release(p_release_id uuid, payload jsonb)` | void | `22023` release archived, `tracks` not a list, single given `album`, blank album/track title, track without artist, stale draft; plus the same `resolve_artist_refs` `22023` messages as `add_album_track`. A malformed artist `{id}` or track id raises raw `22P02`, so callers must pre-validate UUIDs |
+
+- `archive_release` sets `releases.archived_at` and archives the release's live tracks with the
+  **same timestamp**, queuing track audio/art keys and the album art key (`archived`).
+  `restore_release` restores only tracks carrying that same timestamp and deletes their uncleaned
+  `archived` queue rows.
+- `archive_track` queues that track's keys; if it was the album's last live track it archives the
+  release too (same timestamp, queues album art). `restore_track` clears one track and its uncleaned rows.
+- `add_album_track` payload `{ title, audioKey, artists: [{id}|{newName}] }`; the position is
+  `max(position) + 1` over every track on the album (live or removed), so it lands last. Key format
+  and object existence are checked in the server action, not here.
+- `replace_track_audio` queues the old key (`replaced`) and swaps `audio_url`.
+- `update_release` payload `{ album?: { title, artists }, tracks: [{ id, title, artists }] }`. `tracks`
+  must list exactly the release's live tracks (else `22023` "This release changed since you opened it.
+  Reload the page."); array order becomes positions 1..n, removed (archived) tracks keep their
+  relative order after the live ones. Artists go through `resolve_artist_refs`, so a "new" name that
+  exists in another case reuses the artist.
+- **`release_for_track(p_track_id uuid)` is internal** (`plpgsql`, `stable`; execute revoked from
+  `public`, `anon` and `authenticated`, so it is not an RPC). It returns the release that owns a
+  track, `null` if none (callers raise `P0002`), and raises `22023` ("This track belongs to more than
+  one release.") if the track is on several releases. The schema would allow that (a track on two
+  albums, or a single's track also on an album) but nothing creates it; `archive_release` and
+  `restore_release` refuse the same ambiguity ("A track on this release also belongs to another
+  release.") because `archived_at` is per track.
+- **Positions:** `track_albums` has no unique `(album_id, position)`. Every writer of positions
+  locks the release row first (`add_album_track`, `update_release`), so don't write them without it.
+
 ## Writing a new function
 
 Follow the template in [rls-model.md](rls-model.md) ("Adding a new write path"). Use
