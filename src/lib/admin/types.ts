@@ -16,3 +16,13 @@ export type UploadUrlsResult =
   | { targets: UploadTarget[]; error: null }
   | { targets: null; error: string };
 export type PublishResult = { error: string };
+
+// Release admin (edit/archive/reorder). Every action returns this shape.
+export type AdminResult = { error: string | null };
+export type MoveDirection = "up" | "down";
+// The edit-page draft: `tracks` lists exactly the release's live tracks, in order.
+export type ReleaseEditPayload = {
+  album?: { title: string; artists: ArtistRef[] };
+  tracks: Array<{ id: string; title: string; artists: ArtistRef[] }>;
+};
+export type AddTrackPayload = { title: string; audioKey: string; artists: ArtistRef[] };
