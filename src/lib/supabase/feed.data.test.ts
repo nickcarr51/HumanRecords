@@ -197,4 +197,18 @@ describe("getFeed ordering and archive", () => {
       await label.cleanup();
     }
   });
+
+  it("drops a live single whose track is archived", async () => {
+    const tag = `ARCS-${Date.now()}-`;
+    const t = await makeTrack(`${tag}Single`);
+    await makeSingleRelease(t);
+    await admin.from("tracks").update({ archived_at: new Date().toISOString() }).eq("id", t);
+    const label = await createTestUser({ role: "label_member" });
+    try {
+      const { items } = await getFeed(await label.signIn(), { page: 1, pageSize: 500 });
+      expect(items.some((i) => i.id === t)).toBe(false);
+    } finally {
+      await label.cleanup();
+    }
+  });
 });

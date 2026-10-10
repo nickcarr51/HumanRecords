@@ -48,7 +48,7 @@ export function feedPageSize(): number {
 // orders an RPC result (search_feed, chained later) only by projected columns.
 const RELEASE_SELECT = `
   id, kind, created_at, pinned, sort_at,
-  track:tracks ( id, title, track_art_url, track_artists ( position, artists ( name ) ) ),
+  track:tracks ( id, title, track_art_url, archived_at, track_artists ( position, artists ( name ) ) ),
   album:albums (
     id, title, album_art_url,
     album_artists ( position, artists ( name ) ),
@@ -72,6 +72,7 @@ type ReleaseRow = {
 
 function toFeedItem(row: ReleaseRow): FeedItem | null {
   if (row.kind === "single" && row.track) {
+    if (row.track.archived_at) return null;
     return {
       kind: "track",
       id: row.track.id,

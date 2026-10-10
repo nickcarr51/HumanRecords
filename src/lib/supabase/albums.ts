@@ -37,7 +37,9 @@ export async function getAlbum(
   // one-to-one (releases.album_id is unique) but tolerate an array too.
   const rel = (data as unknown as { releases: { archived_at: string | null } | Array<{ archived_at: string | null }> | null }).releases;
   const relRows = Array.isArray(rel) ? rel : rel ? [rel] : [];
-  if (relRows.some((r) => r.archived_at)) return null;
+  // RLS hides an archived release from listeners, so the embed comes back
+  // empty for them; every album has a release, so a missing one is not found.
+  if (relRows.length === 0 || relRows.some((r) => r.archived_at)) return null;
 
   const trackRel = (data.track_albums ?? []) as unknown as Array<{
     position: number;

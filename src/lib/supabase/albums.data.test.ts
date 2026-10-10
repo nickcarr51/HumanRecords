@@ -20,6 +20,7 @@ describe("getAlbum", () => {
     artistIds.push(artist!.id);
     const { data: album } = await admin.from("albums").insert({ title: `${tag}Album` }).select("id").single();
     albumIds.push(album!.id);
+    await admin.from("releases").insert({ kind: "album", album_id: album!.id });
     const { data: track } = await admin
       .from("tracks")
       .insert({ title: `${tag}T1`, audio_url: "tracks/x/audio.mp3" })
@@ -50,6 +51,7 @@ describe("getAlbum", () => {
     const tag = `ALBPOS-${Date.now()}-`;
     const { data: album } = await admin.from("albums").insert({ title: `${tag}Album` }).select("id").single();
     albumIds.push(album!.id);
+    await admin.from("releases").insert({ kind: "album", album_id: album!.id });
     const { data: zed } = await admin.from("tracks").insert({ title: `${tag}Zed`, audio_url: "tracks/z.mp3" }).select("id").single();
     const { data: alpha } = await admin.from("tracks").insert({ title: `${tag}Alpha`, audio_url: "tracks/a.mp3" }).select("id").single();
     trackIds.push(zed!.id, alpha!.id);
@@ -80,6 +82,18 @@ describe("getAlbum archive handling", () => {
       expect(await getAlbum(await label.signIn(), al!.id)).toBeNull();
     } finally {
       await label.cleanup();
+    }
+  });
+
+  it("returns null for an album whose release is archived, for a listener too", async () => {
+    const { data: al } = await admin.from("albums").insert({ title: `ARCL-${Date.now()}` }).select("id").single();
+    albumIds.push(al!.id);
+    await admin.from("releases").insert({ kind: "album", album_id: al!.id, archived_at: new Date().toISOString() });
+    const listener = await createTestUser({ role: "listener" });
+    try {
+      expect(await getAlbum(await listener.signIn(), al!.id)).toBeNull();
+    } finally {
+      await listener.cleanup();
     }
   });
 
