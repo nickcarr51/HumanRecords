@@ -383,6 +383,25 @@ export type Database = {
       }
       publish_release: { Args: { payload: Json }; Returns: string }
       resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
+      search_feed: {
+        Args: { q: string }
+        Returns: {
+          album_id: string | null
+          archived_at: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["release_kind"]
+          pinned: boolean
+          sort_at: string
+          track_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "releases"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       release_kind: "single" | "album"
