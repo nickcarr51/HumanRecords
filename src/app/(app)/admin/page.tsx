@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { Heading, Text } from '@/components';
 import { requireLabelMember } from '@/lib/auth/role';
 import { ActionCard, Back, Page } from './admin.styles';
+
+export const metadata: Metadata = { title: 'Admin' };
 
 export default async function AdminPage() {
   // Layouts don't re-run on client navigation; the page must gate itself.

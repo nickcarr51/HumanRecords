@@ -9,7 +9,7 @@ vi.mock("@/lib/auth/session", () => ({ getSessionUser: () => getSessionUser() })
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/lib/admin/users-actions", () => ({ createUser: vi.fn(), issueInvite: vi.fn(), setUserRole: vi.fn() }));
 
-import AdminUsersPage from "./page";
+import AdminUsersPage, { metadata } from "./page";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -36,3 +36,5 @@ describe("AdminUsersPage", () => {
     expect(await AdminUsersPage()).toBeTruthy();
   });
 });
+
+it("sets the tab title", () => expect(metadata.title).toBe("Admin · Users"));
