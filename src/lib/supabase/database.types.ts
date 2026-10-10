@@ -186,23 +186,32 @@ export type Database = {
       releases: {
         Row: {
           album_id: string | null
+          archived_at: string | null
           created_at: string
           id: string
           kind: Database["public"]["Enums"]["release_kind"]
+          pinned: boolean
+          sort_at: string
           track_id: string | null
         }
         Insert: {
           album_id?: string | null
+          archived_at?: string | null
           created_at?: string
           id?: string
           kind: Database["public"]["Enums"]["release_kind"]
+          pinned?: boolean
+          sort_at: string
           track_id?: string | null
         }
         Update: {
           album_id?: string | null
+          archived_at?: string | null
           created_at?: string
           id?: string
           kind?: Database["public"]["Enums"]["release_kind"]
+          pinned?: boolean
+          sort_at?: string
           track_id?: string | null
         }
         Relationships: [
@@ -290,6 +299,7 @@ export type Database = {
       }
       tracks: {
         Row: {
+          archived_at: string | null
           audio_url: string
           created_at: string
           id: string
@@ -298,6 +308,7 @@ export type Database = {
           track_art_url: string | null
         }
         Insert: {
+          archived_at?: string | null
           audio_url: string
           created_at?: string
           id?: string
@@ -306,6 +317,7 @@ export type Database = {
           track_art_url?: string | null
         }
         Update: {
+          archived_at?: string | null
           audio_url?: string
           created_at?: string
           id?: string
