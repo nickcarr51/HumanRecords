@@ -92,3 +92,24 @@ describe("admin_set_user_role", () => {
     expect(error?.code).toBe("P0002");
   });
 });
+
+describe("admin_list_users banned_until", () => {
+  it("reports the auth ban for a deactivated user", async () => {
+    const admin = createAdminClient();
+    const label = await createTestUser({ role: "label_member" });
+    const target = await createTestUser({ role: "listener" });
+    try {
+      await admin.auth.admin.updateUserById(target.id, { ban_duration: "876000h" });
+      const client = await label.signIn();
+      const { data, error } = await client.rpc("admin_list_users");
+      expect(error).toBeNull();
+      const row = (data as Array<{ id: string; banned_until: string | null }>).find((r) => r.id === target.id);
+      expect(row?.banned_until).toBeTruthy();
+      const self = (data as Array<{ id: string; banned_until: string | null }>).find((r) => r.id === label.id);
+      expect(self?.banned_until).toBeNull();
+    } finally {
+      await target.cleanup();
+      await label.cleanup();
+    }
+  });
+});

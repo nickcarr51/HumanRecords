@@ -386,6 +386,7 @@ export type Database = {
       admin_list_users: {
         Args: never
         Returns: {
+          banned_until: string
           created_at: string
           email: string
           id: string
