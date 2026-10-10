@@ -13,8 +13,12 @@ const Wrapper = styled.div`
   flex-direction: column;
   overflow: hidden;
   background: ${({ theme }) => theme.colors.bg};
-  /* Keep toasts clear of the PlayerBar (≈3.5rem tall) docked at the bottom. */
+  /* Keep toasts clear of the PlayerBar docked at the bottom: ≈3.5rem tall on
+     wide screens, ≈5.3rem on phones where it wraps to two rows. */
   --toast-offset: 4rem;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    --toast-offset: 6rem;
+  }
 `;
 
 // Fills the space between the nav and the universal player (PlayerBar,
