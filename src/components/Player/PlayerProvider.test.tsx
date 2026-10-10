@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
@@ -169,6 +169,48 @@ describe("PlayerProvider", () => {
     expect(play).not.toHaveBeenCalled();
   });
 
+  it("treats a rejected stream-URL call like a signing error (no stale audio, no unhandled rejection)", async () => {
+    mockGet.mockImplementation(async (id: string) => {
+      if (id === "t2") throw new Error("network lost");
+      return { url: `https://signed.example/${id}`, error: null };
+    });
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("error"));
+    expect(container.querySelector("audio")?.getAttribute("src")).toBeNull();
+
+    const play = window.HTMLMediaElement.prototype.play as unknown as ReturnType<typeof vi.fn>;
+    play.mockClear();
+    await userEvent.click(screen.getByText("toggle"));
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it("does not skip loading a track whose earlier moveTo was superseded before its effect ran", async () => {
+    const FOUR = [...TRACKS, { id: "t3", title: "Three", artistName: "Gamma" }, { id: "t4", title: "Four", artistName: "Delta" }];
+    const { container } = renderPlayer({ tracks: FOUR });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2")); // t2 pre-signed
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Two nexts in one batch: t2 starts from its pre-signed URL (startedRef=t2) but
+    // the render lands directly on t3, so the effect never sees t2.
+    act(() => {
+      fireEvent.click(screen.getByText("next"));
+      fireEvent.click(screen.getByText("next"));
+    });
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Three"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t4")); // t4 pre-signed replaces t2's URL
+    await new Promise((r) => setTimeout(r, 0));
+
+    mockGet.mockClear();
+    await userEvent.click(screen.getByText("prev")); // back to t2, no pre-signed URL: must load it
+    expect(screen.getByTestId("title")).toHaveTextContent("Two");
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+  });
+
   it("prev() moves to the previous track", async () => {
     renderPlayer();
     await userEvent.click(screen.getByText("play"));
@@ -198,8 +240,16 @@ describe("PlayerProvider paging", () => {
     await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ q: "", page: 2 }));
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("2"));
 
-    endTrack(container);
+    // The appended page's first track gets pre-signed while t1 plays.
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+    await new Promise((r) => setTimeout(r, 0));
+    mockGet.mockClear();
+
+    const audio = endTrack(container);
+    // Set synchronously inside the 'ended' handler, from the pre-signed URL.
+    expect(audio.getAttribute("src")).toBe("https://signed.example/t2");
     await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Two"));
+    expect(mockGet).not.toHaveBeenCalledWith("t2");
   });
 
   it("stops at the end of the last page", async () => {

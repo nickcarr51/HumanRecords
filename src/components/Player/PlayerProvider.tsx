@@ -288,10 +288,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Load + play whenever the selected track changes (unless moveTo already did).
   useEffect(() => {
     if (!currentTrack) return;
-    if (startedRef.current === currentTrack.id) {
-      startedRef.current = null;
-      return;
-    }
+    // Always consume the marker: if moveTo's track was superseded before this
+    // effect ran, a stale marker must not make a later load of it get skipped.
+    const alreadyStarted = startedRef.current === currentTrack.id;
+    startedRef.current = null;
+    if (alreadyStarted) return;
     let cancelled = false;
     setStatus("loading");
     setCurrentTime(0);
@@ -301,21 +302,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const urlResult: Promise<UrlResult> = pre
       ? Promise.resolve({ url: pre, error: null })
       : getTrackStreamUrl(currentTrack.id);
-    urlResult.then((res) => {
-      if (cancelled) return;
-      const audio = audioRef.current;
-      if (!audio) return;
-      if (res.error || !res.url) {
-        // Clear the previously-loaded track so a later toggle()/play can't
-        // resume the wrong audio under the failed track's title.
-        audio.removeAttribute("src");
-        audio.load();
-        setStatus("error");
-        setIsPlaying(false);
-        return;
-      }
-      startAudio(res.url, () => !cancelled);
-    });
+    // A rejected call (network loss, stale server-action id) is handled exactly
+    // like an { url: null, error } result.
+    urlResult
+      .catch((): UrlResult => ({ url: null, error: "Could not load track." }))
+      .then((res) => {
+        if (cancelled) return;
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (res.error || !res.url) {
+          // Clear the previously-loaded track so a later toggle()/play can't
+          // resume the wrong audio under the failed track's title.
+          audio.removeAttribute("src");
+          audio.load();
+          setStatus("error");
+          setIsPlaying(false);
+          return;
+        }
+        startAudio(res.url, () => !cancelled);
+      });
     return () => {
       cancelled = true;
     };
