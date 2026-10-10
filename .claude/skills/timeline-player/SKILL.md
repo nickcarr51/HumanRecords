@@ -24,6 +24,11 @@ never unmount. No global state library, no refresh-resume.
 |---|---|
 | Player state + `<audio>` + actions | `src/components/Player/PlayerProvider.tsx` |
 | Player control bar (UI) | `src/components/Player/PlayerBar.tsx` |
+| Queue model (sources, paging, dedup) | `src/components/Player/queue.ts` |
+| Lock-screen controls | `src/components/Player/useMediaSession.ts` |
+| Next-page server actions | `src/lib/feed/actions.ts` (`loadFeedPage`, `continueAfterAlbum`) |
+| Follow-the-music on /feed | `src/components/Feed/FollowPlayingPage.tsx` |
+| Feed search box + pager | `src/components/{SearchInput,Pagination}/` (shared with [[artists-read]]); `src/app/(app)/feed/{page.tsx,params.ts}` |
 | Feed data (pinned + `sort_at` order, archived hidden) | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Album detail data | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Shared artist-name flattener | `src/lib/supabase/artist-names.ts` |
@@ -38,9 +43,10 @@ never unmount. No global state library, no refresh-resume.
 
 - [persistent-player.md](References/persistent-player.md) — the player context, its state
   machine (load/play/pause/next/prev/seek), signed-URL playback, and error/autoplay handling.
-- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one query on
-  `releases`, `pinned desc, sort_at desc`, archived hidden, SQL pagination, `FEED_PAGE_SIZE`) and `getAlbum` (tracks in `position` order);
-  position ordering and the "Various Artists" label.
+- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
+  or `search_feed` via `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
+  `FEED_PAGE_SIZE`), `getAlbumFeedPage` / `getFeedAfterAlbum`, and `getAlbum` (tracks in `position`
+  order); position ordering and the "Various Artists" label.
 - [routing-and-auth.md](References/routing-and-auth.md) — the `(app)` route group, `/feed`
   as the authenticated home, `/albums/[id]`, the auth retarget, retired `/artists`, the
   global 404 bounce, and the error boundary.
@@ -64,8 +70,8 @@ never unmount. No global state library, no refresh-resume.
 
 - **Releases model** — shipped in `feature/admin-release-upload`: the feed reads a
   `releases` table and link rows carry `position`. See [[admin-upload]].
-- Feed search bar and Load-More/pagination UI are deferred (data layer supports paging; the `search_feed` RPC exists but nothing calls it).
-- Player icons/artwork are placeholder pending a design pass.
+- Feed rows show no artwork; lock screen uses the fixed logo.
+- Player icons are placeholder pending a design pass.
 
 A code guide (mount chain, player state machine, feed data, reading order) is in
 `Walkthrough/walkthrough.md` (gitignored).
