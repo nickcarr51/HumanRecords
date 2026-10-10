@@ -42,7 +42,8 @@ never unmount. No global state library, no refresh-resume.
 ## References
 
 - [persistent-player.md](References/persistent-player.md) — the player context, its state
-  machine (load/play/pause/next/prev/seek), signed-URL playback, and error/autoplay handling.
+  machine (load/play/pause/next/prev/seek), signed-URL playback, error/autoplay handling, queue
+  sources and paging, pre-signing, Media Session, and `FollowPlayingPage`.
 - [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
   or `search_feed` via `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
   `FEED_PAGE_SIZE`), `getAlbumFeedPage` / `getFeedAfterAlbum`, and `getAlbum` (tracks in `position`

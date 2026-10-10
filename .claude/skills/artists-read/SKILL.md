@@ -26,8 +26,9 @@ of the slice are live elsewhere: `escapeLike` is used by the admin artist search
 | Data: list (search + paging + track counts), detail | `src/lib/supabase/artists.ts` (`getArtists`, `getArtist`) |
 | LIKE-escaping (also used by `searchArtists` in admin) | `src/lib/supabase/artists.ts` (`escapeLike`) |
 | Browse page (server) | `src/app/(app)/artists/page.tsx` + `artists.styles.ts` |
-| Debounced URL search box | `src/app/(app)/artists/SearchInput.tsx` |
-| Prev/next pager + `pageHref` | `src/app/(app)/artists/Pagination.tsx` |
+| Debounced URL search box (takes a `label`; shared with `/feed`) | `src/components/SearchInput/` |
+| Prev/next pager | `src/components/Pagination/` |
+| `pageHref(basePath, query, page)` (plain module, server-safe) | `src/components/Pagination/pageHref.ts` |
 | Detail page (server) | `src/app/(app)/artists/[id]/page.tsx` + `artist-detail.styles.ts` |
 | List row | `src/components/ArtistCard/ArtistCard.tsx` |
 | Initials placeholder (server-safe) | `src/lib/initials.ts` |

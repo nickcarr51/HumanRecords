@@ -10,14 +10,14 @@ themselves. That makes them unit-testable against local Supabase and reusable by
 components. See [[catalog-schema]] for the underlying tables and RLS, and [[admin-upload]]
 for the `releases` table and `position` columns this reads.
 
-## `getFeed(supabase, { page?, pageSize? })` → `FeedPage`
+## `getFeed(supabase, { page?, pageSize?, q? })` → `FeedPage`
 
 Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as a discriminated union on `kind`:
 
 - `{ kind: "album", id, title, albumArtUrl, artistNames[], createdAt, tracks: FeedTrack[] }`
 - `{ kind: "track", id, title, trackArtUrl, artistNames[], createdAt }`
 
-`FeedTrack = { id, title, artistNames[] }`. `FeedPage = { items, page, pageSize, hasMore }`.
+`FeedTrack = { id, title, artistNames[] }`. `FeedPage = { items, page, pageSize, hasMore, total, totalPages }`.
 `createdAt` is the **release's** `created_at` (the real upload date, which never changes; position in the feed comes from `sort_at`).
 
 How it works:
@@ -32,9 +32,10 @@ How it works:
    explicit), then ordered `pinned desc, sort_at desc, id desc` (id breaks ties so pages are
    stable). `RELEASE_SELECT` includes `pinned, sort_at` because PostgREST orders an RPC result
    (`search_feed`, chained later) only by projected columns.
-3. **Pagination in SQL**: `.range(from, from + pageSize)` with `from = (page-1)*pageSize`.
-   `range` is inclusive, so it fetches `pageSize + 1` rows; the first `pageSize` become the
-   page and `hasMore = rows.length > pageSize`.
+3. **Pagination in SQL**: `.range(from, from + pageSize - 1)` with `from = (page-1)*pageSize`, and
+   `count: 'exact'` → `total`/`totalPages`; `hasMore = page < totalPages`. A page past the end makes
+   PostgREST fail with `PGRST103`; `getFeed` then runs a count-only query on the same source and
+   returns `items: []` with the real `total`/`totalPages` so the page can redirect to the last page.
 4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
    item. A release whose embedded target is null (hidden/removed) is skipped (so a page can
    have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped. Dropping an item (empty album, archived single) makes that page come back short, so admin actions must keep data consistent: archiving an album's last live track must archive the release too.
@@ -44,9 +45,27 @@ How it works:
 An uncredited track yields `artistNames: []` (never a crash); the UI shows
 "Unknown Artist".
 
+**Search (`q`)**: `q` is trimmed; blank = the plain feed. Otherwise the source is the `search_feed`
+RPC (see [[catalog-schema]]) instead of the `releases` table, with the same select, archived filter,
+order and range applied by one shared function (`releaseQuery` + the chain in `getFeed`), so search
+and the plain feed can never disagree on order.
+
 `pageSize` defaults to `feedPageSize()`: the optional `FEED_PAGE_SIZE` env var if it is a positive
 integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging
 (`src/lib/supabase/feed-page-size.test.ts`).
+
+## `getAlbumFeedPage` / `getFeedAfterAlbum`
+
+- `getAlbumFeedPage(supabase, albumId, pageSize?)` → the feed page (1-based) an album's release is
+  on, or `null` if archived/missing. Counts live releases ordered ahead of it with `or()`:
+  pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is wrapped in double
+  quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
+  `floor(ahead / pageSize) + 1`.
+- `getFeedAfterAlbum(supabase, albumId, pageSize?)` → `{ items, page, hasMore } | null`: the items
+  after the album on its page, or the whole next page when it was the last item. Used by
+  `continueAfterAlbum` for the album-page queue.
+- Tests: `feed-query.data.test.ts` (search through `getFeed`), `feed-after-album.data.test.ts`
+  (album position and continuation). For local paging, set `FEED_PAGE_SIZE=2`.
 
 ## `getAlbum(supabase, id)` → `AlbumDetail | null`
 

@@ -23,7 +23,9 @@ null render on empty queue; title/artist; controls call actions; play vs pause i
 order; tracks without a release excluded; uncredited single → empty `artistNames`;
 pagination (`pageSize`/`hasMore`) — the tests give `releases.created_at` values that
 contradict track creation order, proving ordering comes from `releases`; `getAlbum`
-positive + null (missing + non-UUID + archived) paths and position (not title) track order; feed pinned/`sort_at` order and archived items hidden; `feed-page-size.test.ts` (unit) for `FEED_PAGE_SIZE`.
+positive + null (missing + non-UUID + archived) paths and position (not title) track order; feed pinned/`sort_at` order and archived items hidden; `feed-page-size.test.ts` (unit) for `FEED_PAGE_SIZE`; `feed-query.data.test.ts` for search (`q`), counts/`totalPages` and past-the-end totals; `feed-after-album.data.test.ts` for `getAlbumFeedPage`/`getFeedAfterAlbum` position.
+
+**Queue + lock screen** — `queue.test.ts` (pure queue functions, dedup), `PlayerProvider.test.tsx` (paging, retries, pre-sign), `useMediaSession.test.tsx`.
 
 **Auth redirects** — `route-guard.test.ts`, `safe-next.test.ts`, `not-found.test.tsx`,
 `middleware.test.ts`, `auth/confirm/route.test.ts` all assert the `/feed` targets.

@@ -31,7 +31,8 @@ pager pinned to the bottom.
 
 ## `Pagination` (client)
 
-- `pageHref(query, page)` — exported pure helper: `/artists`, `/artists?q=x`,
+- `pageHref(basePath, query, page)` — pure helper in the plain module `pageHref.ts` (no
+  `'use client'`, so server pages can use it): `/artists`, `/artists?q=x`,
   `/artists?q=x&page=3` (never `page=1`).
 - Renders `null` when `totalPages <= 1`; otherwise `‹ prev` · `page N of M` · `next ›`, using
   `next/link` styled locally. Empty `<span />`s keep the three-column layout when prev/next
