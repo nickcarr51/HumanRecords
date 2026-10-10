@@ -323,7 +323,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const id = nextTrack.id;
     getTrackStreamUrl(id)
       .then((res) => {
-        if (gen === genRef.current && res.url) presignedRef.current = { trackId: id, url: res.url, at: Date.now() };
+        // Only keep it if this track is still the next one: a late result for a
+        // track the player already moved onto must not replace the new next URL.
+        const { tracks, index } = queueRef.current;
+        if (gen === genRef.current && res.url && tracks[index + 1]?.id === id) {
+          presignedRef.current = { trackId: id, url: res.url, at: Date.now() };
+        }
       })
       .catch(() => {});
   }, [nextTrack]);

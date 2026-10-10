@@ -224,6 +224,32 @@ describe("PlayerProvider paging", () => {
     expect(mockGet).not.toHaveBeenCalledWith("t2");
   });
 
+  it("keeps the next track's pre-signed URL when an older pre-sign resolves late", async () => {
+    const THREE = [...TRACKS, { id: "t3", title: "Three", artistName: "Gamma" }];
+    let resolveB!: (v: Awaited<ReturnType<typeof getTrackStreamUrl>>) => void;
+    let bCalls = 0;
+    mockGet.mockImplementation(async (id: string) => {
+      // The first sign of t2 (its pre-sign while t1 plays) is slow.
+      if (id === "t2" && bCalls++ === 0) return new Promise((r) => (resolveB = r));
+      return { url: `https://signed.example/${id}`, error: null };
+    });
+    const { container } = renderPlayer({ tracks: THREE });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
+
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t3")); // C pre-signed
+    await new Promise((r) => setTimeout(r, 0));
+    resolveB({ url: "https://signed.example/t2-late", error: null }); // B's late pre-sign
+    await new Promise((r) => setTimeout(r, 0));
+    mockGet.mockClear();
+
+    const audio = endTrack(container);
+    expect(audio.getAttribute("src")).toBe("https://signed.example/t3");
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Three"));
+    expect(mockGet).not.toHaveBeenCalledWith("t3");
+  });
+
   it("re-signs a pre-signed URL older than 60 minutes", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     try {
