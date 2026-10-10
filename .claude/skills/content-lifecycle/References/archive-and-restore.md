@@ -11,7 +11,7 @@ Migration `20261010120000_feed_order_and_archive.sql`. Columns: `releases.archiv
 | An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). **Closed:** `archive_release` archives the album's live tracks with the same timestamp, so stream/download refuse them too. |
 | One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. **If it was the album's last live track, archive the release too:** the feed drops albums with zero live tracks (`toFeedItem`), which makes that page come back short, so `archive_track` does this itself: removing the last live track archives the release with the same timestamp. |
 
-The archive writes are the SQL functions `archive_release` / `archive_track` (the admin UI that calls them is not built). Each archive also queues the object
+The archive writes are the SQL functions `archive_release` / `archive_track` (the admin UI that calls them is built: `/admin/releases` and `/admin/releases/[id]`, via `release-actions.ts`). Each archive also queues the object
 keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
 
 ## Who still sees archived rows

@@ -60,11 +60,11 @@ touches hosted data without explicit permission in the moment (guard hook enforc
 [[catalog-schema]] (migrations, seed, types), [[media-storage]] (buckets, tokens, CORS),
 [[auth]] (hosted settings, templates), [[invites]] (`/admin/users`, `SITE_URL`, NFC links).
 
-## Known deferrals (as of 2026-10-09)
+## Known deferrals (as of 2026-10-10)
 
 - Prod is on `https://services.humanrecords.co`; develop stays on `humanservices-dev.vercel.app`
   (no dev subdomain, decided). Auth email sends from `noreply@humanrecords.co`.
 - No develop DB backups and no backup encryption (deliberate).
-- No edit/delete releases yet; when built it must soft-delete (prod bucket is locked).
+- Release edit/delete is built (`/admin/releases`); "delete" is a soft-delete via archive (prod bucket is locked, nothing is removed from R2).
 - Copilot review not set up. `infra/r2/cors.*.json` are user-pasted into Cloudflare.
 - Never add a payment method to Sentry (free Developer plan only).

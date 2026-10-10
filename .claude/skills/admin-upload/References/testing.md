@@ -52,7 +52,7 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 
 ## Running
 
-- Unit only (no DB): `yarn test --run src/components/Upload src/lib/admin src/lib/auth src/lib/storage src/app src/components/AppShell`
+- Unit only (no DB; `src/lib/admin/releases.data.test.ts` needs local Supabase, so `src/lib/admin` is listed file by file): `yarn test --run src/components/Upload src/lib/admin/{actions,release-actions,rules,users,users-actions}.test.ts src/lib/auth src/lib/storage src/app src/components/AppShell`
 - DB tests: `yarn supabase start` first, then
   `yarn test --run src/lib/supabase`
   (`test-helpers.ts` refuses non-local URLs).

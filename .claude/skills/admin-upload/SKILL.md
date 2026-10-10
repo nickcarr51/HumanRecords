@@ -88,12 +88,15 @@ files already uploaded stay in R2 (orphans; accepted for now).
 - [[auth]] — session/middleware layer under the label-member gate; `getCurrentRole` and
   `requireLabelMember` live in `src/lib/auth/role.ts`.
 
-## Known deferrals (as of 2026-09-30)
+## Known deferrals (as of 2026-10-10)
 
 - **Release admin shipped** (2026-10-10) at `/admin/releases` and `/admin/releases/[id]`. Behaviors to keep:
   - **Hybrid save**: titles, artists and track order are one *draft* saved with `saveRelease` (`update_release`); file and lifecycle changes (replace MP3, add track, remove/restore track, archive/restore, pin, move) are *instant* actions.
   - **Dirty lock**: instant actions and the header Archive are disabled while the draft is dirty ("Save or discard your changes first."). The draft resets only when server content changes (`draftKey`), so unrelated re-renders keep unsaved edits.
-  - **Stale-draft refusal**: `update_release` rejects a draft built on out-of-date content; the user reloads.
+  - **Draft fields lock while an instant action is in flight**: during add-track or restore the album/track fields, artists, ↑/↓, Save and Discard are disabled (`EditReleaseForm`, via `onBusyChange` on `AddTrackForm`/`RemovedTracks`), because success resets the draft from server content and would wipe edits typed meanwhile.
+  - **Stale-track-list refusal**: `update_release` rejects a draft whose track list no longer matches the live tracks (add/remove/restore elsewhere); the user reloads. Concurrent title/artist edits are not detected: last write wins.
+  - **Replace MP3** shows a `role="status"` "MP3 replaced." line next to the control; picking another file clears it.
+  - **Per-row controls** have accessible names with the title (`Pin <title>`, `Archive <title>`, `Remove <title>`, `Replace MP3 for <title>`); visible text is unchanged.
   - **Errors are inline** (`role="alert"`), not toasts: `ToastProvider` is not mounted in the app.
   - Every action checks the role first, validates UUIDs and artist refs, and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
   - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
@@ -101,7 +104,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).
-- **ORM**: none. Revisit (likely Drizzle) when edit/delete adds more multi-table writes;
+- **ORM**: none. Edit/delete now exists as SQL functions + thin server actions; revisit (likely Drizzle) only if more multi-table writes appear;
   `src/lib/admin/` is the seam.
 - **Production accounts** are created by hand; `scripts/invite-users.mts` is for develop.
 - **R2 CORS** must be applied in Cloudflare before any real browser upload works.

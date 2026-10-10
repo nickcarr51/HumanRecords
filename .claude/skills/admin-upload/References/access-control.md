@@ -12,7 +12,7 @@ check exists at four layers because each one alone has a hole.
 2. **Layout + page gates → 404 bounce** — `requireLabelMember()` in `src/lib/auth/role.ts`
    calls `notFound()` unless the role is `label_member`. It is called first in
    `src/app/(app)/admin/layout.tsx` **and** at the top of every admin page
-   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`). The page call is required: on client-side
+   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`, `admin/releases/page.tsx`, `admin/releases/[id]/page.tsx`). The page call is required: on client-side
    (RSC) navigation Next can render a child page without re-running its layout, so a
    layout-only gate is bypassable. `notFound()` renders `src/app/not-found.tsx`, which
    redirects signed-in users to `/feed` — a non-member sees the same thing as for any
