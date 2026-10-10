@@ -8,7 +8,7 @@ import { Status } from './releases.styles';
 import { useAdminAction } from './use-admin-action';
 
 // Archive (with confirmation) or Restore (no confirmation: it's the safe direction).
-export function ArchiveControl({ releaseId, title, archived }: { releaseId: string; title: string; archived: boolean }) {
+export function ArchiveControl({ releaseId, title, archived, disabled }: { releaseId: string; title: string; archived: boolean; disabled?: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const { busy, error, setError, run } = useAdminAction();
 
@@ -25,7 +25,7 @@ export function ArchiveControl({ releaseId, title, archived }: { releaseId: stri
 
   return (
     <>
-      <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(true)}>Archive</Button>
+      <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirming(true)}>Archive</Button>
       <ConfirmModal
         open={confirming}
         title={`Archive "${title}"?`}

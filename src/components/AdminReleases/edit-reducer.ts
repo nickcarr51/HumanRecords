@@ -78,6 +78,11 @@ function snapshot(s: EditState): string {
   });
 }
 
+// Content key of the server data as a draft; unchanged key => same data.
+export function draftKey(release: AdminRelease): string {
+  return snapshot(draftFrom(release));
+}
+
 export function isDraftDirty(state: EditState, release: AdminRelease): boolean {
   return snapshot(state) !== snapshot(draftFrom(release));
 }

@@ -19,6 +19,11 @@ beforeEach(() => {
 });
 
 describe("ArchiveControl", () => {
+  it("disables Archive when disabled", () => {
+    renderWithTheme(<ArchiveControl releaseId="r1" title="X" archived={false} disabled />);
+    expect(screen.getByRole("button", { name: "Archive" })).toBeDisabled();
+  });
+
   it("asks for confirmation before archiving", async () => {
     renderWithTheme(<ArchiveControl releaseId="r1" title="Night Drives" archived={false} />);
     await userEvent.click(screen.getByRole("button", { name: "Archive" }));

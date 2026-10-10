@@ -100,4 +100,35 @@ describe("EditReleaseForm", () => {
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
+
+  it("resets the draft when the server data changes", () => {
+    const { rerender } = renderWithTheme(<EditReleaseForm release={album} />);
+    rerender(<EditReleaseForm release={{ ...album, album: { ...album.album!, title: "Dawn" } }} />);
+    expect(screen.getByLabelText("Album title")).toHaveValue("Dawn");
+  });
+
+  it("keeps a dirty draft when re-rendered with identical content", async () => {
+    const { rerender } = renderWithTheme(<EditReleaseForm release={album} />);
+    await userEvent.type(screen.getByLabelText("Album title"), "!");
+    rerender(<EditReleaseForm release={structuredClone(album)} />);
+    expect(screen.getByLabelText("Album title")).toHaveValue("Night!");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+
+  it("disables header Archive while dirty", async () => {
+    renderWithTheme(<EditReleaseForm release={album} />);
+    expect(screen.getByRole("button", { name: "Archive" })).toBeEnabled();
+    await userEvent.type(screen.getByLabelText("Album title"), "!");
+    expect(screen.getByRole("button", { name: "Archive" })).toBeDisabled();
+  });
+
+  it("Discard clears a shown save error", async () => {
+    saveRelease.mockResolvedValueOnce({ error: "Boom" });
+    renderWithTheme(<EditReleaseForm release={album} />);
+    await userEvent.type(screen.getByLabelText("Album title"), "!");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Boom");
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });
