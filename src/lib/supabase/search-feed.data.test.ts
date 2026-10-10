@@ -47,7 +47,7 @@ async function search(q: string): Promise<string[]> {
     const client = await user.signIn();
     const { data, error } = await client.rpc("search_feed", { q }).select("id");
     if (error) throw error;
-    return (data ?? []).map((r: { id: string }) => r.id);
+    return ((data as unknown as Array<{ id: string }> | null) ?? []).map((r) => r.id);
   } finally {
     await user.cleanup();
   }
@@ -121,7 +121,8 @@ describe("search_feed", () => {
         .order("id", { ascending: false })
         .range(0, 9);
       expect(error).toBeNull();
-      expect(data?.[0]).toMatchObject({ kind: "single", track: { title: `${tag} Embedded` } });
+      const rows = data as unknown as Array<Record<string, unknown>> | null;
+      expect(rows?.[0]).toMatchObject({ kind: "single", track: { title: `${tag} Embedded` } });
     } finally {
       await user.cleanup();
     }
