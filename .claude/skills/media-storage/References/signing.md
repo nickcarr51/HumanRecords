@@ -46,7 +46,9 @@ attachment; filename="<ascii fallback>"; filename*=UTF-8''<percent-encoded>
 ```
 
 The ASCII fallback strips `"` and `\` (so they can't break out of the quotes) and replaces
-non-ASCII with `_`; `filename*` carries the real name (e.g. "Café.mp3").
+non-ASCII with `_`; `filename*` carries the real name (e.g. "Café.mp3"), with `' ( ) *` also
+percent-encoded (`encodeURIComponent` leaves them, but RFC 5987 `attr-char` forbids them; strict parsers like Firefox
+otherwise fall back to the ASCII name).
 
 The name itself comes from `downloadFilename(artistNames, title, ext)` in
 `src/lib/storage/filename.ts` (pure, no `server-only`; tests in `filename.test.ts`):

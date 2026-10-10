@@ -36,7 +36,7 @@ the HTML `<head>`, so the first paint is styled.
 | Shared input styles (`Input`/`Textarea`/`Select`) | `src/components/field/fieldStyles.ts` |
 | Full-height centered shell for standalone screens | `src/app/screen.styles.ts` (`Screen`) |
 | Live catalog of every component (dev only) | `src/app/style-guide/page.tsx` (404s in production via `layout.tsx`) |
-| Toasts: `ToastProvider` mounted once in `AppShell`; `--toast-offset` (set on its Wrapper) lifts them above the player bar | `src/components/AppShell/AppShell.tsx`, `src/components/Toast/` |
+| Toasts: `ToastProvider` mounted once in `AppShell`; `--toast-offset` (set on its Wrapper: 4rem, 6rem at ≤`sm` where the player bar wraps to two rows) lifts them above the player bar; any page under `(app)` can call `useToast()`, so don't add another provider | `src/components/AppShell/AppShell.tsx`, `src/components/Toast/` |
 | Test render helper | `src/test/renderWithTheme.tsx` |
 
 ## References
@@ -49,9 +49,6 @@ the HTML `<head>`, so the first paint is styled.
   transient props, and which feature owns the composite ones (Player, Feed, Upload, AppShell).
 - [styling-conventions.md](References/styling-conventions.md) — `'use client'` + `*.styles.ts`,
   `$` transient props, folder/barrel layout, a11y defaults, responsive pattern, and testing.
-
-**Toasts:** `ToastProvider` is mounted once in `AppShell`, so any page under `(app)` can call `useToast()`. Don't add
-another provider.
 
 ## Depends on
 

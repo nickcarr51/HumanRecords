@@ -47,7 +47,7 @@ Verified byte-identical (SHA-256) on 2026-10-10 through `signUploadUrl` then `si
 | CORS rule per bucket | `infra/r2/cors.{local,dev,prod}.json` (to be committed during setup, Task B2 pending; user pastes into Cloudflare) |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
 | Keys that may be deletable later | `r2_cleanup_queue` table (service-role only; see [[content-lifecycle]]) |
-| Tests | `src/lib/storage/{config,sign,actions}.test.ts` |
+| Tests | `src/lib/storage/{config,sign,actions,filename}.test.ts` |
 
 ## References
 
