@@ -113,12 +113,14 @@ type FeedQuery = PromiseLike<{ data: unknown; error: PostgrestError | null; coun
   range(from: number, to: number): FeedQuery;
 };
 
-function releaseQuery(supabase: SupabaseClient<Database>, q: string): FeedQuery {
+function releaseQuery(supabase: SupabaseClient<Database>, q: string, countOnly = false): FeedQuery {
+  const columns = countOnly ? "id" : RELEASE_SELECT;
+  const opts = countOnly ? ({ count: "exact", head: true } as const) : ({ count: "exact" } as const);
   // search_feed only filters (an empty pattern would match everything, so it
   // is skipped for a blank q); count: 'exact' gives the page count either way.
   const query = q
-    ? supabase.rpc("search_feed", { q }, { count: "exact" }).select(RELEASE_SELECT)
-    : supabase.from("releases").select(RELEASE_SELECT, { count: "exact" });
+    ? supabase.rpc("search_feed", { q }, opts).select(columns)
+    : supabase.from("releases").select(columns, opts);
   return query as unknown as FeedQuery;
 }
 
@@ -139,7 +141,15 @@ export async function getFeed(
     .order("sort_at", { ascending: false })
     .order("id", { ascending: false })
     .range(from, from + pageSize - 1);
-  if (error) throw error;
+  if (error) {
+    if (error.code !== "PGRST103") throw error;
+    // Past-the-end page: PostgREST refuses the range. Report the totals (same
+    // source and archived filter, count only) so callers can redirect.
+    const counted = await releaseQuery(supabase, q, true).is("archived_at", null);
+    if (counted.error) throw counted.error;
+    const total = counted.count ?? 0;
+    return { items: [], page, pageSize, hasMore: false, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  }
 
   const rows = (data ?? []) as unknown as ReleaseRow[];
   const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);

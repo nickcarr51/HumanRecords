@@ -29,7 +29,8 @@ async function albumWithTrack(albumTitle: string, trackTitle: string, sortAt: st
   if (error) throw error;
   albumIds.push(data.id);
   const t = await track(trackTitle);
-  await admin.from("track_albums").insert({ album_id: data.id, track_id: t, position: 1 });
+  const link = await admin.from("track_albums").insert({ album_id: data.id, track_id: t, position: 1 });
+  if (link.error) throw link.error;
   const rel = await admin.from("releases").insert({ kind: "album", album_id: data.id, sort_at: sortAt });
   if (rel.error) throw rel.error;
   return data.id as string;
@@ -120,7 +121,8 @@ describe("getFeed with q", () => {
     await single(live, "2101-04-01T00:00:00Z");
     await single(decoy, "2101-04-02T00:00:00Z");
     await single(gone, "2101-04-03T00:00:00Z");
-    await admin.from("releases").update({ archived_at: new Date().toISOString() }).eq("track_id", gone);
+    const arch = await admin.from("releases").update({ archived_at: new Date().toISOString() }).eq("track_id", gone);
+    if (arch.error) throw arch.error;
     await asListener(async (client) => {
       const { items, total } = await getFeed(client, { q: `${tag} 100% Pure_`, pageSize: 10 });
       expect(items.map((i) => i.id)).toEqual([live]);
@@ -133,6 +135,35 @@ describe("getFeed with q", () => {
       const { total, totalPages, pageSize } = await getFeed(client, { pageSize: 2 });
       expect(total).toBeGreaterThan(0);
       expect(totalPages).toBe(Math.max(1, Math.ceil(total / pageSize)));
+    });
+  });
+
+  it("returns totals for a past-the-end page of the plain feed", async () => {
+    await asListener(async (client) => {
+      const first = await getFeed(client, { page: 1, pageSize: 2 });
+      const far = await getFeed(client, { page: 999, pageSize: 2 });
+      expect(far.items).toEqual([]);
+      expect(far.hasMore).toBe(false);
+      expect(far.total).toBe(first.total);
+      expect(far.totalPages).toBe(first.totalPages);
+    });
+  });
+
+  it("returns totals for a past-the-end search page", async () => {
+    const tag = `FSP${Date.now()}`;
+    for (const [n, d] of [["One", "01"], ["Two", "02"], ["Three", "03"]]) {
+      await single(await track(`${tag} ${n}`), `2101-07-${d}T00:00:00Z`);
+    }
+    await asListener(async (client) => {
+      const far = await getFeed(client, { q: tag, page: 5, pageSize: 2 });
+      expect(far).toMatchObject({ items: [], hasMore: false, total: 3, totalPages: 2 });
+    });
+  });
+
+  it("returns zero totals for a search with no matches", async () => {
+    await asListener(async (client) => {
+      const none = await getFeed(client, { q: `NoSuchThing${Date.now()}`, page: 3, pageSize: 2 });
+      expect(none).toMatchObject({ items: [], hasMore: false, total: 0, totalPages: 1 });
     });
   });
 });
