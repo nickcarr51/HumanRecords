@@ -87,6 +87,7 @@ function toFeedItem(row: ReleaseRow): FeedItem | null {
       .map((r) => r.tracks)
       .filter((t): t is TrackRel => t !== null && !t.archived_at)
       .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
+    if (tracks.length === 0) return null; // never show an empty album
     return {
       kind: "album",
       id: row.album.id,

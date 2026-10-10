@@ -25,9 +25,14 @@ Definer, label members only (`42501`); `direction` is `up` or `down` (`22023` ot
 1. Lock the target row, find the live neighbour in the **same pinned group** by `(sort_at, id)`.
 2. At the group edge (top or bottom of its pinned group) return silently. Moving the top
    unpinned release "up" does not cross into the pinned group; pin/unpin changes groups.
-3. If target and neighbour have the **same** `sort_at`, swapping would change nothing. First
-   spread the whole tied block: the top row keeps `t`, each next row gets `t - k µs`, in current
-   feed (id) order. Then swap. One click therefore always moves exactly one spot.
+3. Before swapping, spread **every** tied block in the pinned group whose `sort_at` equals the
+   target's **or** the neighbour's: live rows only, current feed order (`sort_at desc, id desc`),
+   the top row keeps `t`, each next row gets `t - k ms`. Spreading only when the two tie is not
+   enough: with A and B tied at `t` and C at `t-1` (feed A, B, C), moving B down would hand C the
+   value `t`, tie it with A, and the id tiebreak would put C above A (two spots). With both blocks
+   spread, the swap exchanges two unique values and cannot create a tie. The step is 1 ms because
+   JS `Date` keeps only milliseconds; finer steps would collapse back into ties if `sort_at` is
+   ever round-tripped through JS. Then re-read both rows and swap. One click always moves exactly one spot.
 4. Swap the two `sort_at` values in one transaction.
 
 Concurrent opposite moves can deadlock (`40P01`); callers should show a "try again" message.

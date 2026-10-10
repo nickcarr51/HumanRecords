@@ -77,9 +77,11 @@ which is invoker but only reachable from inside `publish_release`.
 - Errors: `42501` not a label member; `22023` direction not `up`/`down`, or the release is archived;
   `P0002` no such release. Already at the edge of its pinned group: silent no-op.
 - Locks the target and its neighbour (`for update`), finds the neighbour in the **same pinned group**
-  (live only) by `(sort_at, id)`, then swaps their `sort_at`. If the two tie on `sort_at`, it first
-  spreads the whole tied block (top keeps `t`, each next row gets `t - k µs`, in current feed order),
-  so one click always moves exactly one spot.
+  (live only) by `(sort_at, id)`, then swaps their `sort_at`. Before the swap it spreads every
+  tied block (same pinned group, live rows) whose `sort_at` equals the target's or the neighbour's
+  (top keeps `t`, each next row gets `t - k ms`, in current feed order). Both blocks, because a third
+  row tied with either one would otherwise tie after the swap and jump two spots. 1 ms steps, because
+  JS `Date` keeps only milliseconds. One click always moves exactly one spot.
 - Two concurrent opposite moves can deadlock (`40P01`): callers should show a "try again" message.
 - Caller: the future release-admin UI ([[content-lifecycle]], `References/ordering.md`).
 

@@ -211,4 +211,20 @@ describe("getFeed ordering and archive", () => {
       await label.cleanup();
     }
   });
+
+  it("drops a live album release whose only track is archived", async () => {
+    const tag = `EMPTYALB-${Date.now()}-`;
+    const albumId = await makeAlbum(`${tag}Album`);
+    const t = await makeTrack(`${tag}Only`);
+    await admin.from("track_albums").insert({ track_id: t, album_id: albumId, position: 1 });
+    await makeAlbumRelease(albumId);
+    await admin.from("tracks").update({ archived_at: new Date().toISOString() }).eq("id", t);
+    const label = await createTestUser({ role: "label_member" });
+    try {
+      const { items } = await getFeed(await label.signIn(), { page: 1, pageSize: 500 });
+      expect(items.some((i) => i.id === albumId)).toBe(false);
+    } finally {
+      await label.cleanup();
+    }
+  });
 });

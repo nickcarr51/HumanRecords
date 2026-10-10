@@ -64,7 +64,7 @@ Artwork columns are currently always null (no artwork upload yet).
 ## What appears in the feed
 
 Only rows with a `releases` row. An album's tracks have no release of their own, so they
-never appear as separate feed items. Archived releases are excluded, as are archived album tracks and archived single tracks (a single whose track is archived is dropped). Pre-existing hosted rows were backfilled: every album
+never appear as separate feed items. Archived releases are excluded, as are archived album tracks and archived single tracks (a single whose track is archived is dropped). An album with zero live tracks (all archived, or none) is also dropped by `toFeedItem`; a dropped item makes that page come back short, so admin actions must keep data consistent (archiving an album's last live track archives the release). Pre-existing hosted rows were backfilled: every album
 got an `album` release; every track not on an album got a `single` release.
 
 ## Querying with embeds

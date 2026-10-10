@@ -27,7 +27,7 @@ How it works:
    single, and `album:albums(id, title, album_art_url, album_artists(position,
    artists(name)), track_albums(position, tracks(id, title, archived_at, track_artists(position,
    artists(name)))))` for an album. Only things with a `releases` row appear — an album's
-   tracks are never their own feed row because they have no release of their own. A single whose track is archived is dropped in `toFeedItem`.
+   tracks are never their own feed row because they have no release of their own. A single whose track is archived is dropped in `toFeedItem`, and so is an album with zero live tracks (all archived, or none); the feed never returns an empty album.
 2. `.is("archived_at", null)` (label members can read archived rows via RLS, so the filter is
    explicit), then ordered `pinned desc, sort_at desc, id desc` (id breaks ties so pages are
    stable). `RELEASE_SELECT` includes `pinned, sort_at` because PostgREST orders an RPC result
@@ -37,7 +37,7 @@ How it works:
    page and `hasMore = rows.length > pageSize`.
 4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
    item. A release whose embedded target is null (hidden/removed) is skipped (so a page can
-   have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped.
+   have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped. Dropping an item (empty album, archived single) makes that page come back short, so admin actions must keep data consistent: archiving an album's last live track must archive the release too.
 5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list
    is in credit order via `namesFrom`.
 

@@ -9,7 +9,7 @@ Migration `20261010120000_feed_order_and_archive.sql`. Columns: `releases.archiv
 |---|---|
 | A single | Set `releases.archived_at` and the track's `archived_at` together. The single disappears from the feed and its track can no longer be streamed or downloaded. |
 | An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). Its tracks need not be archived individually. **Known gap (deferred to the release-admin branch):** the live tracks of an archived album are still signable by `getTrackStreamUrl` / `getTrackDownloadUrl` if a caller already has the track id; fix by checking the parent release or archiving the tracks with the album. |
-| One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. |
+| One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. **If it was the album's last live track, archive the release too:** the feed drops albums with zero live tracks (`toFeedItem`), which makes that page come back short, so admin actions must keep data consistent. |
 
 The archive writes happen in the admin UI (not built). Each archive also queues the object
 keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
