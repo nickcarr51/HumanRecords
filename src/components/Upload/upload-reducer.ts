@@ -91,7 +91,7 @@ export function titleFromFilename(name: string): string {
   return name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim();
 }
 
-function move<T>(list: T[], index: number, dir: Direction): T[] {
+export function move<T>(list: T[], index: number, dir: Direction): T[] {
   const to = index + dir;
   if (index < 0 || to < 0 || to >= list.length) return list;
   const next = [...list];
@@ -99,12 +99,12 @@ function move<T>(list: T[], index: number, dir: Direction): T[] {
   return next;
 }
 
-function addChip(list: ArtistChip[], chip: ArtistChip): ArtistChip[] {
+export function addChip(list: ArtistChip[], chip: ArtistChip): ArtistChip[] {
   const dup = list.some((c) => c.key === chip.key || normalizeName(c.name) === normalizeName(chip.name));
   return dup ? list : [...list, chip];
 }
 
-function moveChip(list: ArtistChip[], key: string, dir: Direction): ArtistChip[] {
+export function moveChip(list: ArtistChip[], key: string, dir: Direction): ArtistChip[] {
   return move(list, list.findIndex((c) => c.key === key), dir);
 }
 
@@ -219,7 +219,7 @@ export function hasErrors(errors: ValidationErrors): boolean {
   return Boolean(errors.albumTitle || errors.form || Object.keys(errors.tracks).length);
 }
 
-function toRef(chip: ArtistChip): ArtistRef {
+export function toRef(chip: ArtistChip): ArtistRef {
   return chip.id ? { id: chip.id } : { newName: chip.name.trim() };
 }
 
