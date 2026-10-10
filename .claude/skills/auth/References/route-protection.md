@@ -18,6 +18,13 @@
 4. Otherwise return `supabaseResponse` **as is** — returning a different response without
    copying cookies desyncs browser and server sessions.
 
+### Public assets (link previews)
+
+Link-preview crawlers fetch logged out. `og.png`, `icon*.png`, `apple-icon.png` pass because the matcher
+skips `*.png`; `/manifest.webmanifest` runs middleware but isn't in `PROTECTED_PREFIXES`, so it passes too.
+New public asset types (e.g. `.ico`, or a `.webmanifest` under a protected prefix) must stay outside both.
+Verify with logged-out `curl -I` (2026-10-10: og, icon, apple-icon, icon-192/512, manifest all 200; `/feed` 307 → `/login`).
+
 ## `authRedirectPath(pathname, isAuthed)` (`src/lib/auth/route-guard.ts`)
 
 Pure function, evaluated in this order:

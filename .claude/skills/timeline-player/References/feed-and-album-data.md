@@ -58,6 +58,19 @@ integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally
   album page and the feed's expanded album row always agree.
 - `AlbumDetail = { id, title, albumArtUrl, artistNames[], tracks: FeedTrack[] }`.
 
+## Downloaded state (`src/lib/supabase/downloads.ts`)
+
+Both pages show which tracks the user already downloaded:
+
+- Feed: `getMyDownloadedTrackIds(supabase, feedTrackIds(items))`; album page: the album's track ids.
+  `feedTrackIds` flattens singles and album tracks in feed order.
+- Uses the **user (cookie) client**: `downloads` RLS is owner-only, so no `user_id` filter. Queries in
+  chunks of 100 ids (PostgREST URL length) and **fails soft** to `[]` (logs; buttons just show the plain arrow).
+- The page wraps its list in `<DownloadsProvider initialIds={...}>`; rows render `DownloadButton`. The provider
+  unions the server ids with local marks, so new `initialIds` (e.g. `?page=2`, which doesn't remount) apply without losing clicks.
+- Album page also exports `generateMetadata` and uses `cache(loadAlbum)`, so the title and the page share one
+  `getAlbum` query per request. Feed title is `Feed`.
+
 ## `artist-names.ts`
 
 - `ArtistNameRel = Array<{ position?: number | null; artists: { name: string } | null }> | null`

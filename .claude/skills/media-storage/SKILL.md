@@ -28,6 +28,10 @@ then signs it. The R2 secret is read only in `server-only` modules (`config.ts`,
 importing either from a client component is a build error. Actions always return
 `{ url, error }` — they never throw to the client.
 
+**Downloads serve the original R2 bytes. Never transcode/re-encode;** artists tag MP3s (320 kbps /
+44.1 kHz, ID3 incl. art) before upload and DJs rely on them. Only the saved filename changes.
+Verified byte-identical (SHA-256) on 2026-10-10 through `signUploadUrl` then `signDownloadUrl`.
+
 ## Pieces
 
 | Concern | Where |
@@ -35,6 +39,8 @@ importing either from a client component is a build error. Actions always return
 | R2 env validation (read per call) | `src/lib/storage/config.ts` (`getR2Config`) |
 | Signers + TTLs + HEAD | `src/lib/storage/sign.ts` (`signStreamUrl`, `signDownloadUrl`, `signImageUrl`, `signUploadUrl`, `headObject`) |
 | Session-gated server actions | `src/lib/storage/actions.ts` (`getTrackStreamUrl`, `getTrackDownloadUrl`) |
+| Download filename (pure) | `src/lib/storage/filename.ts` (`downloadFilename`, `extFromKey`) |
+| Download button (client) | `src/components/Downloads/DownloadButton.tsx` (calls `getTrackDownloadUrl`) |
 | Service-role client (download recording) | `src/lib/supabase/service.ts` |
 | Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts` ([[admin-upload]]) |
 | Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
@@ -46,7 +52,7 @@ importing either from a client component is a build error. Actions always return
 ## References
 
 - [signing.md](References/signing.md) — how `aws4fetch` presigns, each signer and its TTL,
-  the RFC 6266 download filename, the PUT Content-Type rule, `headObject`, and config.
+  the RFC 6266 download filename and how `downloadFilename` builds the name, the PUT Content-Type rule, `headObject`, and config.
 - [server-actions.md](References/server-actions.md) — `getTrackStreamUrl` /
   `getTrackDownloadUrl` step by step (both refuse archived tracks), the `{ url, error }` contract, download recording, and
   how to add a new signed-URL action.
@@ -66,7 +72,7 @@ Used by: [[timeline-player]] (player calls `getTrackStreamUrl`), [[admin-upload]
 
 ## Known deferrals (as of 2026-10-10)
 
-- `getTrackDownloadUrl` and `signImageUrl` are built and tested but **not wired to any UI** yet.
+- `signImageUrl` is built and tested but unused (no artwork yet). Downloads are wired: `DownloadButton` on feed and album track rows ([[timeline-player]]).
 - No artwork upload; art columns are null, so image signing is unused.
 - Orphaned objects (failed/replaced uploads) are not cleaned up. `r2_cleanup_queue` records archived and replaced keys; the job that reads it is not built ([[content-lifecycle]]).
 - R2 CORS rule must be applied per bucket before browser uploads work (see

@@ -23,6 +23,12 @@ on the cookie-bound client → `redirect('/feed')`. If any step after the claim 
 token is **restored**. A used, unknown, or regenerated token is ignored silently: the normal
 form appears with the email pre-filled.
 
+**Link previews:** invite links (`/login?email=&invite=`) render the root OG/Twitter tags (title `Human Services`,
+`/og.png`). `metadataBase` comes from `SITE_URL` (`src/app/layout.tsx`), so a wrong `SITE_URL` breaks
+link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/login?invite=x' | grep og:`.
+
+**Page titles:** admin pages use `Admin · <Section>` via `export const metadata = { title }` (e.g. `Admin · Users`).
+
 ## Pieces
 
 | Concern | Where |
