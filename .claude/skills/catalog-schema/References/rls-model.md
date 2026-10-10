@@ -15,7 +15,6 @@
 |---|---|
 | `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
 | `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
-| `artists` (writes) | `"label members insert artists"` / `"label members update artists"`: `current_user_role() = 'label_member'` (insert `with check`; update `using` + `with check`). No delete policy — use `admin_delete_artist`. The only write policies in the schema. |
 | `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; service role only |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
 
@@ -40,7 +39,15 @@ RLS filters rows, not columns. To hide `users.role` from peers while keeping nam
 
 ## Writes
 
-No insert/update/delete policy exists on any table. Under RLS, a write that no policy allows
+The only write policies are on `artists`, for label members (`/admin/artists`):
+
+| Policy | Rule |
+|---|---|
+| `"label members insert artists"` | `with check (current_user_role() = 'label_member')` |
+| `"label members update artists"` | `using` + `with check (current_user_role() = 'label_member')` — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
+
+No delete policy: deletes go through `admin_delete_artist`. No other table has an insert/update/delete
+policy. Under RLS, a write that no policy allows
 is **silently a no-op** (zero rows, `error: null`) — tests assert the value is unchanged, not
 that the call errored (see `catalog.test.ts`).
 

@@ -11,7 +11,7 @@ workflow, and the generated TypeScript types. Every other feature reads through 
 
 ## The one thing to understand first
 
-**The `authenticated` role can read the catalog and write nothing.** Every table has RLS on,
+**The `authenticated` role can read the catalog and write nothing — except label members writing `artists`.** Every table has RLS on,
 every table has an `authenticated … for select` policy: `using (true)` for most, except
 `downloads` (owner-only), `releases`/`tracks` (archived rows hidden unless the caller is a label
 member), and `r2_cleanup_queue` (no policies at all; service role only). See

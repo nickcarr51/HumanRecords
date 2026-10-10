@@ -10,19 +10,24 @@ const albumIds: string[] = [];
 
 let label: Awaited<ReturnType<typeof createTestUser>>;
 let listener: Awaited<ReturnType<typeof createTestUser>>;
+let artistUser: Awaited<ReturnType<typeof createTestUser>>;
 let labelClient: SupabaseClient;
 let listenerClient: SupabaseClient;
+let artistClient: SupabaseClient;
 
 beforeAll(async () => {
   label = await createTestUser({ role: "label_member" });
   listener = await createTestUser({ role: "listener" });
+  artistUser = await createTestUser({ role: "artist" });
   labelClient = await label.signIn();
   listenerClient = await listener.signIn();
+  artistClient = await artistUser.signIn();
 });
 
 afterAll(async () => {
   await label.cleanup();
   await listener.cleanup();
+  await artistUser.cleanup();
 });
 
 afterEach(async () => {
@@ -73,6 +78,16 @@ describe("artists write policies", () => {
     expect(upd.data).toHaveLength(0);
   });
 
+  it("rejects inserts and updates from the artist role", async () => {
+    const ins = await artistClient.from("artists").insert({ name: uniqueName() });
+    expect(ins.error?.code).toBe("42501");
+
+    const a = await seedArtist();
+    const upd = await artistClient.from("artists").update({ bio: "nope" }).eq("id", a.id).select("id");
+    expect(upd.error).toBeNull();
+    expect(upd.data).toHaveLength(0);
+  });
+
   it("rejects a duplicate name (case/space-insensitive) on insert and update", async () => {
     const a = await seedArtist();
     const b = await seedArtist();
@@ -104,6 +119,12 @@ describe("admin_delete_artist", () => {
   it("refuses non-label-members", async () => {
     const a = await seedArtist();
     const { error } = await listenerClient.rpc("admin_delete_artist", { target: a.id });
+    expect(error?.code).toBe("42501");
+  });
+
+  it("refuses the artist role", async () => {
+    const a = await seedArtist();
+    const { error } = await artistClient.rpc("admin_delete_artist", { target: a.id });
     expect(error?.code).toBe("42501");
   });
 
