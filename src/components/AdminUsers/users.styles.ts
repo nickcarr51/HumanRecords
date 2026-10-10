@@ -24,6 +24,10 @@ export const Table = styled.table`
     border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   }
 
+  tr[data-deactivated='true'] td {
+    opacity: 0.6;
+  }
+
   /* Phones: each row becomes a stacked card. */
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     thead {

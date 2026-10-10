@@ -10,6 +10,8 @@ vi.mock("@/lib/admin/users-actions", () => ({
   createUser: vi.fn(),
   issueInvite: (...a: unknown[]) => issueInvite(...a),
   setUserRole: (...a: unknown[]) => setUserRole(...a),
+  updateUserProfile: vi.fn(),
+  setUserActive: vi.fn(),
 }));
 
 import { UsersTable } from "./UsersTable";
@@ -122,5 +124,19 @@ describe("UsersTable", () => {
     expect(await within(row("new@x.co")).findByRole("alert")).toHaveTextContent(/something went wrong/i);
     expect(select).toHaveValue("listener");
     expect(select).toBeEnabled();
+  });
+  it("links each row to the user's edit page", () => {
+    renderWithTheme(<UsersTable users={users} selfId="me" />);
+    expect(within(row("new@x.co")).getByRole("link", { name: "Edit" })).toHaveAttribute("href", "/admin/users/new");
+  });
+
+  it("tags deactivated users and locks their role and invite controls", () => {
+    const gone = { ...users[1], deactivated: true };
+    renderWithTheme(<UsersTable users={[users[0], gone]} selfId="me" />);
+    const r = within(row("new@x.co"));
+    expect(r.getByText("Deactivated")).toBeInTheDocument();
+    expect(r.getByRole("combobox")).toBeDisabled();
+    expect(r.getByRole("button", { name: "Copy" })).toBeDisabled();
+    expect(r.getByRole("button", { name: "Regenerate" })).toBeDisabled();
   });
 });
