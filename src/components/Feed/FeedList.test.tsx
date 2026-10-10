@@ -126,3 +126,20 @@ describe('FeedList play/pause state', () => {
     expect(toggle).not.toHaveBeenCalled();
   });
 });
+
+describe('FeedList source', () => {
+  const source = { kind: 'feed', q: 'wav', lastPage: 2, hasMore: true } as const;
+
+  it('passes the feed source and tags tracks with the page', () => {
+    renderWithTheme(<FeedList items={items} source={source} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Play Older Single' }));
+    const [queue, , passed] = playQueue.mock.calls.at(-1)!;
+    expect(passed).toEqual(source);
+    expect((queue as Array<{ page?: number }>).every((t) => t.page === 2)).toBe(true);
+  });
+
+  it('shows the given empty message', () => {
+    renderWithTheme(<FeedList items={[]} emptyMessage='No results for "zzz"' />);
+    expect(screen.getByText('No results for "zzz"')).toBeInTheDocument();
+  });
+});

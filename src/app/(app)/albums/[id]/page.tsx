@@ -34,7 +34,7 @@ export default async function AlbumPage({
           <Artists>{artist}</Artists>
         </div>
       </Head>
-      <AlbumTracks tracks={album.tracks} />
+      <AlbumTracks tracks={album.tracks} albumId={album.id} />
     </Page>
   );
 }
