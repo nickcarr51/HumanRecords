@@ -68,20 +68,20 @@ call; `jwt_expiry = 3600`.
 1. **OTP refused, with a vague message.** `signInWithOtp({ shouldCreateUser: false })` for a
    banned email still *succeeds* (no error, code mail goes out). `verifyOtp` (and the
    generateLink + verifyOtp path) fails with 403 `user_banned` / "User is banned". `submitOtp`
-   only maps `/expired|invalid|incorrect|token/`, so the user sees "Something went wrong.
-   Please try again." — not a clear "deactivated" message.
+   now checks for the ban first (`user_banned` / `/banned/i`) and shows "This account has been
+   deactivated. Contact Human Records if you think this is a mistake." (no redirect).
 2. **Existing session is not kicked immediately.** After banning: `refreshSession()` fails
    (400 `user_banned`, "Invalid Refresh Token: User Banned") and `getUser()` fails (403
    `user_banned`), but `getClaims()` still returns valid claims until the access token
    expires. The middleware and `getSessionUser` use `getClaims()`, so a banned user with an
    open session keeps access for up to the remaining access-token life (up to 1 hour, the
    `jwt_expiry`), then the refresh fails and they are signed out. No instant kick exists.
-3. **Invite link for a deactivated user fails generically.** `redeemInvite` claims the token,
+3. **Invite link for a deactivated user.** `redeemInvite` claims the token,
    `generateLink` still succeeds, `verifyOtp` fails with `user_banned`; the catch restores the
-   token and returns "Couldn't sign you in — try again, or use your email below." The token is
-   not burned, and nothing says the account is deactivated.
+   token and returns the deactivated message (same copy as check 1). The token is not burned,
+   so it works again after reactivation.
 
-Open owner decisions (not built): an instant kick, and a friendlier deactivated message.
+Open owner decision (not built): an instant kick of existing sessions.
 
 ## References
 

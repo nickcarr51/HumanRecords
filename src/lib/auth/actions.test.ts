@@ -64,6 +64,13 @@ describe("requestOtp", () => {
 });
 
 describe("submitOtp", () => {
+  it("tells a deactivated user their account is deactivated", async () => {
+    verifyOtp.mockResolvedValue({ error: { code: "user_banned", message: "User is banned" } });
+    const res = await submitOtp("ada@example.com", "123456");
+    expect(res.error).toBe("This account has been deactivated. Contact Human Records if you think this is a mistake.");
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
   it("verifies the code with type 'email' and redirects on success", async () => {
     verifyOtp.mockResolvedValue({ error: null });
     await expect(submitOtp("ada@example.com", "123456")).rejects.toThrow("NEXT_REDIRECT");
