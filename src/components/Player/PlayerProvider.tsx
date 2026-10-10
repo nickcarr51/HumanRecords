@@ -21,6 +21,7 @@ import {
   type QueueSource,
   type QueueState,
 } from "./queue";
+import { useMediaSession } from "./useMediaSession";
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
 
@@ -231,12 +232,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
   }, [currentTrack, status]);
 
+  const pause = useCallback(() => {
+    audioRef.current?.pause();
+  }, []);
+
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) play();
-    else audio.pause();
-  }, [play]);
+    else pause();
+  }, [play, pause]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -339,6 +344,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const { tracks, index, source } = queueState;
     if (tracks.length > 0 && index === tracks.length - 1 && canExtend(source)) void extend();
   }, [queueState, extend]);
+
+  useMediaSession(audioRef, currentTrack, isPlaying, { play, pause, next, prev, seek });
 
   const value: PlayerContextValue = {
     queue: queueState.tracks,
