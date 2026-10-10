@@ -53,7 +53,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
 | Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping, `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
 | Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
-| Reused list pagination (optional `basePath`, e.g. `/admin/artists`) | `src/components/Pagination` |
+| Reused list pagination (optional `basePath`, e.g. `/admin/artists`) | `src/app/(app)/artists/Pagination.tsx` (used by `src/app/(app)/admin/artists/page.tsx`; may move to `src/components/` later) |
 | Admin index cards (Upload, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
