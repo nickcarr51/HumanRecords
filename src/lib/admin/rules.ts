@@ -19,6 +19,6 @@ export function audioFileError(file: { name: string; size: number }): string | n
   return null;
 }
 
-// Catalog ids are v4 UUIDs; server actions refuse anything else before
+// Catalog ids are UUIDs; server actions refuse anything else before
 // touching the database.
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
