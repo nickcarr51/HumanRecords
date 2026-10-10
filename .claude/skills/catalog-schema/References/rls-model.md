@@ -18,7 +18,7 @@
 | `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; service role only |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
 
-Because label members can read archived rows, listener-facing code (`getFeed`, `getAlbum`, the stream/download actions, `search_feed`) also filters `archived_at` explicitly; RLS alone is not enough. See [[content-lifecycle]].
+Because label members can read archived rows, listener-facing code (`getFeed`, `getAlbum`, the stream/download actions, `search_feed`) also filters `archived_at` explicitly (`getAlbum` treats a missing release row as not found, since RLS hides archived releases from listeners; `getFeed` drops singles whose track is archived); RLS alone is not enough. See [[content-lifecycle]].
 
 `(select auth.uid())` (wrapped in a subselect) lets Postgres evaluate it once per query
 instead of per row — use that form in new policies.

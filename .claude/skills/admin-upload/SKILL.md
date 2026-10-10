@@ -32,7 +32,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Local seed: positions, 2 releases, real test accounts | `supabase/seed.sql` |
 | Generated DB types (releases, position columns, RPCs) | `src/lib/supabase/database.types.ts` |
 | Position ordering, name flattening, "Various Artists" | `src/lib/supabase/artist-names.ts` |
-| Feed data (releases, newest first) | `src/lib/supabase/feed.ts` (`getFeed`) |
+| Feed data (releases, pinned first, then `sort_at`) | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Album detail, tracks in position order | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | LIKE-escaping shared with artist search | `src/lib/supabase/artists.ts` (`escapeLike`) |
 | Role helper + page-level gate | `src/lib/auth/role.ts` (`getCurrentRole`, `requireLabelMember`) |

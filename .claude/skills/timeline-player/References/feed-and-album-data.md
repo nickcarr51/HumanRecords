@@ -23,11 +23,11 @@ Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as a
 How it works:
 
 1. **One query on `releases`** (`RELEASE_SELECT`), embedding the target via its foreign key:
-   `track:tracks(id, title, track_art_url, track_artists(position, artists(name)))` for a
+   `track:tracks(id, title, track_art_url, archived_at, track_artists(position, artists(name)))` for a
    single, and `album:albums(id, title, album_art_url, album_artists(position,
    artists(name)), track_albums(position, tracks(id, title, archived_at, track_artists(position,
    artists(name)))))` for an album. Only things with a `releases` row appear — an album's
-   tracks are never their own feed row because they have no release of their own.
+   tracks are never their own feed row because they have no release of their own. A single whose track is archived is dropped in `toFeedItem`.
 2. `.is("archived_at", null)` (label members can read archived rows via RLS, so the filter is
    explicit), then ordered `pinned desc, sort_at desc, id desc` (id breaks ties so pages are
    stable). `RELEASE_SELECT` includes `pinned, sort_at` because PostgREST orders an RPC result
@@ -53,7 +53,7 @@ integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
 - `.maybeSingle()`; returns `null` for a missing album **and for an archived one** (it embeds
-  `releases(archived_at)`), even for label members. Archived tracks are skipped from `tracks`.
+  `releases(archived_at)`), even for label members. A missing release is also `null` (RLS hides an archived release from listeners, so the embed comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
 - Same embeds as the feed's album branch; tracks sorted by `track_albums.position`, so the
   album page and the feed's expanded album row always agree.
 - `AlbumDetail = { id, title, albumArtUrl, artistNames[], tracks: FeedTrack[] }`.

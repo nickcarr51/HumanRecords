@@ -8,7 +8,7 @@ Migration `20261010120000_feed_order_and_archive.sql`. Columns: `releases.archiv
 | Archive | Effect |
 |---|---|
 | A single | Set `releases.archived_at` and the track's `archived_at` together. The single disappears from the feed and its track can no longer be streamed or downloaded. |
-| An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). Its tracks need not be archived individually. |
+| An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). Its tracks need not be archived individually. **Known gap (deferred to the release-admin branch):** the live tracks of an archived album are still signable by `getTrackStreamUrl` / `getTrackDownloadUrl` if a caller already has the track id; fix by checking the parent release or archiving the tracks with the album. |
 | One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. |
 
 The archive writes happen in the admin UI (not built). Each archive also queues the object
@@ -20,7 +20,7 @@ keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md
   Listeners never read archived rows; label members do, for the admin pages.
 - Because of that, listener-facing code filters explicitly. Guards that exist: `getFeed`
   (`.is("archived_at", null)`, archived album tracks dropped), `getAlbum` (`null` for an
-  archived album, archived tracks skipped), `getTrackStreamUrl` / `getTrackDownloadUrl`
+  archived album or one with no visible release, archived tracks skipped), `getTrackStreamUrl` / `getTrackDownloadUrl`
   ("Track not found."), `search_feed` (archived releases and tracks excluded).
 - A new listener-facing query on `releases` or `tracks` **must** add its own `archived_at`
   filter, or label members will see archived items.

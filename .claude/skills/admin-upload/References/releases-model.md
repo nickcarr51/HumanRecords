@@ -14,8 +14,8 @@ Files: `supabase/migrations/20260929120000_create_releases.sql`,
     track/album; deleting the track or album deletes its release.
   - Check `releases_kind_matches_target`: single ⇒ `track_id` set, `album_id` null; album ⇒
     the reverse.
-  - `releases_created_at_idx` on `created_at desc` (the feed's sort).
-  - RLS on; one `select` policy for `authenticated using (true)`. **No insert/update/delete
+  - `releases_created_at_idx` on `created_at desc` (the feed's sort). **Stale:** the feed now sorts by `releases_feed_order_idx` (pinned, sort_at, id).
+  - RLS on; one `select` policy for `authenticated using (true)` (**stale:** it now hides archived rows from non-label-members). **No insert/update/delete
     policies** — the only way to write is `publish_release` (security definer) or the
     service role.
 - `position integer not null` on `track_albums`, `track_artists`, `album_artists`.

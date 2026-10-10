@@ -12,8 +12,10 @@ workflow, and the generated TypeScript types. Every other feature reads through 
 ## The one thing to understand first
 
 **The `authenticated` role can read the catalog and write nothing.** Every table has RLS on,
-every table has an `authenticated … for select using (true)` policy (except `downloads`,
-owner-only), and **no table has an insert/update/delete policy**. All writes go through one of
+every table has an `authenticated … for select` policy: `using (true)` for most, except
+`downloads` (owner-only), `releases`/`tracks` (archived rows hidden unless the caller is a label
+member), and `r2_cleanup_queue` (no policies at all; service role only). See
+`References/rls-model.md`. And **no table has an insert/update/delete policy**. All writes go through one of
 two doors: a `security definer` SQL function that checks the caller itself
 (`increment_play_count`, `publish_release`, `move_release`), or the server-only **service-role** client
 (`createServiceClient`, used for recording downloads). A blocked write under RLS does not

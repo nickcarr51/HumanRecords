@@ -45,7 +45,7 @@ object with no row pointing at it. Accepted for now.
 |---|---|---|
 | `archived` | an archived track's `audio_url`/`track_art_url`, an archived album's `album_art_url` | `tracks` / `albums` |
 | `replaced` | a file swapped out in the admin UI (MP3 or image) | `tracks` / `albums` / `artists` |
-| `archived` | the photo of an uncredited artist that was hard-deleted | `artists` |
+| `archived` | the photo of an uncredited artist that was hard-deleted (queued as `archived` because the check constraint allows only `archived` / `replaced`) | `artists` |
 
 **Nothing deletes from R2 now.** The future cleanup job may delete a key only when it was queued
 30+ days ago **and** no live row still references it (album/track art can be shared), then sets

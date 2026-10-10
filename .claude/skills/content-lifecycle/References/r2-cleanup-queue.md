@@ -28,7 +28,7 @@ server actions write it with `createServiceClient()` after checking the role
 
 - **Archive** a release/track: queue its audio key and any art key (`archived`).
 - **Replace** an MP3 or image: queue the old key (`replaced`).
-- **Hard-delete an uncredited artist**: queue their `profile_photo_url` key.
+- **Hard-delete an uncredited artist**: queue their `profile_photo_url` key with reason `archived` (the check constraint allows only `archived` / `replaced`, so there is no "deleted" reason).
 
 ## When rows are removed
 

@@ -14,7 +14,7 @@ artists; listener/artist refused with `42501` and nothing written; a later inval
 rolls back everything.
 
 **Feed / album** — `feed.data.test.ts`, `albums.data.test.ts` (local Supabase): releases
-newest first with tracks + credits in position order; tracks without a release excluded;
+pinned first then `sort_at`, with tracks + credits in position order; tracks without a release excluded;
 uncredited single → `artistNames: []`; pagination with `hasMore`; album tracks by position
 not title. The feed tests give `releases.created_at` values that **contradict** track
 creation order, so they'd fail if ordering came from `tracks.created_at`.
