@@ -8,17 +8,27 @@
 -- track). Not callable through the API.
 create or replace function public.release_for_track(p_track_id uuid)
 returns uuid
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select r.id from public.releases r where r.track_id = p_track_id
-  union all
-  select r.id from public.releases r
-    join public.track_albums ta on ta.album_id = r.album_id
-    where ta.track_id = p_track_id
-  limit 1;
+declare
+  v_ids uuid[];
+begin
+  select array_agg(distinct x.id) into v_ids
+  from (
+    select r.id from public.releases r where r.track_id = p_track_id
+    union all
+    select r.id from public.releases r
+      join public.track_albums ta on ta.album_id = r.album_id
+      where ta.track_id = p_track_id
+  ) x;
+  if coalesce(array_length(v_ids, 1), 0) > 1 then
+    raise exception 'This track belongs to more than one release.' using errcode = '22023';
+  end if;
+  return v_ids[1]; -- null when the track has no release
+end;
 $$;
 
 revoke execute on function public.release_for_track(uuid) from public;
@@ -45,6 +55,26 @@ begin
   end if;
   if rel.archived_at is not null then
     return; -- already archived: a double click is harmless
+  end if;
+
+  -- Refuse the ambiguous case: archived_at is per track, so a track also shown
+  -- by another release can't be archived/restored with just this one.
+  if exists (
+    select 1
+    from (
+      select rel.track_id as tid where rel.kind = 'single'
+      union all
+      select ta.track_id from public.track_albums ta
+        where rel.kind = 'album' and ta.album_id = rel.album_id
+    ) mine
+    where exists (
+      select 1 from public.releases r2
+      where r2.id <> rel.id
+        and (r2.track_id = mine.tid
+          or r2.album_id in (select ta2.album_id from public.track_albums ta2 where ta2.track_id = mine.tid))
+    )
+  ) then
+    raise exception 'A track on this release also belongs to another release.' using errcode = '22023';
   end if;
 
   update public.releases set archived_at = v_at where id = rel.id;
@@ -99,6 +129,26 @@ begin
   end if;
   if rel.archived_at is null then
     return;
+  end if;
+
+  -- Refuse the ambiguous case: archived_at is per track, so a track also shown
+  -- by another release can't be archived/restored with just this one.
+  if exists (
+    select 1
+    from (
+      select rel.track_id as tid where rel.kind = 'single'
+      union all
+      select ta.track_id from public.track_albums ta
+        where rel.kind = 'album' and ta.album_id = rel.album_id
+    ) mine
+    where exists (
+      select 1 from public.releases r2
+      where r2.id <> rel.id
+        and (r2.track_id = mine.tid
+          or r2.album_id in (select ta2.album_id from public.track_albums ta2 where ta2.track_id = mine.tid))
+    )
+  ) then
+    raise exception 'A track on this release also belongs to another release.' using errcode = '22023';
   end if;
 
   -- Only tracks archived together with the release (same timestamp).

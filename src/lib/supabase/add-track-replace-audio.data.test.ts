@@ -93,4 +93,20 @@ describe("replace_track_audio", () => {
     expect([arch.error?.code, arch.error?.message]).toEqual(["22023", "Restore this track before replacing its file."]);
     expect((await archivedAt("tracks", [trackId])).get(trackId)).not.toBeNull();
   });
+
+  it("replace refuses an orphan track (no release)", async () => {
+    tag = newTag("RPL");
+    const { data: trk, error: insErr } = await admin
+      .from("tracks")
+      .insert({ title: `${tag}-Orphan`, audio_url: `tracks/${tag}-orphan.mp3` })
+      .select("id")
+      .single();
+    if (insErr) throw insErr;
+    const client = await signedIn();
+    const { error } = await client.rpc("replace_track_audio", { p_track_id: trk.id, p_audio_key: `tracks/${tag}-v2.mp3` });
+    expect(error?.code).toBe("P0002");
+    const { data: after } = await admin.from("tracks").select("audio_url").eq("id", trk.id).single();
+    expect(after?.audio_url).toBe(`tracks/${tag}-orphan.mp3`);
+    expect(await queueRows(tag)).toEqual([]);
+  });
 });

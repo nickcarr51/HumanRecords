@@ -5,6 +5,15 @@ import { admin, archivedAt, cleanup, makeAlbum, makeSingle, newTag, queueRows, s
 let tag = "";
 afterEach(() => cleanup(tag));
 
+async function shareTrackOnSecondAlbum(tag: string, trackId: string) {
+  const { data: album, error } = await admin.from("albums").insert({ title: `${tag}-AlbumB` }).select("id").single();
+  if (error) throw error;
+  const { error: link } = await admin.from("track_albums").insert({ track_id: trackId, album_id: album.id, position: 1 });
+  if (link) throw link;
+  const { error: rel } = await admin.from("releases").insert({ kind: "album", album_id: album.id });
+  if (rel) throw rel;
+}
+
 describe("archive_track", () => {
   it("refuses non-label-members", async () => {
     tag = newTag("ATR");
@@ -120,5 +129,15 @@ describe("restore_track", () => {
     const { error } = await client.rpc("restore_track", { p_track_id: trackIds[0] });
     expect(error?.code).toBe("22023");
     expect(error?.message).toBe("This track's file was already deleted from storage.");
+  });
+
+  it("refuses to remove a track that belongs to two releases", async () => {
+    tag = newTag("ATR");
+    const { trackIds } = await makeAlbum(tag, 2);
+    await shareTrackOnSecondAlbum(tag, trackIds[0]);
+    const client = await signedIn();
+    const { error } = await client.rpc("archive_track", { p_track_id: trackIds[0] });
+    expect([error?.code, error?.message]).toEqual(["22023", "This track belongs to more than one release."]);
+    expect((await archivedAt("tracks", [trackIds[0]])).get(trackIds[0])).toBeNull();
   });
 });

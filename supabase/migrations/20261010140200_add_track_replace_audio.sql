@@ -71,12 +71,16 @@ set search_path = public
 as $$
 declare
   trk public.tracks%rowtype;
+  v_release_id uuid;
 begin
   if public.current_user_role() is distinct from 'label_member' then
     raise exception 'Only label members can replace files.' using errcode = '42501';
   end if;
 
-  perform 1 from public.releases where id = public.release_for_track(p_track_id) for update;
+  select id into v_release_id from public.releases where id = public.release_for_track(p_track_id) for update;
+  if not found then
+    raise exception 'Track not found.' using errcode = 'P0002';
+  end if;
   select * into trk from public.tracks where id = p_track_id for update;
   if not found then
     raise exception 'Track not found.' using errcode = 'P0002';
