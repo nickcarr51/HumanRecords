@@ -16,9 +16,9 @@ import { UsersTable } from "./UsersTable";
 
 const URL_ = "http://127.0.0.1:3000/login?email=new%40x.co&invite=tok";
 const users: AdminUserRow[] = [
-  { id: "me", email: "me@x.co", name: "Me", role: "label_member", createdAt: "2026-10-01T00:00:00Z", invite: { status: "none" } },
-  { id: "new", email: "new@x.co", name: "New Person", role: "listener", createdAt: "2026-10-02T00:00:00Z", invite: { status: "unused", url: URL_ } },
-  { id: "old", email: "old@x.co", name: null, role: "artist", createdAt: "2026-09-01T00:00:00Z", invite: { status: "used", usedAt: "2026-10-02T15:00:00Z" } },
+  { id: "me", email: "me@x.co", name: "Me", role: "label_member", createdAt: "2026-10-01T00:00:00Z", deactivated: false, invite: { status: "none" } },
+  { id: "new", email: "new@x.co", name: "New Person", role: "listener", createdAt: "2026-10-02T00:00:00Z", deactivated: false, invite: { status: "unused", url: URL_ } },
+  { id: "old", email: "old@x.co", name: null, role: "artist", createdAt: "2026-09-01T00:00:00Z", deactivated: false, invite: { status: "used", usedAt: "2026-10-02T15:00:00Z" } },
 ];
 
 function row(email: string) {
