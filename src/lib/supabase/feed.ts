@@ -158,3 +158,59 @@ export async function getFeed(
 
   return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
 }
+
+export type FeedAfterAlbum = { items: FeedItem[]; page: number; hasMore: boolean };
+
+// The feed page an album's release is on, or null if it is archived/missing.
+// Counts the live releases ordered ahead of it using the feed's own order:
+// pinned desc, sort_at desc, id desc.
+export async function getAlbumFeedPage(
+  supabase: SupabaseClient<Database>,
+  albumId: string,
+  pageSize: number = feedPageSize(),
+): Promise<number | null> {
+  const { data: rel, error } = await supabase
+    .from("releases")
+    .select("id, pinned, sort_at")
+    .eq("album_id", albumId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!rel) return null;
+
+  // Timestamps contain ':' and '+', which PostgREST's or() syntax reserves, so quote them.
+  const s = `"${rel.sort_at}"`;
+  const ahead = rel.pinned
+    ? `and(pinned.eq.true,sort_at.gt.${s}),and(pinned.eq.true,sort_at.eq.${s},id.gt.${rel.id})`
+    : `pinned.eq.true,sort_at.gt.${s},and(sort_at.eq.${s},id.gt.${rel.id})`;
+
+  const { count, error: countError } = await supabase
+    .from("releases")
+    .select("id", { count: "exact", head: true })
+    .is("archived_at", null)
+    .or(ahead);
+  if (countError) throw countError;
+
+  return Math.floor((count ?? 0) / Math.max(1, pageSize)) + 1;
+}
+
+// What plays after an album finishes on the album page: the rest of its feed
+// page, or the next page when the album was the last item on its page.
+export async function getFeedAfterAlbum(
+  supabase: SupabaseClient<Database>,
+  albumId: string,
+  pageSize: number = feedPageSize(),
+): Promise<FeedAfterAlbum | null> {
+  const page = await getAlbumFeedPage(supabase, albumId, pageSize);
+  if (page === null) return null;
+
+  const current = await getFeed(supabase, { page, pageSize });
+  const idx = current.items.findIndex((i) => i.kind === "album" && i.id === albumId);
+  if (idx === -1) return null;
+
+  const rest = current.items.slice(idx + 1);
+  if (rest.length > 0 || !current.hasMore) return { items: rest, page, hasMore: current.hasMore };
+
+  const following = await getFeed(supabase, { page: page + 1, pageSize });
+  return { items: following.items, page: page + 1, hasMore: following.hasMore };
+}
