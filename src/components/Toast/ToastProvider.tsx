@@ -32,7 +32,9 @@ const slideIn = keyframes`
 
 const Region = styled.div`
   position: fixed;
-  bottom: ${({ theme }) => theme.space.lg};
+  /* --toast-offset lets a host (AppShell) lift toasts above bottom-docked UI
+     like the player bar. Defaults to 0 (style guide). */
+  bottom: calc(${({ theme }) => theme.space.lg} + var(--toast-offset, 0px));
   right: ${({ theme }) => theme.space.lg};
   display: flex;
   flex-direction: column;
