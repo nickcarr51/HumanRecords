@@ -15,7 +15,7 @@ export function FeedList({ items }: { items: FeedItem[] }) {
   const offsets: number[] = [];
   for (const item of items) {
     offsets.push(queue.length);
-    if (item.kind === 'album') queue.push(...item.tracks.map(toPlayerTrack));
+    if (item.kind === 'album') queue.push(...item.tracks.map((t) => toPlayerTrack(t)));
     else queue.push(toPlayerTrack(item));
   }
 

@@ -9,20 +9,9 @@ import {
   useState,
 } from "react";
 import { getTrackStreamUrl } from "@/lib/storage/actions";
+import type { PlayerTrack } from "./queue";
 
-export type PlayerTrack = { id: string; title: string; artistName: string };
-
-export function toPlayerTrack(t: {
-  id: string;
-  title: string;
-  artistNames: string[];
-}): PlayerTrack {
-  return {
-    id: t.id,
-    title: t.title,
-    artistName: t.artistNames.length ? t.artistNames.join(", ") : "Unknown Artist",
-  };
-}
+export { toPlayerTrack, type PlayerTrack } from "./queue";
 
 type Status = "idle" | "loading" | "playing" | "error";
 

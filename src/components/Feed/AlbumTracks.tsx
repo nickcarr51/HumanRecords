@@ -18,7 +18,7 @@ export function AlbumTracks({
 }) {
   if (tracks.length === 0) return <Empty>No tracks in this album yet.</Empty>;
 
-  const playable = queue ?? tracks.map(toPlayerTrack);
+  const playable = queue ?? tracks.map((t) => toPlayerTrack(t));
 
   return (
     <div>
