@@ -13,6 +13,10 @@ export default async function AdminPage() {
         <Heading $level={3}>Upload a release</Heading>
         <Text $variant="muted">Publish a single or an album to the timeline.</Text>
       </ActionCard>
+      <ActionCard href="/admin/releases">
+        <Heading $level={3}>Releases</Heading>
+        <Text $variant="muted">Pin, reorder, edit, and archive releases.</Text>
+      </ActionCard>
       <ActionCard href="/admin/users">
         <Heading $level={3}>Users</Heading>
         <Text $variant="muted">Invite people and manage roles.</Text>

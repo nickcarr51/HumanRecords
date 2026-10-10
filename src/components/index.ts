@@ -31,3 +31,4 @@ export * from './Feed';
 export * from './Upload';
 export * from './Login';
 export * from './AdminUsers';
+export * from './AdminReleases';
