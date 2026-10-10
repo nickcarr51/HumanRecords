@@ -48,6 +48,8 @@ missing, upload failure, action errors, rejected calls, redirect rethrow, mismat
 targets), `UploadForm.test.tsx` (initial single, album fields, toggle confirm, empty publish
 errors, auto-title + wav error, Clear all, Cancel confirm, form locked while publishing).
 
+**Release admin** — `src/lib/admin/release-actions.test.ts` (role gate before any DB call, UUID/artist-ref/key validation, `headObject` before add/replace, RPC error mapping, revalidation), `src/lib/admin/releases.data.test.ts` (local Supabase: `getAdminReleases`/`getAdminRelease`), `src/lib/supabase/{archive-release,move-release,update-release}.data.test.ts` plus the Part 1 archive-track / add-track tests (the SQL functions), `src/components/AdminReleases/{edit-reducer.test.ts, upload-one.test.ts, ReleasesTable.test.tsx, ArchiveControl.test.tsx, EditReleaseForm.test.tsx, instant-actions.test.tsx}` (draft reducer and `draftKey`, dirty lock, instant actions, inline errors), `src/app/(app)/admin/releases/page.test.tsx` and `[id]/page.test.tsx` (each page gates itself).
+
 ## Running
 
 - Unit only (no DB): `yarn test --run src/components/Upload src/lib/admin src/lib/auth src/lib/storage src/app src/components/AppShell`

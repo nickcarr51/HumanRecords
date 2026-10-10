@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, or the invite-users script. (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), or the invite-users script. (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -8,8 +8,9 @@ description: Use when working on the releases model (releases table, positions, 
 A **releases** model (a release is either a single → one track, or an album → one album of
 ordered tracks) that the `/feed` timeline now reads in one query, plus a label-member-only
 **admin portal** (`/admin` → `/admin/upload`) where a label member publishes a single or an
-album: MP3s go to R2, catalog rows go to Supabase. Create only — edit/delete is the next
-branch (schema side: soft delete and ordering, see [[content-lifecycle]]). Built on branch `feature/admin-release-upload` (2026-09-29/30).
+album: MP3s go to R2, catalog rows go to Supabase. Publishing is create-only; managing published releases (pin, reorder, archive/restore, edit, replace MP3,
+add/remove tracks) lives at `/admin/releases` (branch `feature/admin-release`, 2026-10-10; schema side:
+soft delete and ordering, see [[content-lifecycle]]). Upload built on `feature/admin-release-upload` (2026-09-29/30).
 
 ## The one thing to understand first
 
@@ -50,6 +51,10 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
+| Release admin actions (role check first, then RPCs; `setPinned` uses the service client): `setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio` | `src/lib/admin/release-actions.ts` |
+| Release admin reads | `src/lib/admin/releases.ts` (`getAdminReleases`, `getAdminRelease`) |
+| Release admin UI | `src/components/AdminReleases/*` (`ReleasesTable`, `ArchiveControl`, `ConfirmModal`, `useAdminAction`, `uploadOne`, `edit-reducer` incl. `draftKey`, `TrackEditor`, `ReplaceAudio`, `RemoveTrack`, `RemovedTracks`, `AddTrackForm`, `EditReleaseForm`) |
+| Release admin pages + `/admin` Releases card | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx`, `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
 
@@ -85,9 +90,16 @@ files already uploaded stay in R2 (orphans; accepted for now).
 
 ## Known deferrals (as of 2026-09-30)
 
-- **Edit/delete** ships next branch, reusing `ReleasePayload` and the form. The schema is ready (`archived_at`, `move_release`; [[content-lifecycle]]); the UI is not.
-- **Orphaned R2 objects**: a publish that fails after uploads (or a file replaced after it
-  uploaded) leaves objects in R2 with no row pointing at them. Cleanup lands with Delete.
+- **Release admin shipped** (2026-10-10) at `/admin/releases` and `/admin/releases/[id]`. Behaviors to keep:
+  - **Hybrid save**: titles, artists and track order are one *draft* saved with `saveRelease` (`update_release`); file and lifecycle changes (replace MP3, add track, remove/restore track, archive/restore, pin, move) are *instant* actions.
+  - **Dirty lock**: instant actions and the header Archive are disabled while the draft is dirty ("Save or discard your changes first."). The draft resets only when server content changes (`draftKey`), so unrelated re-renders keep unsaved edits.
+  - **Stale-draft refusal**: `update_release` rejects a draft built on out-of-date content; the user reloads.
+  - **Errors are inline** (`role="alert"`), not toasts: `ToastProvider` is not mounted in the app.
+  - Every action checks the role first, validates UUIDs and artist refs, and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
+  - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
+  - **ID3 hint**: edits don't rewrite MP3 tags; the page tells users to replace the MP3 with a re-tagged file.
+  - No images in this pass.
+- **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).
 - **ORM**: none. Revisit (likely Drizzle) when edit/delete adds more multi-table writes;
   `src/lib/admin/` is the seam.
