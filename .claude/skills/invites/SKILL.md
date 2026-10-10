@@ -70,7 +70,7 @@ call; `jwt_expiry = 3600`.
    generateLink + verifyOtp path) fails with 403 `user_banned` / "User is banned". `submitOtp`
    now checks for the ban first (`user_banned` / `/banned/i`) and shows "This account has been
    deactivated. Contact Human Records if you think this is a mistake." (no redirect).
-2. **Existing session is not kicked immediately.** After banning: `refreshSession()` fails
+2. **Existing session is not kicked immediately (decided limitation).** After banning: `refreshSession()` fails
    (400 `user_banned`, "Invalid Refresh Token: User Banned") and `getUser()` fails (403
    `user_banned`), but `getClaims()` still returns valid claims until the access token
    expires. The middleware and `getSessionUser` use `getClaims()`, so a banned user with an
@@ -81,7 +81,7 @@ call; `jwt_expiry = 3600`.
    token and returns the deactivated message (same copy as check 1). The token is not burned,
    so it works again after reactivation.
 
-Open owner decision (not built): an instant kick of existing sessions.
+Decided (owner, 2026-10-10): no instant kick on deactivate. A banned user keeps access until the access token expires (≤1h), then the refresh fails and they are signed out. This is a documented limitation.
 
 ## References
 
