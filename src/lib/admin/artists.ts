@@ -62,15 +62,24 @@ export async function listAdminArtists(
   const query = (opts.query ?? "").trim().slice(0, MAX_QUERY_LENGTH);
   const from = (page - 1) * pageSize;
 
-  let builder = db
-    .from("artists")
-    .select(ROW_SELECT, { count: "exact" })
-    .order("name", { ascending: true })
-    .range(from, from + pageSize - 1);
-  if (query) builder = builder.ilike("name", `%${escapeLike(query)}%`);
+  const matches = (q: ReturnType<Db["from"]>) => (query ? q.ilike("name", `%${escapeLike(query)}%`) : q);
+  const builder = matches(
+    db
+      .from("artists")
+      .select(ROW_SELECT, { count: "exact" })
+      .order("name", { ascending: true })
+      .range(from, from + pageSize - 1),
+  );
 
   const [{ data, error, count }, users] = await Promise.all([builder, listUsers(db)]);
-  if (error) throw error;
+  if (error) {
+    // PostgREST answers a range past the last row with 416 / PGRST103. Return
+    // the true total so the caller can clamp to the last real page.
+    if (error.code !== "PGRST103") throw error;
+    const head = await matches(db.from("artists").select("id", { count: "exact", head: true }));
+    if (head.error) throw head.error;
+    return { artists: [], total: head.count ?? 0, page, pageSize };
+  }
   const byId = new Map(users.map((u) => [u.id, u]));
   return {
     artists: ((data ?? []) as unknown as RawRow[]).map((r) => toRow(r, byId)),

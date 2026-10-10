@@ -51,6 +51,15 @@ describe("admin artists reads", () => {
     expect(detail).toMatchObject({ id: a, bio: "b", trackCount: 1 });
   });
 
+  it("returns an empty page with the true total when page is past the end", async () => {
+    await seed(`${PREFIX} one`);
+    await seed(`${PREFIX} two`);
+    const page = await listAdminArtists(db, { query: PREFIX, page: 999 });
+    expect(page.artists).toEqual([]);
+    expect(page.total).toBe(2);
+    expect(page.page).toBe(999);
+  });
+
   it("returns null for unknown or malformed ids", async () => {
     expect(await getAdminArtist(db, randomUUID())).toBeNull();
     expect(await getAdminArtist(db, "nope")).toBeNull();
