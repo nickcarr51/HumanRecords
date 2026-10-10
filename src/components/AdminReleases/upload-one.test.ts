@@ -25,4 +25,9 @@ describe("uploadOne", () => {
     const failingPut = vi.fn(async () => { throw new Error("Upload failed (403)"); });
     expect(await uploadOne(file(), { createUploadUrls: ok, putFile: failingPut }, () => {})).toEqual({ key: null, error: "Upload failed (403)" });
   });
+
+  it("reports a missing upload target instead of throwing", async () => {
+    const empty = vi.fn(async () => ({ targets: [], error: null as null }));
+    expect(await uploadOne(file(), { createUploadUrls: empty, putFile: vi.fn() }, () => {})).toEqual({ key: null, error: "Couldn't prepare the upload." });
+  });
 });

@@ -45,7 +45,10 @@ export const Table = styled.table`
   }
 `;
 
-export const Row = styled.tr<{ $muted?: boolean }>`
+export const Row = styled.tr``;
+
+// Archived rows dim their text cells only, never the actions cell.
+export const TextCell = styled.td<{ $muted?: boolean }>`
   opacity: ${({ $muted }) => ($muted ? 0.55 : 1)};
 `;
 

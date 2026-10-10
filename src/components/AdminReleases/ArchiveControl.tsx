@@ -15,7 +15,7 @@ export function ArchiveControl({ releaseId, title, archived, disabled }: { relea
   if (archived) {
     return (
       <>
-        <Button type="button" size="sm" variant="secondary" loading={busy} onClick={() => run(() => restoreRelease(releaseId))}>
+        <Button type="button" size="sm" variant="secondary" aria-label={`Restore ${title}`} loading={busy} onClick={() => run(() => restoreRelease(releaseId))}>
           Restore
         </Button>
         {error ? <Status $tone="error" role="alert">{error}</Status> : null}
@@ -25,7 +25,7 @@ export function ArchiveControl({ releaseId, title, archived, disabled }: { relea
 
   return (
     <>
-      <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setConfirming(true)}>Archive</Button>
+      <Button type="button" size="sm" variant="ghost" aria-label={`Archive ${title}`} disabled={disabled} onClick={() => setConfirming(true)}>Archive</Button>
       <ConfirmModal
         open={confirming}
         title={`Archive "${title}"?`}

@@ -22,6 +22,7 @@ export async function uploadOne(file: File, deps: UploadOneDeps, onProgress: (fr
   if (res.error !== null) return { key: null, error: res.error };
 
   const target = res.targets[0];
+  if (!target) return { key: null, error: "Couldn't prepare the upload." };
   try {
     await deps.putFile(target.url, file, onProgress);
   } catch (err) {

@@ -21,12 +21,12 @@ beforeEach(() => {
 describe("ArchiveControl", () => {
   it("disables Archive when disabled", () => {
     renderWithTheme(<ArchiveControl releaseId="r1" title="X" archived={false} disabled />);
-    expect(screen.getByRole("button", { name: "Archive" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Archive X" })).toBeDisabled();
   });
 
   it("asks for confirmation before archiving", async () => {
     renderWithTheme(<ArchiveControl releaseId="r1" title="Night Drives" archived={false} />);
-    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Archive Night Drives" }));
     expect(screen.getByRole("dialog", { name: 'Archive "Night Drives"?' })).toBeInTheDocument();
     expect(archiveRelease).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Archive release" }));
@@ -37,7 +37,7 @@ describe("ArchiveControl", () => {
   it("keeps the dialog open and shows the error when archiving fails", async () => {
     archiveRelease.mockResolvedValue({ error: "Release not found." });
     renderWithTheme(<ArchiveControl releaseId="r1" title="X" archived={false} />);
-    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Archive X" }));
     await userEvent.click(screen.getByRole("button", { name: "Archive release" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Release not found.");
@@ -45,7 +45,7 @@ describe("ArchiveControl", () => {
 
   it("restores without a dialog", async () => {
     renderWithTheme(<ArchiveControl releaseId="r1" title="X" archived />);
-    await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await userEvent.click(screen.getByRole("button", { name: "Restore X" }));
     expect(restoreRelease).toHaveBeenCalledWith("r1");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

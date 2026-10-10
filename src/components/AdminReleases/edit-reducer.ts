@@ -73,8 +73,8 @@ export function editReducer(state: EditState, action: EditAction): EditState {
 
 function snapshot(s: EditState): string {
   return JSON.stringify({
-    album: s.album && { title: s.album.title, artists: s.album.artists.map((c) => c.key) },
-    tracks: s.tracks.map((t) => ({ id: t.id, title: t.title, artists: t.artists.map((c) => c.key) })),
+    album: s.album && { title: s.album.title.trim(), artists: s.album.artists.map((c) => c.key) },
+    tracks: s.tracks.map((t) => ({ id: t.id, title: t.title.trim(), artists: t.artists.map((c) => c.key) })),
   });
 }
 

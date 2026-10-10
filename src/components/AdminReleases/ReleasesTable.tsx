@@ -12,7 +12,7 @@ import type { AdminReleaseRow } from '@/lib/admin/releases';
 import { moveRelease, setPinned } from '@/lib/admin/release-actions';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
 import { ArchiveControl } from './ArchiveControl';
-import { Actions, Cell, Group, Row, Status, Table } from './releases.styles';
+import { Actions, Cell, Group, Row, Status, Table, TextCell } from './releases.styles';
 import { useAdminAction } from './use-admin-action';
 
 // UTC so server and client render the same date (no hydration mismatch).
@@ -28,22 +28,22 @@ function ReleaseRow({ release, isFirst, isLast }: { release: AdminReleaseRow; is
   const { busy, error, run } = useAdminAction();
   const { id, title, archived, pinned } = release;
   return (
-    <Row $muted={archived}>
-      <td>
+    <Row>
+      <TextCell $muted={archived}>
         <Cell>
           <Link as={NextLink} href={`/admin/releases/${id}`}>{title}</Link>
           <Status>{artistLabel(release)}</Status>
         </Cell>
-      </td>
-      <td><Tag>{release.kind}</Tag></td>
-      <td><Mono>{formatDate(release.createdAt)}</Mono></td>
+      </TextCell>
+      <TextCell $muted={archived}><Tag>{release.kind}</Tag></TextCell>
+      <TextCell $muted={archived}><Mono>{formatDate(release.createdAt)}</Mono></TextCell>
       <td>
         <Actions>
           {archived ? null : (
             <>
               <IconButton type="button" aria-label={`Move ${title} up`} disabled={busy || isFirst} onClick={() => run(() => moveRelease(id, 'up'))}>↑</IconButton>
               <IconButton type="button" aria-label={`Move ${title} down`} disabled={busy || isLast} onClick={() => run(() => moveRelease(id, 'down'))}>↓</IconButton>
-              <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => run(() => setPinned(id, !pinned))}>
+              <Button type="button" size="sm" variant="secondary" aria-label={`${pinned ? 'Unpin' : 'Pin'} ${title}`} disabled={busy} onClick={() => run(() => setPinned(id, !pinned))}>
                 {pinned ? 'Unpin' : 'Pin'}
               </Button>
             </>

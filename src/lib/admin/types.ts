@@ -1,5 +1,5 @@
 // Client-safe types shared by the upload form and the admin server actions.
-// ReleasePayload is also the shape next branch's edit flow will send.
+// ReleasePayload is the upload form's shape; the edit flow sends ReleaseEditPayload.
 
 export type ReleaseKind = "single" | "album";
 export type ArtistRef = { id: string } | { newName: string };

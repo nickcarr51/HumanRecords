@@ -1,7 +1,7 @@
 // src/components/AdminReleases/AddTrackForm.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { FileInput } from '@/components/FileInput';
@@ -20,7 +20,7 @@ import { uploadOne } from './upload-one';
 import { useAdminAction } from './use-admin-action';
 
 // Appends a track to a published album: upload → addAlbumTrack (one transaction).
-export function AddTrackForm({ releaseId, disabled }: { releaseId: string; disabled: boolean }) {
+export function AddTrackForm({ releaseId, disabled, onBusyChange }: { releaseId: string; disabled: boolean; onBusyChange?: (busy: boolean) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [artists, setArtists] = useState<ArtistChip[]>([]);
@@ -28,6 +28,10 @@ export function AddTrackForm({ releaseId, disabled }: { releaseId: string; disab
   const [progress, setProgress] = useState<number | null>(null);
   const { busy, error, run } = useAdminAction();
   const off = disabled || busy;
+  useEffect(() => {
+    onBusyChange?.(busy);
+    return () => onBusyChange?.(false);
+  }, [busy, onBusyChange]);
 
   const fileError = file ? audioFileError(file) ?? undefined : 'Choose an MP3.';
   const titleError = title.trim() ? undefined : 'Title is required.';

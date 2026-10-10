@@ -15,6 +15,7 @@ import { useAdminAction } from './use-admin-action';
 export function ReplaceAudio({ trackId, title, disabled }: { trackId: string; title: string; disabled: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
+  const [replaced, setReplaced] = useState(false);
   const { busy, error, setError, run } = useAdminAction();
 
   function pick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -27,6 +28,7 @@ export function ReplaceAudio({ trackId, title, disabled }: { trackId: string; ti
       return;
     }
     setError(null);
+    setReplaced(false);
     setFile(picked);
   }
 
@@ -39,7 +41,10 @@ export function ReplaceAudio({ trackId, title, disabled }: { trackId: string; ti
       return replaceTrackAudio(trackId, up.key);
     });
     setProgress(null);
-    if (ok) setFile(null);
+    if (ok) {
+      setFile(null);
+      setReplaced(true);
+    }
   }
 
   return (
@@ -47,13 +52,14 @@ export function ReplaceAudio({ trackId, title, disabled }: { trackId: string; ti
       <FileInput
         id={`${trackId}-replace`}
         buttonLabel="Replace MP3"
-        aria-label="Replace MP3"
+        aria-label={`Replace MP3 for ${title}`}
         variant="secondary"
         size="sm"
         accept=".mp3,audio/mpeg"
         disabled={disabled || busy}
         onChange={pick}
       />
+      {replaced ? <Status role="status">MP3 replaced.</Status> : null}
       {error && !file ? <Status $tone="error" role="alert">{error}</Status> : null}
       <ConfirmModal
         open={file !== null}

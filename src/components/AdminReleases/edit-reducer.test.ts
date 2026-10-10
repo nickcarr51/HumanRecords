@@ -66,4 +66,11 @@ describe("edit reducer", () => {
     });
     expect(buildEditPayload(draftFrom(single))).toEqual({ tracks: [{ id: "s1", title: "Solo", artists: [{ id: "a1" }] }] });
   });
+
+  it("trailing whitespace alone is not a change", () => {
+    let s = draftFrom(album);
+    s = editReducer(s, { type: "setAlbumTitle", title: "Night  " });
+    s = editReducer(s, { type: "setTrackTitle", id: "t1", title: "One " });
+    expect(isDraftDirty(s, album)).toBe(false);
+  });
 });

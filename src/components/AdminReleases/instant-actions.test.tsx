@@ -40,17 +40,27 @@ beforeEach(() => {
 describe("ReplaceAudio", () => {
   it("confirms, uploads, then replaces", async () => {
     renderWithTheme(<ReplaceAudio trackId="t1" title="One" disabled={false} />);
-    await userEvent.upload(screen.getByLabelText("Replace MP3"), mp3());
+    await userEvent.upload(screen.getByLabelText("Replace MP3 for One"), mp3());
     expect(screen.getByRole("dialog", { name: 'Replace the MP3 for "One"?' })).toHaveTextContent("Downloads already made keep the old file");
     await userEvent.click(screen.getByRole("button", { name: "Replace" }));
     expect(putFile).toHaveBeenCalled();
     expect(replaceTrackAudio).toHaveBeenCalledWith("t1", KEY);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("MP3 replaced.");
+  });
+
+  it("clears the success line when a new file is picked", async () => {
+    renderWithTheme(<ReplaceAudio trackId="t1" title="One" disabled={false} />);
+    await userEvent.upload(screen.getByLabelText("Replace MP3 for One"), mp3());
+    await userEvent.click(screen.getByRole("button", { name: "Replace" }));
+    expect(screen.getByRole("status")).toHaveTextContent("MP3 replaced.");
+    await userEvent.upload(screen.getByLabelText("Replace MP3 for One"), mp3("b.mp3"));
+    expect(screen.queryByText("MP3 replaced.")).not.toBeInTheDocument();
   });
 
   it("rejects a non-MP3 without opening the dialog", async () => {
     renderWithTheme(<ReplaceAudio trackId="t1" title="One" disabled={false} />);
-    await userEvent.upload(screen.getByLabelText("Replace MP3"), mp3("a.wav"), { applyAccept: false });
+    await userEvent.upload(screen.getByLabelText("Replace MP3 for One"), mp3("a.wav"), { applyAccept: false });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Only MP3 files are supported.");
   });
@@ -59,7 +69,7 @@ describe("ReplaceAudio", () => {
 describe("RemoveTrack", () => {
   it("warns that removing the last live track archives the album", async () => {
     renderWithTheme(<RemoveTrack trackId="t1" title="One" isLastLive disabled={false} />);
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove One" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("the album will be archived too");
     await userEvent.click(screen.getByRole("button", { name: "Remove track" }));
     expect(removeTrack).toHaveBeenCalledWith("t1");
@@ -67,7 +77,7 @@ describe("RemoveTrack", () => {
 
   it("is disabled while locked", () => {
     renderWithTheme(<RemoveTrack trackId="t1" title="One" isLastLive={false} disabled />);
-    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove One" })).toBeDisabled();
   });
 });
 

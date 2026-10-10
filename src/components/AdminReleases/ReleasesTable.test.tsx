@@ -61,16 +61,16 @@ describe("ReleasesTable", () => {
     renderWithTheme(<ReleasesTable releases={releases} showArchived />);
     const archived = group("Archived");
     expect(within(archived).getAllByRole("link").map((l) => l.textContent)).toEqual(["OldPinned", "Gone"]);
-    expect(within(tr("Gone")).getByRole("button", { name: "Restore" })).toBeInTheDocument();
+    expect(within(tr("Gone")).getByRole("button", { name: "Restore Gone" })).toBeInTheDocument();
     expect(within(tr("Gone")).queryByRole("button", { name: /Move/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Hide archived" })).toHaveAttribute("href", "/admin/releases");
   });
 
   it("pins, moves, and shows an inline error on failure", async () => {
     renderWithTheme(<ReleasesTable releases={releases} showArchived={false} />);
-    await userEvent.click(within(tr("A")).getByRole("button", { name: "Pin" }));
+    await userEvent.click(within(tr("A")).getByRole("button", { name: "Pin A" }));
     expect(setPinned).toHaveBeenCalledWith("A", true);
-    await userEvent.click(within(tr("Comp")).getByRole("button", { name: "Unpin" }));
+    await userEvent.click(within(tr("Comp")).getByRole("button", { name: "Unpin Comp" }));
     expect(setPinned).toHaveBeenCalledWith("Comp", false);
     moveRelease.mockResolvedValueOnce({ error: "Couldn't reorder — try again" });
     await userEvent.click(within(tr("A")).getByRole("button", { name: "Move A down" }));

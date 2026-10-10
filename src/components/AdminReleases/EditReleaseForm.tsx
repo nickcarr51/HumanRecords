@@ -28,6 +28,12 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
   const [state, dispatch] = useReducer(editReducer, release, draftFrom);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // Instant actions that run while the draft is clean (add track, restore).
+  // The draft is read-only meanwhile: their success replaces the draft with
+  // server content, which would wipe anything typed in the gap.
+  const [adding, setAdding] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const instantBusy = adding || restoring;
 
   // Server data changes after every successful action (revalidatePath).
   // Only when the data actually changed: a new object with the same content
@@ -42,7 +48,8 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
   }, [release]);
 
   const dirty = isDraftDirty(state, release);
-  const locked = dirty || saving;
+  const locked = dirty || saving || instantBusy;
+  const fieldsOff = saving || instantBusy;
   const errors = state.showErrors ? validateDraft(state) : { tracks: {} as Record<string, { title?: string; artists?: string }> };
   const pending = pendingInDraft(state);
 
@@ -103,14 +110,14 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
       {state.album ? (
         <Section aria-label="Album details">
           <FormField label="Album title" htmlFor="album-title" error={errors.albumTitle}>
-            <Input id="album-title" value={state.album.title} disabled={saving} $invalid={Boolean(errors.albumTitle)} onChange={(e) => dispatch({ type: 'setAlbumTitle', title: e.target.value })} />
+            <Input id="album-title" value={state.album.title} disabled={fieldsOff} $invalid={Boolean(errors.albumTitle)} onChange={(e) => dispatch({ type: 'setAlbumTitle', title: e.target.value })} />
           </FormField>
           <ArtistCombobox
             id="album-artists"
             label="Album artists (optional)"
             chips={state.album.artists}
             pending={pending}
-            disabled={saving}
+            disabled={fieldsOff}
             onAdd={(chip) => dispatch({ type: 'addAlbumArtist', chip })}
             onRemove={(key) => dispatch({ type: 'removeAlbumArtist', key })}
             onMove={(key, dir) => dispatch({ type: 'moveAlbumArtist', key, dir })}
@@ -131,7 +138,7 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
             errors={errors.tracks[track.id]}
             pending={pending}
             dispatch={dispatch}
-            disabled={saving}
+            disabled={fieldsOff}
             locked={locked}
           />
         ))}
@@ -139,17 +146,17 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
 
       {release.kind === 'album' ? (
         <>
-          <RemovedTracks tracks={release.tracks.filter((t) => t.archived)} disabled={locked} />
-          <AddTrackForm releaseId={release.id} disabled={locked} />
+          <RemovedTracks tracks={release.tracks.filter((t) => t.archived)} disabled={locked} onBusyChange={setRestoring} />
+          <AddTrackForm releaseId={release.id} disabled={locked} onBusyChange={setAdding} />
         </>
       ) : null}
 
       <Footer>
-        <Button type="button" variant="secondary" disabled={!dirty || saving} onClick={() => {
+        <Button type="button" variant="secondary" disabled={!dirty || fieldsOff} onClick={() => {
           dispatch({ type: 'reset', release });
           setFormError(null);
         }}>Discard</Button>
-        <Button type="button" loading={saving} disabled={!dirty} onClick={save}>Save changes</Button>
+        <Button type="button" loading={saving} disabled={!dirty || instantBusy} onClick={save}>Save changes</Button>
       </Footer>
     </>
   );
