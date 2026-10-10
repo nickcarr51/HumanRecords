@@ -10,13 +10,15 @@ track or album fails with SQLSTATE **`23503`** (foreign key violation) instead o
 stripping the credit. Deleting a track or album still cascades its own credit rows (that side is
 unchanged). `artists.user_id` stays `on delete set null`.
 
-## Admin flow (not built)
+## Admin flow (built)
 
-- Attempt the delete (service-role or a definer function). On `23503`, show a message such as
-  "This artist is still credited on releases. Remove or reassign those credits first."
-- No credits: the delete succeeds and is the one **hard delete** in the system. Queue the
-  artist's `profile_photo_url` key in `r2_cleanup_queue` (`source_table = 'artists'`, reason
-  `archived`) before or with the delete ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
+- `/admin/artists/[id]` has a Danger zone (`DeleteArtist`) that calls `deleteArtist`, which runs
+  the definer function `admin_delete_artist` (migration `20261010130000`). On `23503` the UI
+  shows `creditMessage` (still credited on N tracks / M albums; remove or reassign those
+  credits first).
+- No credits: the delete succeeds and is the one **hard delete** in the system. The artist's
+  `profile_photo_url` key is queued in `r2_cleanup_queue` (`source_table = 'artists'`, reason
+  `archived`) ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
 - Credited artists are not archived (artists have no `archived_at`); the admin removes credits
   first, or leaves the artist.
 

@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`), `createUser`/`issueInvite`/`setUserRole` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, or a card points at the wrong domain.
+description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, or a card points at the wrong domain.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -32,7 +32,7 @@ form appears with the email pre-filled.
 | Token generator, `INVITE_TOKEN_RE` (`server-only`) | `src/lib/invites/token.ts` |
 | Link builder (`siteUrl` is a required argument) | `src/lib/invites/url.ts` (`inviteUrl`) |
 | Store: `upsertInvite`, `findUnusedInvite`, `claimInvite`, `restoreInvite` | `src/lib/invites/store.ts` |
-| Admin actions: `createUser`, `issueInvite`, `setUserRole` | `src/lib/admin/users-actions.ts` |
+| Admin actions: `createUser`, `issueInvite`, `setUserRole`, `updateUserProfile`, `setUserActive` | `src/lib/admin/users-actions.ts` |
 | List + row mapping (`inviteUrl` for unused rows) | `src/lib/admin/users.ts`, types in `users-types.ts` |
 | Welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Redeem (claim → sign-in → restore on failure) | `src/lib/auth/actions.ts` (`redeemInvite`) |
@@ -40,10 +40,48 @@ form appears with the email pre-filled.
 | Login UI | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
 | Users page | `src/app/(app)/admin/users/page.tsx` |
 | Users UI | `src/components/AdminUsers/{NewUserForm,UsersTable,RoleSelect,InviteCell,mailto}.*`, `users.styles.ts` |
+| User edit page (name/email form + deactivate toggle) | `src/app/(app)/admin/users/[id]/page.tsx`, `src/components/AdminUsers/{UserForm,ActiveToggle}.tsx` |
 | Env | `SITE_URL` in `.env.example` / `.env.local` (`http://127.0.0.1:3000`) |
 
 The server pages `/login` and `/admin/users` import components per folder
 (`@/components/Login`, `@/components/AdminUsers`), not from the `@/components` barrel.
+
+## Edit and deactivate (`/admin/users/[id]`)
+
+- **`updateUserProfile`** — email changes go through `auth.admin.updateUserById` with
+  `email_confirm: true` (no confirmation mail); the name is written to both `public.users.name`
+  and `user_metadata.name`. If the name write fails after the auth update, the message says the
+  email saved but the name didn't.
+- **`setUserActive(userId, active)`** — deactivate = Supabase auth ban:
+  `updateUserById(id, { ban_duration: '876000h' })`; reactivate = `'none'`. Reversible, download
+  history kept. A label member cannot deactivate themself ("You can't deactivate yourself.").
+- **`AdminUserRow.deactivated`** is derived from `banned_until` in the list mapper. The table
+  shows a status and disables the invite controls (role select, link buttons) for deactivated
+  rows, so to issue a link for a deactivated user: reactivate, New link, deactivate.
+
+### Deactivation behaviour (verified locally 2026-10-10, GoTrue on local Supabase)
+
+Verified against the local stack with a script that reproduces the app's calls (no browser).
+Local JWTs are signed ES256 (asymmetric), so `getClaims()` verifies locally with no server
+call; `jwt_expiry = 3600`.
+
+1. **OTP refused, with a vague message.** `signInWithOtp({ shouldCreateUser: false })` for a
+   banned email still *succeeds* (no error, code mail goes out). `verifyOtp` (and the
+   generateLink + verifyOtp path) fails with 403 `user_banned` / "User is banned". `submitOtp`
+   only maps `/expired|invalid|incorrect|token/`, so the user sees "Something went wrong.
+   Please try again." — not a clear "deactivated" message.
+2. **Existing session is not kicked immediately.** After banning: `refreshSession()` fails
+   (400 `user_banned`, "Invalid Refresh Token: User Banned") and `getUser()` fails (403
+   `user_banned`), but `getClaims()` still returns valid claims until the access token
+   expires. The middleware and `getSessionUser` use `getClaims()`, so a banned user with an
+   open session keeps access for up to the remaining access-token life (up to 1 hour, the
+   `jwt_expiry`), then the refresh fails and they are signed out. No instant kick exists.
+3. **Invite link for a deactivated user fails generically.** `redeemInvite` claims the token,
+   `generateLink` still succeeds, `verifyOtp` fails with `user_banned`; the catch restores the
+   token and returns "Couldn't sign you in — try again, or use your email below." The token is
+   not burned, and nothing says the account is deactivated.
+
+Open owner decisions (not built): an instant kick, and a friendlier deactivated message.
 
 ## References
 

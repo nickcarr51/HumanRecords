@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, or the invite-users script. (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, or the invite-users script, or artist management at `/admin/artists`. (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -50,6 +50,11 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
+| Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
+| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping, `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
+| Reused list pagination (optional `basePath`, e.g. `/admin/artists`) | `src/components/Pagination` |
+| Admin index cards (Upload, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
 
