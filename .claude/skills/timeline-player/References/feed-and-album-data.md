@@ -12,40 +12,48 @@ for the `releases` table and `position` columns this reads.
 
 ## `getFeed(supabase, { page?, pageSize? })` → `FeedPage`
 
-Returns the timeline newest-first as a discriminated union on `kind`:
+Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as a discriminated union on `kind`:
 
 - `{ kind: "album", id, title, albumArtUrl, artistNames[], createdAt, tracks: FeedTrack[] }`
 - `{ kind: "track", id, title, trackArtUrl, artistNames[], createdAt }`
 
 `FeedTrack = { id, title, artistNames[] }`. `FeedPage = { items, page, pageSize, hasMore }`.
-`createdAt` is the **release's** `created_at` (publish time).
+`createdAt` is the **release's** `created_at` (the real upload date, which never changes; position in the feed comes from `sort_at`).
 
 How it works:
 
 1. **One query on `releases`** (`RELEASE_SELECT`), embedding the target via its foreign key:
    `track:tracks(id, title, track_art_url, track_artists(position, artists(name)))` for a
    single, and `album:albums(id, title, album_art_url, album_artists(position,
-   artists(name)), track_albums(position, tracks(id, title, track_artists(position,
+   artists(name)), track_albums(position, tracks(id, title, archived_at, track_artists(position,
    artists(name)))))` for an album. Only things with a `releases` row appear — an album's
    tracks are never their own feed row because they have no release of their own.
-2. Ordered `created_at desc, id desc` (id breaks ties so pages are stable).
+2. `.is("archived_at", null)` (label members can read archived rows via RLS, so the filter is
+   explicit), then ordered `pinned desc, sort_at desc, id desc` (id breaks ties so pages are
+   stable). `RELEASE_SELECT` includes `pinned, sort_at` because PostgREST orders an RPC result
+   (`search_feed`, chained later) only by projected columns.
 3. **Pagination in SQL**: `.range(from, from + pageSize)` with `from = (page-1)*pageSize`.
    `range` is inclusive, so it fetches `pageSize + 1` rows; the first `pageSize` become the
    page and `hasMore = rows.length > pageSize`.
 4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
    item. A release whose embedded target is null (hidden/removed) is skipped (so a page can
-   have fewer than `pageSize` items).
+   have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped.
 5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list
    is in credit order via `namesFrom`.
 
 An uncredited track yields `artistNames: []` (never a crash); the UI shows
 "Unknown Artist".
 
+`pageSize` defaults to `feedPageSize()`: the optional `FEED_PAGE_SIZE` env var if it is a positive
+integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging
+(`src/lib/supabase/feed-page-size.test.ts`).
+
 ## `getAlbum(supabase, id)` → `AlbumDetail | null`
 
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
-- `.maybeSingle()`; returns `null` for a missing album.
+- `.maybeSingle()`; returns `null` for a missing album **and for an archived one** (it embeds
+  `releases(archived_at)`), even for label members. Archived tracks are skipped from `tracks`.
 - Same embeds as the feed's album branch; tracks sorted by `track_albums.position`, so the
   album page and the feed's expanded album row always agree.
 - `AlbumDetail = { id, title, albumArtUrl, artistNames[], tracks: FeedTrack[] }`.

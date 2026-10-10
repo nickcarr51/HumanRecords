@@ -9,7 +9,7 @@ A **releases** model (a release is either a single → one track, or an album �
 ordered tracks) that the `/feed` timeline now reads in one query, plus a label-member-only
 **admin portal** (`/admin` → `/admin/upload`) where a label member publishes a single or an
 album: MP3s go to R2, catalog rows go to Supabase. Create only — edit/delete is the next
-branch. Built on branch `feature/admin-release-upload` (2026-09-29/30).
+branch (schema side: soft delete and ordering, see [[content-lifecycle]]). Built on branch `feature/admin-release-upload` (2026-09-29/30).
 
 ## The one thing to understand first
 
@@ -78,13 +78,14 @@ files already uploaded stay in R2 (orphans; accepted for now).
 - [[catalog-schema]] — `artists`/`tracks`/`albums` and the link tables that
   `publish_release` writes; RLS "authenticated can read" policies.
 - [[component-library]] — `Button`, `Input`, `FormField`, `Alert`, `Heading`, theme tokens.
+- [[content-lifecycle]] — `archived_at`, `pinned`/`sort_at`, `move_release`, `r2_cleanup_queue` on the rows this feature creates.
 - [[invites]] — `/admin/users`; its page and actions follow the same gates.
 - [[auth]] — session/middleware layer under the label-member gate; `getCurrentRole` and
   `requireLabelMember` live in `src/lib/auth/role.ts`.
 
 ## Known deferrals (as of 2026-09-30)
 
-- **Edit/delete** ships next branch, reusing `ReleasePayload` and the form.
+- **Edit/delete** ships next branch, reusing `ReleasePayload` and the form. The schema is ready (`archived_at`, `move_release`; [[content-lifecycle]]); the UI is not.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a file replaced after it
   uploaded) leaves objects in R2 with no row pointing at them. Cleanup lands with Delete.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).

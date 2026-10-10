@@ -29,8 +29,9 @@ and `revalidatePath('/admin/users')` on success.
 
 Both functions are `security definer`, `set search_path = public`, execute revoked from
 `public`/`anon`, granted to `authenticated`.
-- `admin_list_users()` → `id, email, name, role, created_at, invite_token, invite_used_at`
-  (users ⟕ auth.users ⟕ invites, newest first). Raises `42501` unless `label_member`.
+- `admin_list_users()` → `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`
+  (users ⟕ auth.users ⟕ invites, newest first). `banned_until` was added in `20261010120500` for
+  deactivation (a reversible Supabase auth ban); **no UI reads it yet** — it comes with the artist/user admin branch. Raises `42501` unless `label_member`.
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
   `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only.
 

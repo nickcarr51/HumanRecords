@@ -13,8 +13,12 @@
 
 | Table | Policy |
 |---|---|
-| `users`, `artists`, `albums`, `tracks`, `track_artists`, `album_artists`, `track_albums`, `releases` | `authenticated … for select using (true)` |
+| `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
+| `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
+| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; service role only |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
+
+Because label members can read archived rows, listener-facing code (`getFeed`, `getAlbum`, the stream/download actions, `search_feed`) also filters `archived_at` explicitly; RLS alone is not enough. See [[content-lifecycle]].
 
 `(select auth.uid())` (wrapped in a subselect) lets Postgres evaluate it once per query
 instead of per row — use that form in new policies.
@@ -46,6 +50,8 @@ Sanctioned write paths:
 | New `users` row | `handle_new_user` trigger (definer) on `auth.users` insert | Supabase Auth (invite-only) |
 | Increment `play_count` | `rpc('increment_play_count')` (definer) | `authenticated` only; `public`/`anon` revoked |
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
+| Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
+| Search the feed | `rpc('search_feed')` (**invoker**, so RLS applies) | `authenticated` only |
 | List users / change a role | `rpc('admin_list_users')`, `rpc('admin_set_user_role')` (definer) | `label_member`, else `42501`; own id → `22023` |
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |
