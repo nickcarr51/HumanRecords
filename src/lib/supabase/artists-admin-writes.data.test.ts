@@ -88,6 +88,18 @@ describe("artists write policies", () => {
     expect(upd.data).toHaveLength(0);
   });
 
+  it("rejects blank or whitespace-only names on insert and update", async () => {
+    for (const name of ["", "   "]) {
+      const ins = await labelClient.from("artists").insert({ name });
+      expect(ins.error?.code).toBe("42501");
+    }
+    const a = await seedArtist();
+    const upd = await labelClient.from("artists").update({ name: "  " }).eq("id", a.id);
+    expect(upd.error?.code).toBe("42501");
+    const { data } = await admin.from("artists").select("name").eq("id", a.id).single();
+    expect(data!.name).toBe(a.name);
+  });
+
   it("rejects a duplicate name (case/space-insensitive) on insert and update", async () => {
     const a = await seedArtist();
     const b = await seedArtist();
@@ -126,6 +138,15 @@ describe("admin_delete_artist", () => {
     const a = await seedArtist();
     const { error } = await artistClient.rpc("admin_delete_artist", { target: a.id });
     expect(error?.code).toBe("42501");
+  });
+
+  it("leaves a direct table delete with no effect (deletes must go through the function)", async () => {
+    const a = await seedArtist({ profile_photo_url: "artists/direct.jpg" });
+    const del = await labelClient.from("artists").delete().eq("id", a.id).select("id");
+    expect(del.error).toBeNull();
+    expect(del.data).toHaveLength(0);
+    const { data } = await admin.from("artists").select("id").eq("id", a.id);
+    expect(data).toHaveLength(1);
   });
 
   it("raises P0002 for an unknown artist", async () => {

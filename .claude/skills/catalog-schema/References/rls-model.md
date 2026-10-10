@@ -43,8 +43,8 @@ The only write policies are on `artists`, for label members (`/admin/artists`):
 
 | Policy | Rule |
 |---|---|
-| `"label members insert artists"` | `with check (current_user_role() = 'label_member')` |
-| `"label members update artists"` | `using` + `with check (current_user_role() = 'label_member')` — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
+| `"label members insert artists"` | `with check (current_user_role() = 'label_member' and length(trim(name)) > 0)` |
+| `"label members update artists"` | `using (current_user_role() = 'label_member')`, `with check` adds `length(trim(name)) > 0` (blank name → `42501`) — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
 
 No delete policy: deletes go through `admin_delete_artist`. No other table has an insert/update/delete
 policy. Under RLS, a write that no policy allows

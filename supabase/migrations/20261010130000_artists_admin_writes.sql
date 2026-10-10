@@ -2,16 +2,16 @@
 -- RLS (authenticated has held table privileges on artists since creation;
 -- RLS is the only gate). Delete goes through admin_delete_artist so a photo
 -- key is queued for R2 cleanup in the same transaction. Add-only: deployed
--- code never writes artists.
+-- code never writes artists. Blank names are rejected, as publish_release does.
 
 create policy "label members insert artists"
   on public.artists for insert to authenticated
-  with check (public.current_user_role() = 'label_member');
+  with check (public.current_user_role() = 'label_member' and length(trim(name)) > 0);
 
 create policy "label members update artists"
   on public.artists for update to authenticated
   using (public.current_user_role() = 'label_member')
-  with check (public.current_user_role() = 'label_member');
+  with check (public.current_user_role() = 'label_member' and length(trim(name)) > 0);
 
 -- Credited artists: the track_artists/album_artists FKs are ON DELETE
 -- RESTRICT (20261010120400), so the delete raises 23503 and nothing changes.
