@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
@@ -32,6 +32,8 @@ export type FeedPage = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  total: number;
+  totalPages: number;
 };
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -101,32 +103,48 @@ function toFeedItem(row: ReleaseRow): FeedItem | null {
   return null; // a release whose target was hidden/removed — skip rather than crash
 }
 
+// Both sources (the releases table and the search_feed RPC) are PostgREST
+// builders over release rows. Typing them as one shape lets a single function
+// own the archived filter, the order and the range, so search results and the
+// plain feed can never disagree on order.
+type FeedQuery = PromiseLike<{ data: unknown; error: PostgrestError | null; count: number | null }> & {
+  is(column: "archived_at", value: null): FeedQuery;
+  order(column: "pinned" | "sort_at" | "id", opts: { ascending: boolean }): FeedQuery;
+  range(from: number, to: number): FeedQuery;
+};
+
+function releaseQuery(supabase: SupabaseClient<Database>, q: string): FeedQuery {
+  // search_feed only filters (an empty pattern would match everything, so it
+  // is skipped for a blank q); count: 'exact' gives the page count either way.
+  const query = q
+    ? supabase.rpc("search_feed", { q }, { count: "exact" }).select(RELEASE_SELECT)
+    : supabase.from("releases").select(RELEASE_SELECT, { count: "exact" });
+  return query as unknown as FeedQuery;
+}
+
 export async function getFeed(
   supabase: SupabaseClient<Database>,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { page?: number; pageSize?: number; q?: string } = {},
 ): Promise<FeedPage> {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = Math.max(1, opts.pageSize ?? feedPageSize());
+  const q = (opts.q ?? "").trim();
   const from = (page - 1) * pageSize;
 
-  // One extra row past the page tells us whether another page exists.
-  const { data, error } = await supabase
-    .from("releases")
-    .select(RELEASE_SELECT)
+  const { data, error, count } = await releaseQuery(supabase, q)
     // RLS already hides archived rows from listeners; label members can read
     // them, so the feed filters explicitly.
     .is("archived_at", null)
     .order("pinned", { ascending: false })
     .order("sort_at", { ascending: false })
     .order("id", { ascending: false })
-    .range(from, from + pageSize);
+    .range(from, from + pageSize - 1);
   if (error) throw error;
 
   const rows = (data ?? []) as unknown as ReleaseRow[];
-  const items = rows
-    .slice(0, pageSize)
-    .map(toFeedItem)
-    .filter((i): i is FeedItem => i !== null);
+  const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  return { items, page, pageSize, hasMore: rows.length > pageSize };
+  return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
 }
