@@ -15,6 +15,7 @@
 |---|---|
 | `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
 | `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
+| `artists` (writes) | `"label members insert artists"` / `"label members update artists"`: `current_user_role() = 'label_member'` (insert `with check`; update `using` + `with check`). No delete policy — use `admin_delete_artist`. The only write policies in the schema. |
 | `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; service role only |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
 
@@ -52,6 +53,8 @@ Sanctioned write paths:
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
 | Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
 | Search the feed | `rpc('search_feed')` (**invoker**, so RLS applies) | `authenticated` only |
+| Create / edit an artist | cookie client `insert`/`update` on `artists` (RLS policies above) | `label_member`; insert by others → `42501`, update by others → 0 rows (no error). Duplicate name or `user_id` → `23505` (`artists_name_ci_key` / `artists_user_id_key`) |
+| Delete an artist | `rpc('admin_delete_artist')` (definer) | `label_member`, else `42501`; unknown id `P0002`; still credited → `23503` (FK restrict); queues `profile_photo_url` in `r2_cleanup_queue` |
 | List users / change a role | `rpc('admin_list_users')`, `rpc('admin_set_user_role')` (definer) | `label_member`, else `42501`; own id → `22023` |
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |

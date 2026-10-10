@@ -1,6 +1,6 @@
 ---
 name: catalog-schema
-description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `move_release`, `search_feed`), the soft-delete columns (`archived_at`), `r2_cleanup_queue`, editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`), the soft-delete columns (`archived_at`), `r2_cleanup_queue`, editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
 ---
 
 # Catalog Schema + Supabase Data Layer
@@ -15,9 +15,10 @@ workflow, and the generated TypeScript types. Every other feature reads through 
 every table has an `authenticated … for select` policy: `using (true)` for most, except
 `downloads` (owner-only), `releases`/`tracks` (archived rows hidden unless the caller is a label
 member), and `r2_cleanup_queue` (no policies at all; service role only). See
-`References/rls-model.md`. And **no table has an insert/update/delete policy**. All writes go through one of
+`References/rls-model.md`. And **no table has a write policy except `artists`** (label-member insert/update,
+for `/admin/artists`). Every other write goes through one of
 two doors: a `security definer` SQL function that checks the caller itself
-(`increment_play_count`, `publish_release`, `move_release`), or the server-only **service-role** client
+(`increment_play_count`, `publish_release`, `move_release`, `admin_delete_artist`), or the server-only **service-role** client
 (`createServiceClient`, used for recording downloads). A blocked write under RLS does not
 error — it silently affects zero rows. Design new writes as a definer function with a role
 check (see `publish_release` in [[admin-upload]]) rather than opening a write policy.
@@ -43,6 +44,7 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | `r2_cleanup_queue` (service-only) | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
 | `admin_list_users` returns `banned_until` | `…20261010120500_admin_list_users_banned_until.sql` |
+| `artists` label-member insert/update policies, `admin_delete_artist` | `…20261010130000_artists_admin_writes.sql` |
 | Local seed (example users, 4 artists, 1 album, 1 single, releases; `seed_helpers.seed_user`) | `supabase/seed.sql` |
 | Optional gitignored real-account seed (template: `supabase/seed-local.example.sql`) | `supabase/seed.local.sql` (`sql_paths` globs `./seed.local*.sql`) |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
@@ -52,7 +54,7 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | Service-role client (bypasses RLS, `server-only`) | `src/lib/supabase/service.ts` |
 | Session refresh + route guard per request | `src/lib/supabase/middleware.ts` (see [[auth]]) |
 | Test helpers (local-only guard, OTP test users) | `src/lib/supabase/test-helpers.ts` |
-| Schema/RLS tests | `src/lib/supabase/{users,artists,catalog,catalog-relations,releases-schema.data,publish-release.data}.test.ts` |
+| Schema/RLS tests | `src/lib/supabase/{users,artists,catalog,catalog-relations,releases-schema.data,publish-release.data,artists-admin-writes.data}.test.ts` |
 | v1 schema tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts` (+ `invites.data.test.ts` covers `banned_until`) |
 | Unit vs DB test projects | `vitest.config.mts` (`unit` parallel, `db` serial; `dbTests` list) |
 
@@ -64,7 +66,7 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 - [rls-model.md](References/rls-model.md) — read policies, the column grant hiding `role`,
   owner-only downloads, definer functions, and how to add a write path safely.
 - [functions.md](References/functions.md) — `handle_new_user` + role-sync trigger, `increment_play_count`,
-  `current_user_role`, `admin_list_users`, `admin_set_user_role`, `resolve_artist_refs`, `publish_release`,
+  `current_user_role`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `resolve_artist_refs`, `publish_release`,
   `move_release`, `search_feed`, `releases_default_sort_at`/`keep_created_at` (signatures, grants, callers).
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
   dependency-injection convention for data functions, and regenerating `database.types.ts`.

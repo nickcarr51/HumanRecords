@@ -88,6 +88,18 @@ which is invoker but only reachable from inside `publish_release`.
 - Two concurrent opposite moves can deadlock (`40P01`): callers should show a "try again" message.
 - Caller: the future release-admin UI ([[content-lifecycle]], `References/ordering.md`).
 
+## `admin_delete_artist(target uuid)` → void
+
+- Migration `20261010130000_artists_admin_writes.sql`. Definer, `search_path = public`; revoked from
+  `public`/`anon`, granted to `authenticated`.
+- Errors: `42501` not a label member; `P0002` no such artist; `23503` the artist is still credited
+  on a track or album (the `restrict` FKs from `20261010120400` — propagated unchanged, nothing deleted).
+- Deletes the row and, if it had a `profile_photo_url`, inserts that key into `r2_cleanup_queue`
+  (`reason='archived'`, `source_table='artists'`, `source_id=target`) in the same transaction.
+- Caller: `/admin/artists` delete action ([[admin-upload]]). Create/edit use the `artists` RLS write
+  policies instead (see `rls-model.md`).
+- Tests: `src/lib/supabase/artists-admin-writes.data.test.ts`.
+
 ## `search_feed(q text)` → `setof releases`
 
 - Migration `20261010120200_search_feed.sql`. `sql`, `stable`, **security invoker**; `authenticated` only.
