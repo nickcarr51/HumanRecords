@@ -24,15 +24,15 @@ Service-role only: RLS on, **no policies**, all privileges revoked from `anon` a
 server actions write it with `createServiceClient()` after checking the role
 ([[catalog-schema]] `References/rls-model.md`).
 
-## When rows are written (once the admin UI exists)
+## When rows are written
 
-- **Archive** a release/track: queue its audio key and any art key (`archived`).
-- **Replace** an MP3 or image: queue the old key (`replaced`).
+- **Archive** a release/track (`archive_release`, `archive_track`): queue the track audio and art keys and, for an album, its art key (`archived`). `archive_track` queues the album art only when it archives the last live track.
+- **Replace** an MP3 (`replace_track_audio`): queue the old key (`replaced`). Image replacement has no function yet.
 - **Hard-delete an uncredited artist**: queue their `profile_photo_url` key with reason `archived` (the check constraint allows only `archived` / `replaced`, so there is no "deleted" reason).
 
 ## When rows are removed
 
-Restore deletes the uncleaned `archived` rows for that `(source_table, source_id)`. Rows are
+`restore_release` / `restore_track` delete the uncleaned `archived` rows for that `(source_table, source_id)`, and refuse (`22023`) if a matching `archived` row already has `cleaned_at` set. Rows are
 otherwise kept; `cleaned_at` marks them done.
 
 ## The future cleanup job (not built)
@@ -42,3 +42,7 @@ Delete an object only if **all** hold: the row is uncleaned, `queued_at` is 30+ 
 `artists.profile_photo_url`; album and track art can be shared). Then set `cleaned_at`. It must
 never run against the locked prod bucket unless the lock is deliberately lifted in Cloudflare.
 Until then nothing deletes from R2.
+
+The job must lock the owning release row (or re-check `archived_at` on the source row) before
+deleting a key; otherwise a restore that runs between the job's check and its delete brings a
+release back with a missing file.

@@ -8,10 +8,10 @@ Migration `20261010120000_feed_order_and_archive.sql`. Columns: `releases.archiv
 | Archive | Effect |
 |---|---|
 | A single | Set `releases.archived_at` and the track's `archived_at` together. The single disappears from the feed and its track can no longer be streamed or downloaded. |
-| An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). Its tracks need not be archived individually. **Known gap (deferred to the release-admin branch):** the live tracks of an archived album are still signable by `getTrackStreamUrl` / `getTrackDownloadUrl` if a caller already has the track id; fix by checking the parent release or archiving the tracks with the album. |
-| One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. **If it was the album's last live track, archive the release too:** the feed drops albums with zero live tracks (`toFeedItem`), which makes that page come back short, so admin actions must keep data consistent. |
+| An album | Set `releases.archived_at`. The feed row and `/albums/[id]` disappear (`getAlbum` returns `null`). **Closed:** `archive_release` archives the album's live tracks with the same timestamp, so stream/download refuse them too. |
+| One track on an album | Set `tracks.archived_at`. The album stays; the track is skipped in feed and album track lists, and its stream/download is refused. **If it was the album's last live track, archive the release too:** the feed drops albums with zero live tracks (`toFeedItem`), which makes that page come back short, so `archive_track` does this itself: removing the last live track archives the release with the same timestamp. |
 
-The archive writes happen in the admin UI (not built). Each archive also queues the object
+The archive writes are the SQL functions `archive_release` / `archive_track` (the admin UI that calls them is not built). Each archive also queues the object
 keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
 
 ## Who still sees archived rows
@@ -27,10 +27,14 @@ keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md
 
 ## Restore
 
-Restoring = clear `archived_at`. Rules: restore the release and any tracks that were archived
-with it; delete the still-uncleaned `archived` queue rows for that source
-(`cleaned_at is null`) so the job doesn't remove a live file. If a queue row is already
-`cleaned_at`, the file is gone from R2 and the track cannot be restored to a playable state.
+`restore_release` / `restore_track` (atomic). Restoring a release clears `archived_at` on the
+release and **only** on tracks carrying the same timestamp (those archived with it; a track
+removed earlier stays removed). It deletes the still-uncleaned `archived` queue rows for those
+sources (`cleaned_at is null`) so the job doesn't remove a live file. If a matching `archived`
+row is already `cleaned_at`, the file is gone from R2: both functions refuse with `22023`.
+`restore_track` refuses a single ("Restore the single instead.") and an archived album ("Restore
+the album first."). Restoring the album whose last track was removed brings that track back
+(same timestamp). Archive/restore on something already in that state is a no-op.
 `move_release` refuses archived releases (`22023`), so restore before reordering.
 
 ## Why not hard delete

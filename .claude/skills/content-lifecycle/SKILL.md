@@ -8,7 +8,8 @@ description: Use when archiving, restoring, or removing releases, tracks, or art
 What happens to catalog content after it is published: how it is hidden (soft delete), how
 the feed is ordered and reordered, which R2 keys are queued for a future cleanup, and why
 artists can't be deleted while credited. The **schema and read-side guards are built**
-(branch `feature/v1-schema`, 2026-10-10); the admin UI that drives them is not.
+(branch `feature/v1-schema`, 2026-10-10); the admin UI that drives them is not. The atomic archive/restore/edit SQL functions are built
+(branch `feature/release-admin-functions`).
 
 ## The one thing to understand first
 
@@ -30,10 +31,14 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 | `search_feed` (archived excluded) | `…20261010120200_search_feed.sql` |
 | `r2_cleanup_queue` | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
+| `release_for_track` (internal), `archive_release`, `restore_release` | `…20261010140000_archive_restore_release.sql` |
+| `archive_track`, `restore_track` | `…20261010140100_archive_restore_track.sql` |
+| `add_album_track`, `replace_track_audio` | `…20261010140200_add_track_replace_audio.sql` |
+| `update_release` | `…20261010140300_update_release.sql` |
 | Feed order + archived filter, `feedPageSize()` | `src/lib/supabase/feed.ts` (`getFeed`) |
 | `null` for archived albums, archived tracks skipped | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Stream/download refuse archived tracks | `src/lib/storage/actions.ts` |
-| Tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `src/lib/storage/actions.test.ts` |
+| Tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `{archive-release,archive-track,add-track-replace-audio,update-release}.data.test.ts`, `src/lib/storage/actions.test.ts` |
 
 ## References
 
@@ -58,7 +63,6 @@ reversible auth ban, `admin_list_users.banned_until`, not a delete), [[timeline-
 ## Known deferrals (as of 2026-10-10)
 
 - **Admin UI** for archive/restore/reorder/pin and replace is the release-admin branch;
-  artist and user admin is a later branch. No app code calls `move_release`, `search_feed`,
-  or writes `r2_cleanup_queue` yet.
+  artist and user admin is a later branch. The SQL functions exist (see Pieces) but no app code
+  calls them, `move_release`, or `search_feed` yet.
 - **The cleanup job itself** is not built; nothing deletes from R2.
-- **Restore** behaviour (removing uncleaned queue rows) is specified, not implemented.
