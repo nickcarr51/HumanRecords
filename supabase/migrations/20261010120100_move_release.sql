@@ -49,17 +49,25 @@ begin
   end if;
 
   if nb.sort_at = cur.sort_at then
-    -- Same timestamp: order is decided by id, so a swap changes nothing.
-    -- Step just past the neighbour instead.
-    update public.releases
-    set sort_at = nb.sort_at + case when direction = 'up'
-                                    then interval '1 microsecond'
-                                    else -interval '1 microsecond' end
-    where id = cur.id;
-  else
-    update public.releases set sort_at = nb.sort_at where id = cur.id;
-    update public.releases set sort_at = cur.sort_at where id = nb.id;
+    -- Tied sort_at: a swap of equal values changes nothing, and the feed
+    -- falls back to id order. Spread the whole tied block in the same
+    -- pinned group into distinct values that keep their current feed order
+    -- (top keeps t, next t - 1us, and so on), then swap normally.
+    update public.releases r
+    set sort_at = cur.sort_at - (s.rn * interval '1 microsecond')
+    from (
+      select id, row_number() over (order by id desc) - 1 as rn
+      from public.releases
+      where pinned = cur.pinned and archived_at is null and sort_at = cur.sort_at
+    ) s
+    where r.id = s.id;
+
+    select * into cur from public.releases where id = target;
+    select * into nb from public.releases where id = nb.id;
   end if;
+
+  update public.releases set sort_at = nb.sort_at where id = cur.id;
+  update public.releases set sort_at = cur.sort_at where id = nb.id;
 end;
 $$;
 

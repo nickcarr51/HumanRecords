@@ -81,6 +81,19 @@ describe("move_release", () => {
     expect(await order([a, b])).toEqual([second, first]);
   });
 
+  it("moves exactly one spot when three releases share a sort_at", async () => {
+    const a = await makeRelease("2700-01-01T00:00:00Z");
+    const b = await makeRelease("2700-01-01T00:00:00Z");
+    const c = await makeRelease("2700-01-01T00:00:00Z");
+    const [top, mid, bottom] = await order([a, b, c]);
+    await asLabel(async (client) => {
+      expect((await client.rpc("move_release", { target: bottom, direction: "up" })).error).toBeNull();
+      expect(await order([a, b, c])).toEqual([top, bottom, mid]);
+      expect((await client.rpc("move_release", { target: top, direction: "down" })).error).toBeNull();
+      expect(await order([a, b, c])).toEqual([bottom, top, mid]);
+    });
+  });
+
   it("rejects non-label members", async () => {
     const a = await makeRelease("2500-01-01T00:00:00Z");
     const user = await createTestUser({ role: "listener" });
