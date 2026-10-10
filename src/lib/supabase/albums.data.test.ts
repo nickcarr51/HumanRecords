@@ -69,3 +69,36 @@ describe("getAlbum", () => {
     }
   });
 });
+
+describe("getAlbum archive handling", () => {
+  it("returns null for an album whose release is archived, even for label members", async () => {
+    const { data: al } = await admin.from("albums").insert({ title: `ARCA-${Date.now()}` }).select("id").single();
+    albumIds.push(al!.id);
+    await admin.from("releases").insert({ kind: "album", album_id: al!.id, archived_at: new Date().toISOString() });
+    const label = await createTestUser({ role: "label_member" });
+    try {
+      expect(await getAlbum(await label.signIn(), al!.id)).toBeNull();
+    } finally {
+      await label.cleanup();
+    }
+  });
+
+  it("omits archived tracks", async () => {
+    const { data: al } = await admin.from("albums").insert({ title: `ARCB-${Date.now()}` }).select("id").single();
+    albumIds.push(al!.id);
+    await admin.from("releases").insert({ kind: "album", album_id: al!.id });
+    const { data: ts } = await admin
+      .from("tracks")
+      .insert([{ title: "keep", audio_url: "tracks/k.mp3" }, { title: "gone", audio_url: "tracks/g.mp3", archived_at: new Date().toISOString() }])
+      .select("id, title");
+    trackIds.push(...ts!.map((t) => t.id));
+    await admin.from("track_albums").insert(ts!.map((t, i) => ({ album_id: al!.id, track_id: t.id, position: i + 1 })));
+    const label = await createTestUser({ role: "label_member" });
+    try {
+      const album = await getAlbum(await label.signIn(), al!.id);
+      expect(album?.tracks.map((t) => t.title)).toEqual(["keep"]);
+    } finally {
+      await label.cleanup();
+    }
+  });
+});

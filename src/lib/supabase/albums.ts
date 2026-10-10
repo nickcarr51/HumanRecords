@@ -25,20 +25,27 @@ export async function getAlbum(
   const { data, error } = await supabase
     .from("albums")
     .select(
-      "id, title, album_art_url, album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, title, track_artists ( position, artists ( name ) ) ) )",
+      "id, title, album_art_url, releases ( archived_at ), album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, title, archived_at, track_artists ( position, artists ( name ) ) ) )",
     )
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
 
+  // An archived album is gone for everyone, label members included (they
+  // manage it from the admin pages, not the listener view). The embed is
+  // one-to-one (releases.album_id is unique) but tolerate an array too.
+  const rel = (data as unknown as { releases: { archived_at: string | null } | Array<{ archived_at: string | null }> | null }).releases;
+  const relRows = Array.isArray(rel) ? rel : rel ? [rel] : [];
+  if (relRows.some((r) => r.archived_at)) return null;
+
   const trackRel = (data.track_albums ?? []) as unknown as Array<{
     position: number;
-    tracks: { id: string; title: string; track_artists: ArtistNameRel } | null;
+    tracks: { id: string; title: string; archived_at: string | null; track_artists: ArtistNameRel } | null;
   }>;
   const tracks: FeedTrack[] = byPosition(trackRel)
     .map((r) => r.tracks)
-    .filter((t): t is NonNullable<typeof t> => t !== null)
+    .filter((t): t is NonNullable<typeof t> => t !== null && !t.archived_at)
     .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
 
   return {

@@ -67,11 +67,11 @@ describe("getFeed", () => {
       { track_id: first, artist_id: lead, position: 1 },
       { track_id: second, artist_id: lead, position: 1 },
     ]);
-    await makeAlbumRelease(albumId, "2099-01-01T00:00:00Z");
+    await makeAlbumRelease(albumId, "2999-01-01T00:00:00Z");
 
     const single = await makeTrack(`${tag}Single`);
     await admin.from("track_artists").insert({ track_id: single, artist_id: feat, position: 1 });
-    await makeSingleRelease(single, "2099-01-02T00:00:00Z");
+    await makeSingleRelease(single, "2999-01-02T00:00:00Z");
 
     const user = await createTestUser();
     try {
@@ -111,8 +111,8 @@ describe("getFeed", () => {
     // track has the older release. Only a releases-based feed puts `single` first.
     const single = await makeTrack(`${tag}Uncredited`);
     const other = await makeTrack(`${tag}Other`);
-    await makeSingleRelease(other, "2099-02-01T00:00:00Z");
-    await makeSingleRelease(single, "2099-02-02T00:00:00Z");
+    await makeSingleRelease(other, "2999-02-01T00:00:00Z");
+    await makeSingleRelease(single, "2999-02-02T00:00:00Z");
     const user = await createTestUser();
     try {
       const client = await user.signIn();
@@ -129,7 +129,7 @@ describe("getFeed", () => {
     for (let i = 0; i < 3; i++) {
       const id = await makeTrack(`${tag}${i}`);
       // Release dates run opposite to track creation order (first-created = newest release).
-      await makeSingleRelease(id, `2099-03-0${3 - i}T00:00:00Z`);
+      await makeSingleRelease(id, `2999-03-0${3 - i}T00:00:00Z`);
       ids.push(id);
     }
     const user = await createTestUser();
@@ -142,6 +142,59 @@ describe("getFeed", () => {
       expect(page2.items[0].id).toBe(ids[2]);
     } finally {
       await user.cleanup();
+    }
+  });
+});
+
+describe("getFeed ordering and archive", () => {
+  it("puts pinned releases first, then sort_at newest first", async () => {
+    const tag = `ORD-${Date.now()}-`;
+    const old = await makeTrack(`${tag}Old`);
+    const mid = await makeTrack(`${tag}Mid`);
+    const top = await makeTrack(`${tag}Top`);
+    await makeSingleRelease(old, "1990-01-01T00:00:00Z");
+    await makeSingleRelease(mid, "1991-01-01T00:00:00Z");
+    await makeSingleRelease(top, "1992-01-01T00:00:00Z");
+    await admin.from("releases").update({ pinned: true }).eq("track_id", old);
+    await admin.from("releases").update({ sort_at: "1993-01-01T00:00:00Z" }).eq("track_id", mid);
+
+    const user = await createTestUser();
+    try {
+      const client = await user.signIn();
+      const { items } = await getFeed(client, { page: 1, pageSize: 500 });
+      const ids = items.filter((i) => [old, mid, top].includes(i.id)).map((i) => i.id);
+      expect(ids).toEqual([old, mid, top]);
+      expect(items.findIndex((i) => i.id === old)).toBeLessThan(items.findIndex((i) => i.id === mid));
+    } finally {
+      await user.cleanup();
+    }
+  });
+
+  it("hides archived releases and archived album tracks, even from label members", async () => {
+    const tag = `ARCF-${Date.now()}-`;
+    const gone = await makeTrack(`${tag}Gone`);
+    await makeSingleRelease(gone);
+    await admin.from("releases").update({ archived_at: new Date().toISOString() }).eq("track_id", gone);
+
+    const albumId = await makeAlbum(`${tag}Album`);
+    const keep = await makeTrack(`${tag}Keep`);
+    const removed = await makeTrack(`${tag}Removed`);
+    await admin.from("track_albums").insert([
+      { album_id: albumId, track_id: keep, position: 1 },
+      { album_id: albumId, track_id: removed, position: 2 },
+    ]);
+    await makeAlbumRelease(albumId);
+    await admin.from("tracks").update({ archived_at: new Date().toISOString() }).eq("id", removed);
+
+    const label = await createTestUser({ role: "label_member" });
+    try {
+      const client = await label.signIn();
+      const { items } = await getFeed(client, { page: 1, pageSize: 500 });
+      expect(items.some((i) => i.id === gone)).toBe(false);
+      const albumItem = items.find((i) => i.id === albumId);
+      expect(albumItem?.kind === "album" && albumItem.tracks.map((t) => t.id)).toEqual([keep]);
+    } finally {
+      await label.cleanup();
     }
   });
 });
