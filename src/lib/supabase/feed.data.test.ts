@@ -67,11 +67,11 @@ describe("getFeed", () => {
       { track_id: first, artist_id: lead, position: 1 },
       { track_id: second, artist_id: lead, position: 1 },
     ]);
-    await makeAlbumRelease(albumId, "2999-01-01T00:00:00Z");
+    await makeAlbumRelease(albumId, "2099-01-01T00:00:00Z");
 
     const single = await makeTrack(`${tag}Single`);
     await admin.from("track_artists").insert({ track_id: single, artist_id: feat, position: 1 });
-    await makeSingleRelease(single, "2999-01-02T00:00:00Z");
+    await makeSingleRelease(single, "2099-01-02T00:00:00Z");
 
     const user = await createTestUser();
     try {
@@ -111,8 +111,8 @@ describe("getFeed", () => {
     // track has the older release. Only a releases-based feed puts `single` first.
     const single = await makeTrack(`${tag}Uncredited`);
     const other = await makeTrack(`${tag}Other`);
-    await makeSingleRelease(other, "2999-02-01T00:00:00Z");
-    await makeSingleRelease(single, "2999-02-02T00:00:00Z");
+    await makeSingleRelease(other, "2099-02-01T00:00:00Z");
+    await makeSingleRelease(single, "2099-02-02T00:00:00Z");
     const user = await createTestUser();
     try {
       const client = await user.signIn();
@@ -129,7 +129,7 @@ describe("getFeed", () => {
     for (let i = 0; i < 3; i++) {
       const id = await makeTrack(`${tag}${i}`);
       // Release dates run opposite to track creation order (first-created = newest release).
-      await makeSingleRelease(id, `2999-03-0${3 - i}T00:00:00Z`);
+      await makeSingleRelease(id, `2099-03-0${3 - i}T00:00:00Z`);
       ids.push(id);
     }
     const user = await createTestUser();
