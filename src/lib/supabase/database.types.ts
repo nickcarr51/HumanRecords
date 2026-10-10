@@ -183,6 +183,36 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_cleanup_queue: {
+        Row: {
+          cleaned_at: string | null
+          id: string
+          object_key: string
+          queued_at: string
+          reason: string
+          source_id: string
+          source_table: string
+        }
+        Insert: {
+          cleaned_at?: string | null
+          id?: string
+          object_key: string
+          queued_at?: string
+          reason: string
+          source_id: string
+          source_table: string
+        }
+        Update: {
+          cleaned_at?: string | null
+          id?: string
+          object_key?: string
+          queued_at?: string
+          reason?: string
+          source_id?: string
+          source_table?: string
+        }
+        Relationships: []
+      }
       releases: {
         Row: {
           album_id: string | null
