@@ -44,8 +44,10 @@ tests, future scripts) without a `releases` row does not appear on `/feed`.
   above later uploads.
 - `move_release(target, direction)` (label members, definer) swaps `sort_at` with the neighbour in
   the same pinned group. Details: [[content-lifecycle]] `References/ordering.md`.
-- Archived releases are hidden from the feed/album page/stream/download; label members still read
-  the rows. Details: [[content-lifecycle]] `References/archive-and-restore.md`.
+- Archived releases are hidden from the feed and album page; label members still read the rows.
+  Stream/download signing checks only `tracks.archived_at`, so archiving an album release alone
+  leaves its live tracks signable by id (known gap, deferred to the release-admin branch, which
+  archives an album's tracks along with it). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
 
 ## `publish_release(payload jsonb) returns uuid` (`…120100_publish_release.sql`)
 

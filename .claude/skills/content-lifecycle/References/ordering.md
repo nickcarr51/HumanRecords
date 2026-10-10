@@ -25,14 +25,17 @@ Definer, label members only (`42501`); `direction` is `up` or `down` (`22023` ot
 1. Lock the target row, find the live neighbour in the **same pinned group** by `(sort_at, id)`.
 2. At the group edge (top or bottom of its pinned group) return silently. Moving the top
    unpinned release "up" does not cross into the pinned group; pin/unpin changes groups.
-3. Before swapping, spread **every** tied block in the pinned group whose `sort_at` equals the
-   target's **or** the neighbour's: live rows only, current feed order (`sort_at desc, id desc`),
-   the top row keeps `t`, each next row gets `t - k ms`. Spreading only when the two tie is not
-   enough: with A and B tied at `t` and C at `t-1` (feed A, B, C), moving B down would hand C the
-   value `t`, tie it with A, and the id tiebreak would put C above A (two spots). With both blocks
-   spread, the swap exchanges two unique values and cannot create a tie. The step is 1 ms because
-   JS `Date` keeps only milliseconds; finer steps would collapse back into ties if `sort_at` is
-   ever round-tripped through JS. Then re-read both rows and swap. One click always moves exactly one spot.
+3. Fast path: if no other live row in the pinned group shares the target's or neighbour's
+   `sort_at` (and the two differ), skip to the swap: the set of values is unchanged, so no tie can
+   appear, and a normal click writes only the 2 swapped rows.
+   Otherwise normalize the whole pinned group first (live rows, feed order `sort_at desc, id desc`,
+   row `i` numbered from 0, step 1 ms): `v_i = min over j<=i of (s_j + j*1ms) - i*1ms`, updating
+   only rows where `v_i <> s_i`. Result: values only move down, each row is at least 1 ms below the
+   one above, feed order is preserved, so nothing collides and the neighbour is still adjacent.
+   Rows already spaced out keep their value. This covers A and B tied at `t` with C at exactly
+   `t-1ms`, where a fixed-step spread would give B the same value as C and the swap could not move
+   it. 1 ms because JS `Date` keeps only milliseconds; finer gaps would collapse back into ties if
+   `sort_at` is ever round-tripped through JS. Then re-read both rows and swap.
 4. Swap the two `sort_at` values in one transaction.
 
 Concurrent opposite moves can deadlock (`40P01`); callers should show a "try again" message.

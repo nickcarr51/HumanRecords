@@ -77,11 +77,14 @@ which is invoker but only reachable from inside `publish_release`.
 - Errors: `42501` not a label member; `22023` direction not `up`/`down`, or the release is archived;
   `P0002` no such release. Already at the edge of its pinned group: silent no-op.
 - Locks the target and its neighbour (`for update`), finds the neighbour in the **same pinned group**
-  (live only) by `(sort_at, id)`, then swaps their `sort_at`. Before the swap it spreads every
-  tied block (same pinned group, live rows) whose `sort_at` equals the target's or the neighbour's
-  (top keeps `t`, each next row gets `t - k ms`, in current feed order). Both blocks, because a third
-  row tied with either one would otherwise tie after the swap and jump two spots. 1 ms steps, because
-  JS `Date` keeps only milliseconds. One click always moves exactly one spot.
+  (live only) by `(sort_at, id)`, then swaps their `sort_at`.
+  Fast path: one indexed EXISTS looks for any other live row in the group sharing the target's or
+  neighbour's `sort_at` (or the two tie with each other); if none, it is a plain swap writing only
+  those 2 rows. Otherwise it first normalizes the whole pinned group (live rows): with rows
+  numbered `i` in feed order, `v_i = min over j<=i of (s_j + j*1ms) - i*1ms`, writing only rows
+  where `v_i <> s_i`. Values only move down, are strictly 1 ms+ apart, and keep feed order, so
+  nothing collides and the neighbour stays adjacent; then it swaps. 1 ms because JS `Date` keeps
+  only milliseconds. One click always moves exactly one spot.
 - Two concurrent opposite moves can deadlock (`40P01`): callers should show a "try again" message.
 - Caller: the future release-admin UI ([[content-lifecycle]], `References/ordering.md`).
 
