@@ -9,6 +9,7 @@ export const useAudioWaveform = () => useContext(AudioWaveformContext);
 export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>) {
   const meter = useRef<{ context: AudioContext; analyser: AnalyserNode; source: MediaElementAudioSourceNode; bytes: Uint8Array<ArrayBuffer> } | null>(null);
   const level = useRef(0);
+  const lastRead = useRef(-Infinity);
 
   const enable = useCallback(() => {
     const audio = audioRef.current;
@@ -30,6 +31,10 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
   const readLevel = useCallback(() => {
     const m = meter.current;
     if (!m || m.context.state !== 'running' || audioRef.current?.paused) return 0;
+    // Several buttons read per frame; smooth once per frame, not once per reader.
+    const now = performance.now();
+    if (now - lastRead.current < 8) return level.current;
+    lastRead.current = now;
     m.analyser.getByteTimeDomainData(m.bytes);
     let sum = 0;
     for (const byte of m.bytes) sum += ((byte - 128) / 128) ** 2;

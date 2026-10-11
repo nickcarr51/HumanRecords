@@ -7,8 +7,11 @@ import { ThemeModeProvider } from '@/lib/theme/ThemeModeProvider';
 
 export default function StyledComponentsRegistry({
   children,
+  initialDark = false,
 }: {
   children: React.ReactNode;
+  /** Night-mode cookie as read by the server; see ThemeModeProvider. */
+  initialDark?: boolean;
 }) {
   const [styledComponentsStyleSheet] = useState(() => new ServerStyleSheet());
 
@@ -19,12 +22,12 @@ export default function StyledComponentsRegistry({
   });
 
   if (typeof window !== 'undefined') {
-    return <ThemeModeProvider>{children}</ThemeModeProvider>;
+    return <ThemeModeProvider initialDark={initialDark}>{children}</ThemeModeProvider>;
   }
 
   return (
     <StyleSheetManager sheet={styledComponentsStyleSheet.instance}>
-      <ThemeModeProvider>{children}</ThemeModeProvider>
+      <ThemeModeProvider initialDark={initialDark}>{children}</ThemeModeProvider>
     </StyleSheetManager>
   );
 }

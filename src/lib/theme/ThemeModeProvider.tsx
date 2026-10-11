@@ -4,25 +4,23 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import { flushSync } from 'react-dom';
 import { createGlobalStyle, ThemeProvider } from 'styled-components';
 import { theme, amberTheme } from './theme';
+import { rgbTriplet, withAlpha } from './color';
 import { usePathname } from 'next/navigation';
+import { readThemeCookie, themeCookieString } from './mode-cookie';
 
-const STORAGE_KEY = 'humanrecords-amber-mode';
 const CHANGE_EVENT = 'humanrecords-theme-change';
 const ThemeMode = createContext({ dark: false, toggle: () => {} });
 export const useThemeMode = () => useContext(ThemeMode);
 
 function subscribe(callback: () => void) {
-  window.addEventListener('storage', callback);
   window.addEventListener(CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener('storage', callback);
-    window.removeEventListener(CHANGE_EVENT, callback);
-  };
+  return () => window.removeEventListener(CHANGE_EVENT, callback);
 }
 
+// In-memory fallback when cookies are blocked; the cookie is the source of truth.
 let sessionDark = false;
 function snapshot() {
-  try { return localStorage.getItem(STORAGE_KEY) === 'true'; }
+  try { return readThemeCookie(document.cookie) ?? sessionDark; }
   catch { return sessionDark; }
 }
 
@@ -33,7 +31,7 @@ const GlobalTheme = createGlobalStyle`
     color-scheme: ${({ theme }) => theme.mode};
   }
   body {
-    text-shadow: ${({ theme }) => theme.mode === 'dark' ? '0 0 6px rgba(255,182,66,0.12)' : 'none'};
+    text-shadow: ${({ theme }) => theme.mode === 'dark' ? `0 0 6px ${withAlpha(theme.colors.accent, 0.12)}` : 'none'};
   }
   button, input, select, textarea, a {
     text-shadow: inherit;
@@ -41,7 +39,7 @@ const GlobalTheme = createGlobalStyle`
   button svg, a svg {
     overflow: visible;
     filter: drop-shadow(0 0 3px rgba(
-      ${({ theme }) => theme.mode === 'dark' ? '255,182,66' : '255,107,27'},
+      ${({ theme }) => rgbTriplet(theme.colors.accent)},
       calc(${({ theme }) => theme.mode === 'dark' ? '0.08' : '0'} + var(--hover-progress, 0) * 0.14)
     ));
   }
@@ -76,16 +74,20 @@ const GlobalTheme = createGlobalStyle`
   }
 `;
 
-export function ThemeModeProvider({ children }: { children: ReactNode }) {
+/**
+ * `initialDark` is the cookie value as read by the server (root layout), so the
+ * server-rendered HTML and the first client render agree: no theme flash.
+ */
+export function ThemeModeProvider({ children, initialDark = false }: { children: ReactNode; initialDark?: boolean }) {
   const pathname = usePathname();
-  const savedDark = useSyncExternalStore(subscribe, snapshot, () => false);
+  const savedDark = useSyncExternalStore(subscribe, snapshot, () => initialDark);
   const entrance = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login/');
   const dark = Boolean(entrance) || savedDark;
   function toggle() {
     const nextDark = !dark;
     const update = () => {
       sessionDark = nextDark;
-      try { localStorage.setItem(STORAGE_KEY, String(sessionDark)); } catch {}
+      try { document.cookie = themeCookieString(nextDark); } catch {}
       window.dispatchEvent(new Event(CHANGE_EVENT));
     };
     if (!document.startViewTransition || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {

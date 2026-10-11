@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import StyledComponentsRegistry from '@/lib/registry';
+import { THEME_COOKIE, isDarkCookieValue } from '@/lib/theme/mode-cookie';
 import { TYPEKIT_KIT_URL } from '@/lib/theme/fonts';
 import { CRTTexture } from '@/components/CRTTexture/CRTTexture';
 import './globals.css';
@@ -35,11 +37,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Night-mode preference: read here so the first paint already matches.
+  const initialDark = isDarkCookieValue((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <html lang="en">
       <head>
@@ -47,7 +51,7 @@ export default function RootLayout({
         <link rel="stylesheet" href={TYPEKIT_KIT_URL} />
       </head>
       <body>
-        <StyledComponentsRegistry>
+        <StyledComponentsRegistry initialDark={initialDark}>
           {children}
           <CRTTexture />
         </StyledComponentsRegistry>

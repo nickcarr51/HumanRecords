@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { useTheme } from 'styled-components';
 import { ThemeModeProvider, useThemeMode } from './ThemeModeProvider';
+import { THEME_COOKIE } from './mode-cookie';
+
+const cookieValue = () => document.cookie.split('; ').find((c) => c.startsWith(`${THEME_COOKIE}=`))?.split('=')[1] ?? null;
+const setCookie = (value: 'night' | 'day') => { document.cookie = `${THEME_COOKIE}=${value}; path=/`; };
 
 const route = vi.hoisted(() => ({ pathname: '/feed' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
@@ -9,7 +14,7 @@ vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
 const originalTransition = document.startViewTransition;
 afterEach(() => {
   route.pathname = '/feed';
-  localStorage.clear();
+  document.cookie = `${THEME_COOKIE}=; path=/; max-age=0`;
   if (originalTransition) document.startViewTransition = originalTransition;
   else Reflect.deleteProperty(document, 'startViewTransition');
   vi.unstubAllGlobals();
@@ -24,10 +29,10 @@ function Toggle() {
 describe('ThemeModeProvider', () => {
   it.each(['/', '/login', '/login/error'])('renders %s in amber even with a saved day preference', (pathname) => {
     route.pathname = pathname;
-    localStorage.setItem('humanrecords-amber-mode', 'false');
+    setCookie('day');
     const view = render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     expect(screen.getByRole('button', { name: 'dark' })).toBeInTheDocument();
-    expect(localStorage.getItem('humanrecords-amber-mode')).toBe('false');
+    expect(cookieValue()).toBe('day');
     route.pathname = '/feed';
     view.rerender(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     expect(screen.getByRole('button', { name: 'light' })).toBeInTheDocument();
@@ -36,16 +41,21 @@ describe('ThemeModeProvider', () => {
     render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'light' }));
     expect(screen.getByRole('button', { name: 'dark' })).toHaveAttribute('aria-pressed', 'true');
-    expect(localStorage.getItem('humanrecords-amber-mode')).toBe('true');
+    expect(cookieValue()).toBe('night');
     fireEvent.click(screen.getByRole('button', { name: 'dark' }));
     expect(screen.getByRole('button', { name: 'light' })).toHaveAttribute('aria-pressed', 'false');
-    expect(localStorage.getItem('humanrecords-amber-mode')).toBe('false');
+    expect(cookieValue()).toBe('day');
   });
 
   it('restores a saved amber preference', () => {
-    localStorage.setItem('humanrecords-amber-mode', 'true');
+    setCookie('night');
     render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     expect(screen.getByRole('button', { name: 'dark' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('server-renders the cookie-seeded mode so night users get no gray flash', () => {
+    expect(renderToString(<ThemeModeProvider initialDark><Toggle /></ThemeModeProvider>)).toContain('>dark<');
+    expect(renderToString(<ThemeModeProvider><Toggle /></ThemeModeProvider>)).toContain('>light<');
   });
 
   it('updates the theme within a viewport transition when available', () => {

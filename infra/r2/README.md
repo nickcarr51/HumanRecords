@@ -1,22 +1,21 @@
 # R2 CORS rules
 
-The desired CORS policy for each bucket. Paste a file's contents into
-Cloudflare → R2 → <bucket> → Settings → CORS Policy.
+The CORS policy for each bucket, kept here as the record. Paste a file's contents
+into Cloudflare → R2 → <bucket> → Settings → CORS Policy, then update the table.
 
-Each bucket allows `GET`, `HEAD`, and presigned `PUT` uploads from its own
-environment's site. `GET` and `HEAD` support cross-origin image fetches and
-metadata requests; ordinary artwork display with `<img>` does not require CORS.
+Each bucket allows its own environment's site to:
 
-Store a full, accessible HTTPS image URL in `albums.album_art_url`. CORS does not
-make private R2 objects public: use a public artwork URL or a valid presigned GET
-URL (which expires). External image hosts control their own CORS policies.
-The app uses native images, so no Next.js `remotePatterns` configuration is needed.
+- `PUT` — browser uploads (presigned PUT from `/admin/upload`).
+- `GET`/`HEAD` — the `<audio>` element loads signed track URLs with
+  `crossOrigin="anonymous"` so Web Audio can read the signal for the player
+  waveform and button particles. Without `GET`, playback fails entirely
+  (the browser refuses CORS-mode media the bucket hasn't allowed).
 
-The files now include `GET` and `HEAD`; these additions still need to be applied
-in Cloudflare. The dates below record the previous upload-only policies.
+Downloads (navigation) and artwork (`<img>`) don't need CORS. `*_art_url` columns
+hold R2 object keys, signed via `signImageUrl` (see the `media-storage` skill).
 
 | File | Bucket | Status |
 |---|---|---|
-| `cors.local.json` | `humanrecords-media-local` | applied 2026-10-05 |
-| `cors.dev.json` | `humanrecords-media-dev` | applied 2026-10-06 (develop site only) |
-| `cors.prod.json` | `humanrecords-media-prod` | applied 2026-10-09 (services.humanrecords.co + vercel.app) |
+| `cors.local.json` | local media bucket | applied 2026-10-11 (GET/HEAD/PUT) |
+| `cors.dev.json` | dev media bucket | applied 2026-10-11 (GET/HEAD/PUT, develop site only) |
+| `cors.prod.json` | production media bucket | applied 2026-10-11 (GET/HEAD/PUT, services.humanrecords.co + vercel.app) |

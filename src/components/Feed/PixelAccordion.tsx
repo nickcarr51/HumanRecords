@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import styled, { useTheme } from 'styled-components';
 
 const Shell = styled.div`
@@ -24,10 +24,32 @@ const Clip = styled.div`
 
 type Pixel = { x: number; y: number; vx: number; vy: number; gravity: number; born: number; life: number; size: number };
 
+// Matches the Panel grid-template-rows transition so content stays for the collapse.
+const CLOSE_MS = 450;
+
 export function PixelAccordion({ open, id, children }: { open: boolean; id: string; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   const previous = useRef(open);
-  const particleColor = useTheme().mode === 'dark' ? '#ffb642' : '#b8b8b8';
+  const theme = useTheme();
+  const particleColor = theme.effects.particle;
+  const layerZ = String(theme.zIndex.sticky);
+
+  // Children exist only while open or animating closed. Collapsed rows would
+  // otherwise each subscribe to the player and re-render during playback.
+  const [mounted, setMounted] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      return;
+    }
+    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      setMounted(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setMounted(false), CLOSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open]);
 
   useEffect(() => {
     if (previous.current === open) return;
@@ -37,7 +59,7 @@ export function PixelAccordion({ open, id, children }: { open: boolean; id: stri
     const layer = document.createElement('canvas');
     layer.setAttribute('aria-hidden', 'true');
     // A body-level viewport canvas escapes the feed's scrolling/clipping region.
-    Object.assign(layer.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '200' });
+    Object.assign(layer.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: layerZ });
     const ctx = layer.getContext('2d');
     if (!ctx) return;
 
@@ -102,12 +124,12 @@ export function PixelAccordion({ open, id, children }: { open: boolean; id: stri
       ctx.clearRect(0, 0, width, height);
       layer.remove();
     };
-  }, [open, particleColor]);
+  }, [open, particleColor, layerZ]);
 
   return (
     <Shell>
       <Panel ref={panel} id={id} $open={open} aria-hidden={!open} inert={!open}>
-        <Clip>{children}</Clip>
+        <Clip>{mounted ? children : null}</Clip>
       </Panel>
     </Shell>
   );

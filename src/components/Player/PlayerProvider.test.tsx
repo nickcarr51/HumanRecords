@@ -22,7 +22,6 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  vi.stubEnv('NEXT_PUBLIC_AUDIO_REACTIVITY', 'false');
   vi.clearAllMocks();
   mockGet.mockImplementation(async (id: string) => ({ url: `https://signed.example/${id}`, error: null }));
   // clearAllMocks keeps return values; reset so one test's deferred page can't leak into the next.
@@ -76,12 +75,12 @@ describe("toPlayerTrack", () => {
 });
 
 describe("PlayerProvider", () => {
-  it('uses the authenticated same-origin stream when audio analysis is enabled', async () => {
-    vi.stubEnv('NEXT_PUBLIC_AUDIO_REACTIVITY', 'true');
+  it("plays the signed R2 URL directly on a CORS-enabled audio element", async () => {
     const { container } = renderPlayer();
-    await userEvent.click(screen.getByText('play'));
-    await waitFor(() => expect(container.querySelector('audio')?.getAttribute('src')).toBe('/api/tracks/t1/stream'));
-    expect(container.querySelector('audio')?.crossOrigin).toBe('anonymous');
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
+    expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
   });
   it("playQueue sets the current track and requests its signed URL", async () => {
     renderPlayer();

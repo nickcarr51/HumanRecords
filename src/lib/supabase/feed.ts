@@ -4,7 +4,7 @@ import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type FeedTrack = {
   id: string;
-  catalogNumber?: number;
+  catalogNumber: number;
   title: string;
   artistNames: string[];
 };
@@ -12,7 +12,7 @@ export type FeedTrack = {
 export type FeedItem =
   | {
       kind: "album";
-      catalogNumber?: number;
+      catalogNumber: number;
       id: string;
       title: string;
       albumArtUrl: string | null;
@@ -22,7 +22,7 @@ export type FeedItem =
     }
   | {
       kind: "track";
-      catalogNumber?: number;
+      catalogNumber: number;
       id: string;
       title: string;
       trackArtUrl: string | null;

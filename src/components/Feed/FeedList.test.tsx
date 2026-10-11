@@ -31,20 +31,20 @@ vi.mock('next/link', () => ({
 import { FeedList } from './FeedList';
 
 const items: FeedItem[] = [
-  { kind: 'track', id: 's1', title: 'Newest Single', trackArtUrl: null, artistNames: ['Nova'], createdAt: '2026-01-03' },
+  { kind: 'track', catalogNumber: 18, id: 's1', title: 'Newest Single', trackArtUrl: null, artistNames: ['Nova'], createdAt: '2026-01-03' },
   {
     kind: 'album',
-    id: 'a1',
+    catalogNumber: 19, id: 'a1',
     title: 'Sample Album',
     albumArtUrl: null,
     artistNames: [],
     createdAt: '2026-01-02',
     tracks: [
-      { id: 'a1t1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
-      { id: 'a1t2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
+      { catalogNumber: 16, id: 'a1t1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
+      { catalogNumber: 17, id: 'a1t2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
     ],
   },
-  { kind: 'track', id: 's2', title: 'Older Single', trackArtUrl: null, artistNames: [], createdAt: '2026-01-01' },
+  { kind: 'track', catalogNumber: 20, id: 's2', title: 'Older Single', trackArtUrl: null, artistNames: [], createdAt: '2026-01-01' },
 ];
 
 const feedIds = ['s1', 'a1t1', 'a1t2', 's2'];
@@ -98,7 +98,7 @@ describe('FeedList playback queue', () => {
 
   it('playing an album queues the whole feed, starting at its first track', () => {
     renderWithTheme(<FeedList items={items} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Play album' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play pack' }));
     expect(queuedIds()).toEqual(feedIds);
     expect(playQueue.mock.calls.at(-1)![1]).toBe(1);
   });
@@ -121,7 +121,7 @@ describe('FeedList play/pause state', () => {
     expect(playQueue).not.toHaveBeenCalled();
     // Other rows are unaffected.
     expect(screen.getByRole('button', { name: 'Play Newest Single' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play album' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play pack' })).toBeInTheDocument();
   });
 
   it('a paused current track shows play and resumes (toggle), not restart', () => {
@@ -135,7 +135,7 @@ describe('FeedList play/pause state', () => {
   it('album button shows pause while any of its tracks plays, and pauses rather than restarting', () => {
     player = { currentTrack: { id: 'a1t2' }, isPlaying: true, status: 'playing' };
     renderWithTheme(<FeedList items={items} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Pause album' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pause pack' }));
     expect(toggle).toHaveBeenCalledTimes(1);
     expect(playQueue).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Expand tracks' }));

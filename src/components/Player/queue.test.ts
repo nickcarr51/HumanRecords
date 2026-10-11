@@ -20,11 +20,11 @@ describe("toPlayerTrack", () => {
     expect(toPlayerTrack({ id: 'a', title: 'Track', artistNames: [], catalogNumber: 12 }).catalogNumber).toBe(12);
   });
   it("joins artists, falls back to Unknown Artist, and carries the page", () => {
-    expect(toPlayerTrack({ id: "a", title: "x", artistNames: ["A", "B"] }, 2)).toEqual({
-      id: "a", title: "x", artistName: "A, B", page: 2,
+    expect(toPlayerTrack({ catalogNumber: 5, id: "a", title: "x", artistNames: ["A", "B"] }, 2)).toEqual({
+      id: "a", catalogNumber: 5, title: "x", artistName: "A, B", page: 2,
     });
-    expect(toPlayerTrack({ id: "a", title: "x", artistNames: [] })).toEqual({
-      id: "a", title: "x", artistName: "Unknown Artist",
+    expect(toPlayerTrack({ catalogNumber: 6, id: "a", title: "x", artistNames: [] })).toEqual({
+      id: "a", catalogNumber: 6, title: "x", artistName: "Unknown Artist",
     });
   });
 });
@@ -32,12 +32,12 @@ describe("toPlayerTrack", () => {
 describe("feedQueue", () => {
   it("flattens singles and album tracks in order, with each item's offset", () => {
     const items: FeedItem[] = [
-      { kind: "track", id: "s1", title: "S1", trackArtUrl: null, artistNames: [], createdAt: "" },
+      { kind: "track", catalogNumber: 11, id: "s1", title: "S1", trackArtUrl: null, artistNames: [], createdAt: "" },
       {
-        kind: "album", id: "al", title: "AL", albumArtUrl: null, artistNames: [], createdAt: "",
-        tracks: [{ id: "a1", title: "A1", artistNames: [] }, { id: "a2", title: "A2", artistNames: [] }],
+        kind: "album", catalogNumber: 12, id: "al", title: "AL", albumArtUrl: null, artistNames: [], createdAt: "",
+        tracks: [{ catalogNumber: 7, id: "a1", title: "A1", artistNames: [] }, { catalogNumber: 8, id: "a2", title: "A2", artistNames: [] }],
       },
-      { kind: "track", id: "s2", title: "S2", trackArtUrl: null, artistNames: [], createdAt: "" },
+      { kind: "track", catalogNumber: 13, id: "s2", title: "S2", trackArtUrl: null, artistNames: [], createdAt: "" },
     ];
     const { tracks, offsets } = feedQueue(items, 3);
     expect(tracks.map((x) => x.id)).toEqual(["s1", "a1", "a2", "s2"]);
@@ -47,10 +47,10 @@ describe("feedQueue", () => {
 
   it("tags each track with the release it came from", () => {
     const items: FeedItem[] = [
-      { kind: "track", id: "s1", title: "S1", trackArtUrl: null, artistNames: [], createdAt: "" },
+      { kind: "track", catalogNumber: 14, id: "s1", title: "S1", trackArtUrl: null, artistNames: [], createdAt: "" },
       {
-        kind: "album", id: "al", title: "AL", albumArtUrl: null, artistNames: [], createdAt: "",
-        tracks: [{ id: "a1", title: "A1", artistNames: [] }, { id: "a2", title: "A2", artistNames: [] }],
+        kind: "album", catalogNumber: 15, id: "al", title: "AL", albumArtUrl: null, artistNames: [], createdAt: "",
+        tracks: [{ catalogNumber: 9, id: "a1", title: "A1", artistNames: [] }, { catalogNumber: 10, id: "a2", title: "A2", artistNames: [] }],
       },
     ];
     const { tracks } = feedQueue(items, 1);

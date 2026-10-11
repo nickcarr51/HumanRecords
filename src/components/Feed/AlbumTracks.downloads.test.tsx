@@ -27,8 +27,8 @@ import { ToastProvider } from '@/components/Toast';
 import { AlbumTracks } from './AlbumTracks';
 
 const tracks: FeedTrack[] = [
-  { id: 't1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
-  { id: 't2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
+  { catalogNumber: 3, id: 't1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
+  { catalogNumber: 4, id: 't2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
 ];
 
 beforeEach(() => {

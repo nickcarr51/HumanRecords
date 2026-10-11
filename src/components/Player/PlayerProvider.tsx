@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useMemo,
 } from "react";
 import { getTrackStreamUrl, type UrlResult } from "@/lib/storage/actions";
 import { continueAfterRelease, loadFeedPage, type QueuePage } from "@/lib/feed/actions";
@@ -51,8 +52,6 @@ type PlayerContextValue = {
   currentTrack: PlayerTrack | null;
   source: QueueSource;
   isPlaying: boolean;
-  currentTime: number;
-  duration: number;
   status: Status;
   playQueue: (tracks: PlayerTrack[], startIndex?: number, source?: QueueSource) => void;
   toggle: () => void;
@@ -66,6 +65,18 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 export function usePlayer(): PlayerContextValue {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error("usePlayer must be used within a PlayerProvider");
+  return ctx;
+}
+
+// Position/duration tick ~4x/s during playback, so they live in their own
+// context: only the scrubber (PlayerBar) re-renders on each tick, not every
+// play button on the page.
+type PlayerTimeValue = { currentTime: number; duration: number };
+const PlayerTimeContext = createContext<PlayerTimeValue | null>(null);
+
+export function usePlayerTime(): PlayerTimeValue {
+  const ctx = useContext(PlayerTimeContext);
+  if (!ctx) throw new Error("usePlayerTime must be used within a PlayerProvider");
   return ctx;
 }
 
@@ -98,12 +109,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
-  const startAudio = useCallback((url: string, isCurrent: () => boolean, trackId: string) => {
+  const startAudio = useCallback((url: string, isCurrent: () => boolean) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.src = process.env.NEXT_PUBLIC_AUDIO_REACTIVITY === 'true'
-      ? `/api/tracks/${encodeURIComponent(trackId)}/stream`
-      : url;
+    audio.src = url;
     void audio
       .play()
       .then(() => {
@@ -140,7 +149,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         startAudio(
           url,
           () => gen === genRef.current && queueRef.current.tracks[queueRef.current.index]?.id === track.id,
-          track.id,
         );
       }
       commit(s);
@@ -344,7 +352,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setIsPlaying(false);
           return;
         }
-        startAudio(res.url, () => !cancelled, currentTrack.id);
+        startAudio(res.url, () => !cancelled);
       });
     return () => {
       cancelled = true;
@@ -384,29 +392,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useMediaSession(audioRef, currentTrack, isPlaying, { play, pause, next, prev, seek });
 
-  const value: PlayerContextValue = {
-    queue: queueState.tracks,
-    currentIndex: queueState.index,
-    currentTrack,
-    source: queueState.source,
-    isPlaying,
-    currentTime,
-    duration,
-    status,
-    playQueue,
-    toggle,
-    next,
-    prev,
-    seek,
-  };
+  // Memoized so a time tick (which re-renders this provider) doesn't hand
+  // every consumer a new object.
+  const value = useMemo<PlayerContextValue>(
+    () => ({
+      queue: queueState.tracks,
+      currentIndex: queueState.index,
+      currentTrack,
+      source: queueState.source,
+      isPlaying,
+      status,
+      playQueue,
+      toggle,
+      next,
+      prev,
+      seek,
+    }),
+    [queueState, currentTrack, isPlaying, status, playQueue, toggle, next, prev, seek],
+  );
+  const time = useMemo<PlayerTimeValue>(() => ({ currentTime, duration }), [currentTime, duration]);
 
   return (
     <PlayerContext.Provider value={value}>
-      <AudioMeterContext.Provider value={readLevel}>
-        <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
-      </AudioMeterContext.Provider>
+      <PlayerTimeContext.Provider value={time}>
+        <AudioMeterContext.Provider value={readLevel}>
+          <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
+        </AudioMeterContext.Provider>
+      </PlayerTimeContext.Provider>
       {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
-      <audio ref={audioRef} preload="metadata" crossOrigin={process.env.NEXT_PUBLIC_AUDIO_REACTIVITY === 'true' ? 'anonymous' : undefined} />
+      {/* crossOrigin lets Web Audio read the signal for the waveform/particles;
+          the R2 buckets allow GET/HEAD from each site origin (infra/r2/). */}
+      <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
     </PlayerContext.Provider>
   );
 }

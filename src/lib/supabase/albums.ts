@@ -5,7 +5,7 @@ import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type AlbumDetail = {
   id: string;
-  catalogNumber?: number;
+  catalogNumber: number;
   title: string;
   albumArtUrl: string | null;
   artistNames: string[];

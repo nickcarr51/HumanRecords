@@ -1,7 +1,7 @@
 "use client";
 
 import styled from "styled-components";
-import { usePlayer } from "./PlayerProvider";
+import { usePlayer, usePlayerTime } from "./PlayerProvider";
 import { PlaybackButton } from './PlaybackButton';
 import { PixelWaveform } from './PixelWaveform';
 import { CatalogId } from '@/components/CatalogId/CatalogId';
@@ -123,8 +123,8 @@ function fmt(seconds: number): string {
 }
 
 export function PlayerBar() {
-  const { currentTrack, isPlaying, currentTime, duration, status, toggle, next, prev, seek } =
-    usePlayer();
+  const { currentTrack, isPlaying, status, toggle, next, prev, seek } = usePlayer();
+  const { currentTime, duration } = usePlayerTime();
 
   if (!currentTrack) return null;
 

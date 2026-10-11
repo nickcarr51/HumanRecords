@@ -14,6 +14,30 @@ export const palette = {
   info: '#484848',
 } as const;
 
+// Night mode ("amber CRT"). Same keys as `palette`; theme.ts maps both.
+export const paletteAmber = {
+  bgBase: '#15110b',
+  surface: '#15110b',
+  raised: '#241b0d',
+  text: '#ffd18a',
+  muted: '#d0a86c',
+  faint: '#ba945a',
+  border: '#8b6635',
+  accent: '#ffb642',
+  accentDim: '#e59b2c',
+  success: '#ffd18a',
+  error: '#ffb642',
+  warning: '#ffb642',
+  info: '#d0a86c',
+} as const;
+
+// Ambient-effect colors (CRT scanline ink, vignette, pixel particles) that
+// aren't UI colors. Components read them via theme.effects.*.
+export const effects = {
+  light: { ink: '#646464', vignette: '#505050', particle: '#b8b8b8' },
+  dark: { ink: paletteAmber.accent, vignette: '#505050', particle: paletteAmber.accent },
+} as const;
+
 export const space = {
   none: '0',
   xs: '0.25rem',

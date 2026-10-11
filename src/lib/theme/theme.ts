@@ -1,5 +1,7 @@
 import {
   palette,
+  paletteAmber,
+  effects,
   space,
   fontSizes,
   fonts,
@@ -35,20 +37,32 @@ export const theme = {
   motion,
   breakpoints,
   zIndex,
+  effects: effects.light,
 } as const;
 
-export type AppTheme = Omit<typeof theme, 'colors' | 'mode'> & {
+export type AppTheme = Omit<typeof theme, 'colors' | 'mode' | 'effects'> & {
   mode: 'light' | 'dark';
   colors: { [K in keyof typeof theme.colors]: string };
+  effects: { [K in keyof typeof theme.effects]: string };
 };
 export const amberTheme: AppTheme = {
   ...theme,
   mode: 'dark',
   colors: {
-    bg: '#15110b', surface: '#15110b', raised: '#241b0d',
-    text: '#ffd18a', muted: '#d0a86c', faint: '#ba945a', border: '#8b6635',
-    accent: '#ffb642', accentDim: '#e59b2c',
-    success: '#ffd18a', error: '#ffb642', warning: '#ffb642', info: '#d0a86c',
+    bg: paletteAmber.bgBase,
+    surface: paletteAmber.surface,
+    raised: paletteAmber.raised,
+    text: paletteAmber.text,
+    muted: paletteAmber.muted,
+    faint: paletteAmber.faint,
+    border: paletteAmber.border,
+    accent: paletteAmber.accent,
+    accentDim: paletteAmber.accentDim,
+    success: paletteAmber.success,
+    error: paletteAmber.error,
+    warning: paletteAmber.warning,
+    info: paletteAmber.info,
   },
+  effects: effects.dark,
 };
 export type SpaceKey = keyof AppTheme['space'];

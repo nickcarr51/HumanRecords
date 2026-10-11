@@ -49,7 +49,7 @@ export function AlbumRow({
       <Row>
         <PlaybackButton active={activePlaying}
           type="button"
-          aria-label={playing ? 'Pause album' : 'Play album'}
+          aria-label={playing ? 'Pause pack' : 'Play pack'}
           disabled={!hasTracks}
           onClick={onClick}
         >
@@ -75,7 +75,7 @@ export function AlbumRow({
               <path d="m6 9 6 6 6-6" />
             </Chevron>
           </PlayButton>
-          <AlbumLink href={`/albums/${item.id}`} aria-label={`Open album ${item.title}`}>
+          <AlbumLink href={`/albums/${item.id}`} aria-label={`Open pack ${item.title}`}>
             <SweepIcon fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" strokeLinejoin="miter">
               <path d="M6 18 18 6M6 6h12v12" />
             </SweepIcon>

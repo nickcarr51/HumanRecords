@@ -19,8 +19,3 @@ body {
   font-family: 'dico-mono', 'Courier New', ui-monospace, monospace;
   -webkit-font-smoothing: antialiased;
 }
-
-::selection {
-  background: #ff6b1b;
-  color: #111111;
-}

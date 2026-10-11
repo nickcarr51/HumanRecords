@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, type ButtonHTMLAttributes } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { PlayButton } from '@/components/Feed/feed.styles';
+import { withAlpha } from '@/lib/theme/color';
 import { useAudioMeter } from './audioMeter';
 
 const Shell = styled.span<{ $active: boolean }>`
@@ -20,10 +21,10 @@ const Shell = styled.span<{ $active: boolean }>`
     pointer-events: none;
     z-index: -1;
     background: radial-gradient(circle,
-      ${({ theme }) => theme.colors.accent}22 0%,
-      ${({ theme }) => theme.colors.accent}14 28%,
-      ${({ theme }) => theme.colors.accent}06 48%,
-      ${({ theme }) => theme.colors.accent}00 72%);
+      ${({ theme }) => withAlpha(theme.colors.accent, 0.13)} 0%,
+      ${({ theme }) => withAlpha(theme.colors.accent, 0.08)} 28%,
+      ${({ theme }) => withAlpha(theme.colors.accent, 0.024)} 48%,
+      ${({ theme }) => withAlpha(theme.colors.accent, 0)} 72%);
     opacity: ${({ $active }) => $active ? 1 : 0};
     transition: opacity 320ms ease;
   }
@@ -32,8 +33,8 @@ const ActiveButton = styled(PlayButton)<{ $active: boolean }>`
   ${({ $active, theme }) => $active && `
     color: ${theme.colors.accent};
     border-color: ${theme.colors.accent};
-    box-shadow: inset 0 0 6px ${theme.colors.accent}16;
-    svg { filter: drop-shadow(0 0 3px ${theme.colors.accent}66); }
+    box-shadow: inset 0 0 6px ${withAlpha(theme.colors.accent, 0.086)};
+    svg { filter: drop-shadow(0 0 3px ${withAlpha(theme.colors.accent, 0.4)}); }
   `}
 `;
 const Particles = styled.canvas`
@@ -51,6 +52,7 @@ const Particles = styled.canvas`
 export function PlaybackButton({ active, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { active: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const readLevel = useAudioMeter();
+  const particleColor = useTheme().colors.accent;
   useEffect(() => {
     const layer = canvas.current;
     if (!active || !readLevel || !layer || !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -83,7 +85,7 @@ export function PlaybackButton({ active, children, ...props }: ButtonHTMLAttribu
         p.x += p.vx * delta;
         p.y += p.vy * delta;
         ctx.globalAlpha = (1 - p.age / p.life) * 0.5;
-        ctx.fillStyle = '#ffb642';
+        ctx.fillStyle = particleColor;
         ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
       }
       ctx.globalAlpha = 1;
@@ -91,7 +93,7 @@ export function PlaybackButton({ active, children, ...props }: ButtonHTMLAttribu
     }
     frame = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(frame); ctx.clearRect(0, 0, 130, 130); };
-  }, [active, readLevel]);
+  }, [active, readLevel, particleColor]);
   return (
     <Shell $active={active}>
       <ActiveButton {...props} $active={active}>{children}</ActiveButton>

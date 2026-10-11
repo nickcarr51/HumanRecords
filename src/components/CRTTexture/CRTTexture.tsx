@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { rgbTriplet, withAlpha } from '@/lib/theme/color';
 
 const Layer = styled.canvas`
   position: fixed;
@@ -25,7 +26,10 @@ const DistortionBand = styled.div`
 
 /** Canvas tracking texture and a narrow backdrop filter move together. */
 export function CRTTexture() {
-  const dark = useTheme().mode === 'dark';
+  const theme = useTheme();
+  const dark = theme.mode === 'dark';
+  const inkHex = theme.effects.ink;
+  const vignetteHex = theme.effects.vignette;
   const canvas = useRef<HTMLCanvasElement>(null);
   const distortion = useRef<HTMLDivElement>(null);
   const displacement = useRef<SVGFEDisplacementMapElement>(null);
@@ -38,7 +42,7 @@ export function CRTTexture() {
     const ctx = layer.getContext('2d');
     if (!ctx) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const ink = dark ? '255, 182, 66' : '100, 100, 100';
+    const ink = rgbTriplet(inkHex);
     let width = 0;
     let height = 0;
     let frame = 0;
@@ -125,8 +129,10 @@ export function CRTTexture() {
     };
 
     const tick = (now: number) => {
-      // Keep the moving band smooth at 60 fps on faster displays too.
-      if (now - last >= 1000 / 60 - 1) { paint(now); last = now; }
+      // Scanlines drift slowly, so idle at 24 fps; run 60 fps only while a
+      // tracking band is crossing so the sweep stays smooth.
+      const fps = sweep ? 60 : 24;
+      if (now - last >= 1000 / fps - 1) { paint(now); last = now; }
       frame = requestAnimationFrame(tick);
     };
     const resume = () => {
@@ -148,8 +154,8 @@ export function CRTTexture() {
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       const radius = Math.hypot(width, height) / 2;
       vignette = ctx.createRadialGradient(width / 2, height / 2, radius * 0.35, width / 2, height / 2, radius);
-      vignette.addColorStop(0, 'rgba(80,80,80,0)');
-      vignette.addColorStop(1, 'rgba(80,80,80,0.055)');
+      vignette.addColorStop(0, withAlpha(vignetteHex, 0));
+      vignette.addColorStop(1, withAlpha(vignetteHex, 0.055));
       resume();
     };
 
@@ -164,7 +170,7 @@ export function CRTTexture() {
       document.removeEventListener('visibilitychange', resume);
       reduced.removeEventListener('change', resume);
     };
-  }, [dark]);
+  }, [dark, inkHex, vignetteHex]);
 
   const filter = `url("#${filterId}") blur(0.1px)`;
   return (

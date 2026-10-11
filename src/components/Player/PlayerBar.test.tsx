@@ -2,30 +2,37 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
-vi.mock("./PlayerProvider", () => ({ usePlayer: vi.fn() }));
-import { usePlayer } from "./PlayerProvider";
+vi.mock("./PlayerProvider", () => ({ usePlayer: vi.fn(), usePlayerTime: vi.fn() }));
+import { usePlayer, usePlayerTime } from "./PlayerProvider";
 import { PlayerBar } from "./PlayerBar";
 
 const mockUse = vi.mocked(usePlayer);
-beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); });
+const mockTime = vi.mocked(usePlayerTime);
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  mockTime.mockReturnValue({ currentTime: 0, duration: 100 });
+});
 afterEach(() => { vi.restoreAllMocks(); });
 
-function state(overrides: Partial<ReturnType<typeof usePlayer>> = {}) {
+type State = ReturnType<typeof usePlayer> & ReturnType<typeof usePlayerTime>;
+
+// Builds both hook results; time fields route to usePlayerTime.
+function state(overrides: Partial<State> = {}) {
+  const { currentTime = 0, duration = 100, ...rest } = overrides;
+  mockTime.mockReturnValue({ currentTime, duration });
   return {
     queue: [{ id: "t1", title: "One", artistName: "Alpha" }],
     currentIndex: 0,
     currentTrack: { id: "t1", title: "One", artistName: "Alpha" },
     source: { kind: "none" as const },
     isPlaying: false,
-    currentTime: 0,
-    duration: 100,
     status: "idle" as const,
     playQueue: vi.fn(),
     toggle: vi.fn(),
     next: vi.fn(),
     prev: vi.fn(),
     seek: vi.fn(),
-    ...overrides,
+    ...rest,
   };
 }
 
