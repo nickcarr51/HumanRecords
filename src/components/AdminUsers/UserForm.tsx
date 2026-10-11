@@ -55,7 +55,7 @@ export function UserForm({ user }: { user: AdminUserRow }) {
         <FormField
           label="Email"
           htmlFor="user-email"
-          hint={emailChanged ? 'Sign-in codes will go to the new address.' : undefined}
+          hint={emailChanged ? 'Sign-in codes will go to the new address. Invite links or cards made before this change still show the old email.' : undefined}
         >
           <Input
             id="user-email"

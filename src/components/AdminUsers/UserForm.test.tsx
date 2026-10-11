@@ -18,11 +18,11 @@ beforeEach(() => {
 describe("UserForm", () => {
   it("warns only once the email differs", async () => {
     renderWithTheme(<UserForm user={user} />);
-    expect(screen.queryByText("Sign-in codes will go to the new address.")).toBeNull();
+    expect(screen.queryByText("Sign-in codes will go to the new address. Invite links or cards made before this change still show the old email.")).toBeNull();
     const email = screen.getByLabelText("Email");
     await userEvent.clear(email);
     await userEvent.type(email, "new@x.co");
-    expect(screen.getByText("Sign-in codes will go to the new address.")).toBeInTheDocument();
+    expect(screen.getByText("Sign-in codes will go to the new address. Invite links or cards made before this change still show the old email.")).toBeInTheDocument();
   });
 
   it("saves name and email and shows Saved", async () => {
