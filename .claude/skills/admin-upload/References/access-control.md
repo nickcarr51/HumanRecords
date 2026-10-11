@@ -19,8 +19,11 @@ check exists at four layers because each one alone has a hole.
    unknown URL, so the route's existence isn't revealed.
    **Rule: any new `admin/**/page.tsx` must `await requireLabelMember()` first** (nothing
    enforces this automatically; add a page test like `admin/page.test.tsx`).
-3. **Per-action role check** — every server action in `src/lib/admin/actions.ts` and `src/lib/admin/users-actions.ts` (`createUser`, `issueInvite`, `setUserRole`)
-   (`searchArtists`, `createUploadUrls`, `publishRelease`) starts with `isLabelMember()`
+3. **Per-action role check** — every server action in `src/lib/admin/actions.ts`
+   (`searchArtists`, `createUploadUrls`, `publishRelease`), `src/lib/admin/users-actions.ts`
+   (`createUser`, `issueInvite`, `setUserRole`) and `src/lib/admin/release-actions.ts`
+   (`setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`,
+   `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio`) starts with a role check
    and returns `"Only label members can do this."` otherwise. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.

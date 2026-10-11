@@ -19,7 +19,7 @@ export interface TrackEditorProps {
   errors?: { title?: string; artists?: string };
   pending: ArtistChip[];
   dispatch: (a: EditAction) => void;
-  disabled: boolean; // draft fields (true while saving)
+  disabled: boolean; // draft fields (true while saving or while an instant action is in flight)
   locked: boolean; // instant actions (true while the draft is dirty or saving)
 }
 
