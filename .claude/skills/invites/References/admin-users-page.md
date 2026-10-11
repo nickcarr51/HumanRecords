@@ -9,7 +9,7 @@
 
 ## Actions (`src/lib/admin/users-actions.ts`, `"use server"`)
 
-Each starts with `labelMemberId()` (role via `getCurrentRole()` plus session `sub`); non
+Each starts with `labelMemberId()` (`activeLabelMemberId()` in `src/lib/admin/caller.ts`: role via `getCurrentRole()` plus `auth.getUser()`, which fails for banned users); non
 label members get "Only label members can do this." All return `{ error: string | null }`
 and `revalidatePath('/admin/users')` on success.
 

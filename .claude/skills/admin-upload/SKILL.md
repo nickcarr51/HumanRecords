@@ -51,7 +51,9 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
 | Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
-| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping, `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
+| Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
 | Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
 | Reused list pagination (optional `basePath`, e.g. `/admin/artists`) | `src/app/(app)/artists/Pagination.tsx` (used by `src/app/(app)/admin/artists/page.tsx`; may move to `src/components/` later) |
 | Admin index cards (Upload, Users, Artists) | `src/app/(app)/admin/page.tsx` |

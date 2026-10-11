@@ -54,7 +54,16 @@ The server pages `/login` and `/admin/users` import components per folder
   email saved but the name didn't.
 - **`setUserActive(userId, active)`** — deactivate = Supabase auth ban:
   `updateUserById(id, { ban_duration: '876000h' })`; reactivate = `'none'`. Reversible, download
-  history kept. A label member cannot deactivate themself ("You can't deactivate yourself.").
+  history kept. A label member cannot deactivate **or reactivate** themself ("You can't deactivate yourself." /
+  "You can't reactivate yourself.") — otherwise a banned label member could lift their own ban.
+- **Caller check.** Every action starts with `labelMemberId()`, which is `activeLabelMemberId()` in
+  `src/lib/admin/caller.ts`: role must be `label_member` AND `supabase.auth.getUser()` must succeed
+  (it asks the auth server, which rejects banned users with `user_banned`; `getClaims()` would not).
+  So a deactivated label member is refused immediately in the app. Accepted gap: direct API calls
+  with the old access token can still pass `current_user_role()`-based RLS for up to 1h (the
+  function ignores bans); a future migration can make `current_user_role()` ban-aware.
+- **Email-change hint** (`UserForm`): "Sign-in codes will go to the new address. Invite links or
+  cards made before this change still show the old email."
 - **`AdminUserRow.deactivated`** is derived from `banned_until` in the list mapper. The table
   shows a status and disables the invite controls (role select, link buttons) for deactivated
   rows, so to issue a link for a deactivated user: reactivate, New link, deactivate.
@@ -65,7 +74,7 @@ Verified against the local stack with a script that reproduces the app's calls (
 Local JWTs are signed ES256 (asymmetric), so `getClaims()` verifies locally with no server
 call; `jwt_expiry = 3600`.
 
-1. **OTP refused, with a vague message.** `signInWithOtp({ shouldCreateUser: false })` for a
+1. **OTP refused, with a specific message.** `signInWithOtp({ shouldCreateUser: false })` for a
    banned email still *succeeds* (no error, code mail goes out). `verifyOtp` (and the
    generateLink + verifyOtp path) fails with 403 `user_banned` / "User is banned". `submitOtp`
    now checks for the ban first (`user_banned` / `/banned/i`) and shows "This account has been
@@ -81,7 +90,7 @@ call; `jwt_expiry = 3600`.
    token and returns the deactivated message (same copy as check 1). The token is not burned,
    so it works again after reactivation.
 
-Decided (owner, 2026-10-10): no instant kick on deactivate. A banned user keeps access until the access token expires (≤1h), then the refresh fails and they are signed out. This is a documented limitation.
+Decided (owner, 2026-10-10): no instant kick on deactivate (admin server actions are the exception: they verify with `getUser()`, see Caller check). A banned user keeps access until the access token expires (≤1h), then the refresh fails and they are signed out. This is a documented limitation.
 
 ## References
 
