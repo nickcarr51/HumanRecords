@@ -19,12 +19,15 @@ check exists at four layers because each one alone has a hole.
    unknown URL, so the route's existence isn't revealed.
    **Rule: any new `admin/**/page.tsx` must `await requireLabelMember()` first** (nothing
    enforces this automatically; add a page test like `admin/page.test.tsx`).
-3. **Per-action role check** — every server action in `src/lib/admin/actions.ts`
-   (`searchArtists`, `createUploadUrls`, `publishRelease`), `src/lib/admin/users-actions.ts`
-   (`createUser`, `issueInvite`, `setUserRole`) and `src/lib/admin/release-actions.ts`
-   (`setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`,
-   `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio`) starts with a role check
-   and returns `"Only label members can do this."` otherwise. Server actions are public
+3. **Per-action role check** — every admin server action starts with a role check and returns
+   `"Only label members can do this."` otherwise:
+   - `src/lib/admin/actions.ts` (`searchArtists`, `createUploadUrls`, `publishRelease`): `isLabelMember()` → `getCurrentRole()`.
+   - `src/lib/admin/release-actions.ts` (`setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`,
+     `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio`): `getCurrentRole()`.
+   - `src/lib/admin/users-actions.ts` (`createUser`, `issueInvite`, `setUserRole`, `updateUserProfile`, `setUserActive`) and
+     `src/lib/admin/artists-actions.ts` (`createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers`):
+     `activeLabelMemberId()` (`src/lib/admin/caller.ts`) — role check **plus** `auth.getUser()`, so a deactivated label
+     member is refused even while their access token is still valid. The upload and release actions don't do this yet. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
    `admin_list_users` and `admin_set_user_role` re-check the same way. Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is

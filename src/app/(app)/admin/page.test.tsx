@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithTheme } from "@/test/renderWithTheme";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireLabelMember = vi.fn();
 vi.mock("@/lib/auth/role", () => ({ requireLabelMember: () => requireLabelMember() }));
@@ -10,7 +10,7 @@ vi.mock("@/lib/admin/actions", () => ({
   publishRelease: vi.fn(),
 }));
 
-import AdminPage from "./page";
+import AdminPage, { metadata } from "./page";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -34,4 +34,12 @@ describe("AdminPage", () => {
     renderWithTheme(await AdminPage());
     expect(screen.getByRole("link", { name: /Releases/ })).toHaveAttribute("href", "/admin/releases");
   });
+
+  it("links to the artists admin", async () => {
+    requireLabelMember.mockResolvedValue(undefined);
+    renderWithTheme(await AdminPage());
+    expect(screen.getByRole("link", { name: /Artists/ })).toHaveAttribute("href", "/admin/artists");
+  });
 });
+
+it("sets the tab title", () => expect(metadata.title).toBe("Admin"));

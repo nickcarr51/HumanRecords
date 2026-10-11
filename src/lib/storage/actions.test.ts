@@ -97,6 +97,37 @@ describe("getTrackDownloadUrl", () => {
     });
   });
 
+  it("names the file 'A x B - Title.ext' with artists in credited (position) order", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({
+      data: {
+        title: "Night Drive",
+        audio_url: "tracks/abc.mp3",
+        archived_at: null,
+        track_artists: [
+          { position: 2, artists: { name: "Juno" } },
+          { position: 1, artists: { name: "Nova" } },
+        ],
+      },
+      error: null,
+    });
+    signDownloadUrl.mockResolvedValue("https://signed.example/download");
+    await getTrackDownloadUrl("track-1");
+    expect(signDownloadUrl).toHaveBeenCalledWith("tracks/abc.mp3", "Nova x Juno - Night Drive.mp3");
+    expect(select).toHaveBeenCalledWith(expect.stringContaining("track_artists"));
+  });
+
+  it("uses .bin when the key has no extension", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({
+      data: { title: "Song", audio_url: "tracks/abc", archived_at: null, track_artists: [] },
+      error: null,
+    });
+    signDownloadUrl.mockResolvedValue("https://signed.example/download");
+    await getTrackDownloadUrl("track-1");
+    expect(signDownloadUrl).toHaveBeenCalledWith("tracks/abc", "Song.bin");
+  });
+
   it("does not sign or record when unauthenticated", async () => {
     getSessionUser.mockResolvedValue(null);
     const res = await getTrackDownloadUrl("track-1");

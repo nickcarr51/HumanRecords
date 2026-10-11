@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), or the invite-users script. (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the invite-users script, or artist management at `/admin/artists`. (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -49,12 +49,19 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Artist chip combobox | `src/components/Upload/ArtistCombobox.tsx` |
 | Browser upload + publish orchestration | `src/components/Upload/upload-engine.ts` (`putFile`, `runPool`, `runPublish`) |
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
-| Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
+| Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx`. Each exports `metadata = { title: 'Admin · <Section>' }` (tab `Admin · Upload · Human Services`); new admin pages follow [[head-tags]] |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
 | Release admin actions (role check first, then RPCs; `setPinned` uses the service client): `setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio` | `src/lib/admin/release-actions.ts` |
 | Release admin reads | `src/lib/admin/releases.ts` (`getAdminReleases`, `getAdminRelease`) |
 | Release admin UI | `src/components/AdminReleases/*` (`ReleasesTable`, `ArchiveControl`, `ConfirmModal`, `useAdminAction`, `uploadOne`, `edit-reducer` incl. `draftKey`, `TrackEditor`, `ReplaceAudio`, `RemoveTrack`, `RemovedTracks`, `AddTrackForm`, `EditReleaseForm`) |
-| Release admin pages + `/admin` Releases card | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx`, `src/app/(app)/admin/page.tsx` |
+| Release admin pages | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx` |
+| Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
+| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
+| Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
+| Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
+| Reused list search + pagination (`basePath="/admin/artists"`) | `src/components/SearchInput/`, `src/components/Pagination/` (`pageHref(basePath, query, page)`); see [[artists-read]] |
+| Admin index cards (Upload, Releases, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
 
@@ -99,10 +106,11 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - **Stale-track-list refusal**: `update_release` rejects a draft whose track list no longer matches the live tracks (add/remove/restore elsewhere); the user reloads. Concurrent title/artist edits are not detected: last write wins.
   - **Replace MP3** shows a `role="status"` "MP3 replaced." line next to the control; picking another file clears it.
   - **Per-row controls** have accessible names with the title (`Pin <title>`, `Archive <title>`, `Remove <title>`, `Replace MP3 for <title>`); visible text is unchanged.
-  - **Errors are inline** (`role="alert"`), not toasts: `ToastProvider` is not mounted in the app.
+  - **Errors are inline** (`role="alert"`), not toasts (built before `ToastProvider` was mounted in `AppShell`; switching is optional).
   - Every action checks the role first, validates UUIDs and artist refs (each ref must be a UUID `id` or a non-blank string `newName`; anything else is "Invalid request." with no DB call), and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
   - **Edit page**: a failed read shows an inline "Couldn't load this release." (unknown id → 404); "‹ releases" returns to `?archived=1` for an archived release. Tab titles: `Admin · Releases`, `Admin · Edit release`.
-  - **Known gap (security review 2026-10-11, deferred)**: `add_album_track`/`replace_track_audio` accept any existing `tracks/<uuid>.mp3` key, so a hand-built server-action call by a label member could point a track at an object another track uses or one already queued in `r2_cleanup_queue`. Add a SQL guard (refuse keys referenced by `tracks.audio_url` or an uncleaned queue row) before any R2 cleanup job ships.  - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
+  - **Known gap (security review 2026-10-11, deferred)**: `add_album_track`/`replace_track_audio` accept any existing `tracks/<uuid>.mp3` key, so a hand-built server-action call by a label member could point a track at an object another track uses or one already queued in `r2_cleanup_queue`. Add a SQL guard (refuse keys referenced by `tracks.audio_url` or an uncleaned queue row) before any R2 cleanup job ships.
+  - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
   - **ID3 hint**: edits don't rewrite MP3 tags; the page tells users to replace the MP3 with a re-tagged file.
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.

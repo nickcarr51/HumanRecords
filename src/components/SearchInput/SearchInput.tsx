@@ -2,9 +2,15 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Input } from '@/components';
+import { Input } from '../Input';
 
-export function SearchInput({ initialQuery }: { initialQuery: string }) {
+export function SearchInput({
+  initialQuery,
+  label = 'Search artists',
+}: {
+  initialQuery: string;
+  label?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -29,8 +35,8 @@ export function SearchInput({ initialQuery }: { initialQuery: string }) {
     <Input
       type="search"
       role="searchbox"
-      aria-label="Search artists"
-      placeholder="Search artists"
+      aria-label={label}
+      placeholder={label}
       defaultValue={initialQuery}
       onChange={(e) => onChange(e.target.value)}
     />

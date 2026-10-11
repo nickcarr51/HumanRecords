@@ -33,6 +33,8 @@ chars, e.g. truncated by a mail client), or the lookup errored (check server log
 
 Copy: `USED` = "That link has already been used — sign in with your email below."
 `FAILED` = "Couldn't sign you in — try again, or use your email below."
+A ban (`user_banned` from `verifyOtp`) restores the token like `FAILED` but returns
+`DEACTIVATED` = "This account has been deactivated. Contact Human Records if you think this is a mistake."
 
 Why this shape: only Supabase Auth can issue a session, after a verified login. `generateLink`
 plus an immediate `verifyOtp` is the server doing a magic-link sign-in for the user; the

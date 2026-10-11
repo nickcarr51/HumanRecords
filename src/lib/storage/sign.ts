@@ -32,7 +32,10 @@ async function signObjectUrl(
     const asciiFallback = opts.downloadFilename
       .replace(/["\\]/g, "")
       .replace(/[^\x20-\x7e]/g, "_");
-    const utf8 = encodeURIComponent(opts.downloadFilename);
+    const utf8 = encodeURIComponent(opts.downloadFilename).replace(
+      /['()*]/g,
+      (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase(),
+    );
     url.searchParams.set(
       "response-content-disposition",
       `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8}`,

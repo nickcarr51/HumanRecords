@@ -20,6 +20,12 @@
 
 Because label members can read archived rows, listener-facing code (`getFeed`, `getAlbum`, the stream/download actions, `search_feed`) also filters `archived_at` explicitly (`getAlbum` treats a missing release row as not found, since RLS hides archived releases from listeners; `getFeed` drops singles whose track is archived); RLS alone is not enough. See [[content-lifecycle]].
 
+**`downloads` stays owner-only.** `getMyDownloadedTrackIds` (`src/lib/supabase/downloads.ts`) reads it with
+the user client and no `user_id` filter, so the feed/album ✓ state relies on this policy. Adding a
+label-member select policy would make label members see everyone's downloads as their own ✓ — admin
+download stats (v1 pass 2) must use a `security definer` function (pattern: `admin_list_users`), or add
+`.eq("user_id", <caller>)` to that query first. Pinned by `downloads.data.test.ts`.
+
 `(select auth.uid())` (wrapped in a subselect) lets Postgres evaluate it once per query
 instead of per row — use that form in new policies.
 

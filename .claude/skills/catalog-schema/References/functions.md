@@ -110,7 +110,7 @@ which is invoker but only reachable from inside `publish_release`.
 - Returns plain `releases` rows so the caller chains the same embedded select, order and `range` as
   `getFeed`. PostgREST orders an RPC result only by columns in the select projection, so the select
   must include `pinned, sort_at` (as `RELEASE_SELECT` does).
-- Not wired to UI yet.
+- Caller: `getFeed` in `src/lib/supabase/feed.ts` (the `/feed` search box), via the shared order helper.
 
 ## Triggers `releases_default_sort_at()` and `keep_created_at()`
 

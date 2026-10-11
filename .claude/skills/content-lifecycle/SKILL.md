@@ -63,6 +63,7 @@ reversible auth ban, `admin_list_users.banned_until`, not a delete), [[timeline-
 ## Known deferrals (as of 2026-10-10)
 
 - **Admin UI** for pin/reorder/archive/restore/edit/replace/add-remove track is built
-  (`src/lib/admin/release-actions.ts`, `/admin/releases`; [[admin-upload]]). Artist admin is a
-  later branch. `search_feed` still has no admin caller.
+  (`src/lib/admin/release-actions.ts`, `/admin/releases`; [[admin-upload]]); artist admin is
+  `/admin/artists`. `search_feed` is called by `getFeed` when `q` is set (`/feed?q=`); the
+  admin pages don't call it.
 - **The cleanup job itself** is not built; nothing deletes from R2.

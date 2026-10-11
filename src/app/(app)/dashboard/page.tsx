@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { Card, Container, Heading, Mono, Stack, Text } from "@/components";
 import { Center } from "./dashboard.styles";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   // Defense in depth: middleware already gates this route, but never render

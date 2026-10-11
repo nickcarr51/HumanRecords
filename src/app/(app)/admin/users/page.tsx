@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Alert } from '@/components/Alert';
 import { Heading } from '@/components/Heading';
 import { NewUserForm, UsersTable } from '@/components/AdminUsers';
@@ -7,6 +8,8 @@ import { requireLabelMember } from '@/lib/auth/role';
 import { getSessionUser } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { Back, Page } from '../admin.styles';
+
+export const metadata: Metadata = { title: 'Admin · Users' };
 
 export default async function AdminUsersPage() {
   // Layouts don't re-run on client navigation; the page must gate itself.
