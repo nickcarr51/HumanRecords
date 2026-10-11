@@ -21,8 +21,10 @@ const Bar = styled.div`
 
   /* On phones, drop the scrubber onto its own full-width row below meta+controls. */
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: ${({ theme }) => theme.space.sm};
+    padding: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md};
+    padding-bottom: max(${({ theme }) => theme.space.sm}, env(safe-area-inset-bottom));
   }
 `;
 
@@ -57,6 +59,7 @@ const Controls = styled.div`
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
     grid-column: 1 / -1;
     justify-content: space-between;
+    flex-wrap: wrap;
   }
 `;
 
@@ -90,6 +93,7 @@ const Scrubber = styled.div`
 const Range = styled.input`
   width: 100%;
   max-width: 260px;
+  min-width: 0;
   accent-color: ${({ theme }) => theme.colors.accent};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {

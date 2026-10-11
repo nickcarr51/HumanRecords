@@ -3,6 +3,7 @@ import { Container } from "@/components/Container";
 import { InviteWelcome, LoginForm } from "@/components/Login";
 import { getInviteGreeting } from "@/lib/auth/invite";
 import { Screen } from "../screen.styles";
+import { SignInGlitch } from '@/components/Login/SignInGlitch';
 
 // Invite tokens travel in this page's URL; never leak it via Referer.
 export const metadata: Metadata = { referrer: "no-referrer" };
@@ -30,11 +31,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <Screen>
       <Container $max="420px">
+        <SignInGlitch>
         {greeting && invite ? (
           <InviteWelcome token={invite} name={greeting.name} email={email} next={next} />
         ) : (
           <LoginForm initialEmail={email} next={next} linkFailed={param(params, "error") === "auth"} />
         )}
+        </SignInGlitch>
       </Container>
     </Screen>
   );

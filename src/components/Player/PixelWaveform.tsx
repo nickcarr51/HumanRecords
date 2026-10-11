@@ -13,7 +13,8 @@ const Signal = styled.div`
   font-size: ${({ theme }) => theme.fontSizes.xs};
   canvas { width: 96px; height: 24px; }
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    canvas { width: 72px; }
+    gap: ${({ theme }) => theme.space.xs};
+    canvas { width: 36px; }
   }
 `;
 

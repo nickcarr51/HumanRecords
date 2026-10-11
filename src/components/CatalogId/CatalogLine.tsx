@@ -18,6 +18,11 @@ const Line = styled.div`
     border-left: 1px solid ${({ theme }) => theme.colors.border};
     padding-left: ${({ theme }) => theme.space.sm};
   }
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    > * + * {
+      display: none;
+    }
+  }
 `;
 
 export function CatalogLine({ kind, number, issuedAt, slot, total }: {

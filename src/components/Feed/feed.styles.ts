@@ -6,11 +6,20 @@ import { iconSweepStyles } from '@/components/field/hoverStyles';
 
 export const Row = styled.div`
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: ${({ theme }) => theme.space.md};
   padding: ${({ theme }) => theme.space.md} 0;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md};
+    > :last-child {
+      grid-column: 2;
+      justify-self: end;
+    }
+  }
 `;
 
 const circularControlStyles = css`
@@ -67,10 +76,15 @@ export const Meta = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.xs};
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 `;
 
 export const ExpandArea = styled.div`
   padding: 0 0 ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.xl};
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    padding-left: 0;
+  }
 `;
 
 export const Empty = styled.p`

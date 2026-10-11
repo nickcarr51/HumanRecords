@@ -42,6 +42,11 @@ const Brand = styled(Link)`
   gap: ${({ theme }) => theme.space.sm};
   text-decoration: none;
   border: 0;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${({ theme }) => theme.space.xs};
+  }
 `;
 
 const BrandName = styled.span`

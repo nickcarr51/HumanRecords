@@ -1,11 +1,19 @@
 # R2 CORS rules
 
-The applied CORS policy for each bucket, kept here as the record. Paste a file's
-contents into Cloudflare → R2 → <bucket> → Settings → CORS Policy, then commit.
+The desired CORS policy for each bucket. Paste a file's contents into
+Cloudflare → R2 → <bucket> → Settings → CORS Policy.
 
-Only browser **uploads** (presigned PUT from `/admin/upload`) need CORS. Streaming
-(`<audio>`), downloads (navigation), and artwork (`<img>`) don't. Each bucket allows
-uploads only from its own environment's site.
+Each bucket allows `GET`, `HEAD`, and presigned `PUT` uploads from its own
+environment's site. `GET` and `HEAD` support cross-origin image fetches and
+metadata requests; ordinary artwork display with `<img>` does not require CORS.
+
+Store a full, accessible HTTPS image URL in `albums.album_art_url`. CORS does not
+make private R2 objects public: use a public artwork URL or a valid presigned GET
+URL (which expires). External image hosts control their own CORS policies.
+The app uses native images, so no Next.js `remotePatterns` configuration is needed.
+
+The files now include `GET` and `HEAD`; these additions still need to be applied
+in Cloudflare. The dates below record the previous upload-only policies.
 
 | File | Bucket | Status |
 |---|---|---|

@@ -13,6 +13,9 @@ export const Page = styled.div`
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    padding: ${({ theme }) => theme.space.md};
+  }
 `;
 
 export const Header = styled.div`

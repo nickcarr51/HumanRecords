@@ -4,6 +4,7 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import { flushSync } from 'react-dom';
 import { createGlobalStyle, ThemeProvider } from 'styled-components';
 import { theme, amberTheme } from './theme';
+import { usePathname } from 'next/navigation';
 
 const STORAGE_KEY = 'humanrecords-amber-mode';
 const CHANGE_EVENT = 'humanrecords-theme-change';
@@ -76,7 +77,10 @@ const GlobalTheme = createGlobalStyle`
 `;
 
 export function ThemeModeProvider({ children }: { children: ReactNode }) {
-  const dark = useSyncExternalStore(subscribe, snapshot, () => false);
+  const pathname = usePathname();
+  const savedDark = useSyncExternalStore(subscribe, snapshot, () => false);
+  const entrance = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login/');
+  const dark = Boolean(entrance) || savedDark;
   function toggle() {
     const nextDark = !dark;
     const update = () => {

@@ -3,8 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useTheme } from 'styled-components';
 import { ThemeModeProvider, useThemeMode } from './ThemeModeProvider';
 
+const route = vi.hoisted(() => ({ pathname: '/feed' }));
+vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
+
 const originalTransition = document.startViewTransition;
 afterEach(() => {
+  route.pathname = '/feed';
   localStorage.clear();
   if (originalTransition) document.startViewTransition = originalTransition;
   else Reflect.deleteProperty(document, 'startViewTransition');
@@ -18,6 +22,16 @@ function Toggle() {
 }
 
 describe('ThemeModeProvider', () => {
+  it.each(['/', '/login', '/login/error'])('renders %s in amber even with a saved day preference', (pathname) => {
+    route.pathname = pathname;
+    localStorage.setItem('humanrecords-amber-mode', 'false');
+    const view = render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
+    expect(screen.getByRole('button', { name: 'dark' })).toBeInTheDocument();
+    expect(localStorage.getItem('humanrecords-amber-mode')).toBe('false');
+    route.pathname = '/feed';
+    view.rerender(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
+    expect(screen.getByRole('button', { name: 'light' })).toBeInTheDocument();
+  });
   it('switches the theme and persists the choice, then restores gray mode', () => {
     render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'light' }));
