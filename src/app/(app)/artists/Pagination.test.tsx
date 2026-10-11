@@ -24,3 +24,11 @@ describe("Pagination", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("basePath", () => {
+  it("builds links under another route", () => {
+    expect(pageHref("x", 2, "/admin/artists")).toBe("/admin/artists?q=x&page=2");
+    renderWithTheme(<Pagination query="" page={1} totalPages={2} basePath="/admin/artists" />);
+    expect(screen.getByRole("link", { name: /next/i })).toHaveAttribute("href", "/admin/artists?page=2");
+  });
+});

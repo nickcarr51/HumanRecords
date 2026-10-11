@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import styled from 'styled-components';
+import { buttonStyles } from '@/components/Button';
 
 // Fills AppShell's Main and owns its own scroll (see feed-page.styles.ts).
 export const Page = styled.div`
@@ -58,4 +59,19 @@ export const ActionCard = styled(Link)`
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+`;
+
+// A Link that looks like a Button (same tokens as Button/FileInput).
+export const ButtonLink = styled(Link)<{ $variant: 'primary' | 'secondary' | 'ghost'; $size: 'sm' | 'md' | 'lg' }>`
+  ${buttonStyles}
+  text-decoration: none;
+  align-self: flex-start;
+`;
+
+export const PageHead = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.md};
 `;

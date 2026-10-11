@@ -10,15 +10,17 @@ vi.mock("@/lib/admin/users-actions", () => ({
   createUser: vi.fn(),
   issueInvite: (...a: unknown[]) => issueInvite(...a),
   setUserRole: (...a: unknown[]) => setUserRole(...a),
+  updateUserProfile: vi.fn(),
+  setUserActive: vi.fn(),
 }));
 
 import { UsersTable } from "./UsersTable";
 
 const URL_ = "http://127.0.0.1:3000/login?email=new%40x.co&invite=tok";
 const users: AdminUserRow[] = [
-  { id: "me", email: "me@x.co", name: "Me", role: "label_member", createdAt: "2026-10-01T00:00:00Z", invite: { status: "none" } },
-  { id: "new", email: "new@x.co", name: "New Person", role: "listener", createdAt: "2026-10-02T00:00:00Z", invite: { status: "unused", url: URL_ } },
-  { id: "old", email: "old@x.co", name: null, role: "artist", createdAt: "2026-09-01T00:00:00Z", invite: { status: "used", usedAt: "2026-10-02T15:00:00Z" } },
+  { id: "me", email: "me@x.co", name: "Me", role: "label_member", createdAt: "2026-10-01T00:00:00Z", deactivated: false, invite: { status: "none" } },
+  { id: "new", email: "new@x.co", name: "New Person", role: "listener", createdAt: "2026-10-02T00:00:00Z", deactivated: false, invite: { status: "unused", url: URL_ } },
+  { id: "old", email: "old@x.co", name: null, role: "artist", createdAt: "2026-09-01T00:00:00Z", deactivated: false, invite: { status: "used", usedAt: "2026-10-02T15:00:00Z" } },
 ];
 
 function row(email: string) {
@@ -122,5 +124,21 @@ describe("UsersTable", () => {
     expect(await within(row("new@x.co")).findByRole("alert")).toHaveTextContent(/something went wrong/i);
     expect(select).toHaveValue("listener");
     expect(select).toBeEnabled();
+  });
+  it("links each row to the user's edit page", () => {
+    renderWithTheme(<UsersTable users={users} selfId="me" />);
+    const edit = within(row("new@x.co")).getByRole("link", { name: "Edit" });
+    expect(edit).toHaveAttribute("href", "/admin/users/new");
+    expect(edit.getAttribute("class")).toBeTruthy();
+  });
+
+  it("tags deactivated users and locks their role and invite controls", () => {
+    const gone = { ...users[1], deactivated: true };
+    renderWithTheme(<UsersTable users={[users[0], gone]} selfId="me" />);
+    const r = within(row("new@x.co"));
+    expect(r.getByText("Deactivated")).toBeInTheDocument();
+    expect(r.getByRole("combobox")).toBeDisabled();
+    expect(r.getByRole("button", { name: "Copy" })).toBeDisabled();
+    expect(r.getByRole("button", { name: "Regenerate" })).toBeDisabled();
   });
 });

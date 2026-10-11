@@ -31,8 +31,9 @@ pager pinned to the bottom.
 
 ## `Pagination` (client)
 
-- `pageHref(query, page)` — exported pure helper: `/artists`, `/artists?q=x`,
-  `/artists?q=x&page=3` (never `page=1`).
+- `pageHref(query, page, basePath = '/artists')` — exported pure helper: `/artists`, `/artists?q=x`,
+  `/artists?q=x&page=3` (never `page=1`). `<Pagination basePath="/admin/artists" />` builds
+  links under another route (used by `/admin/artists`).
 - Renders `null` when `totalPages <= 1`; otherwise `‹ prev` · `page N of M` · `next ›`, using
   `next/link` styled locally. Empty `<span />`s keep the three-column layout when prev/next
   are absent.

@@ -16,7 +16,7 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-export function InviteCell({ user }: { user: AdminUserRow }) {
+export function InviteCell({ user, disabled = false }: { user: AdminUserRow; disabled?: boolean }) {
   const [pending, setPending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,15 +53,16 @@ export function InviteCell({ user }: { user: AdminUserRow }) {
           <Status>Not used yet</Status>
           <UrlText title={invite.url}>{invite.url}</UrlText>
           <Actions>
-            <Button type="button" variant="secondary" size="sm" onClick={() => copy(invite.url)}>
+            <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={() => copy(invite.url)}>
               {copied ? 'Copied ✓' : 'Copy'}
             </Button>
-            <Link href={mailtoHref(user.email, invite.url)}>Email</Link>
+            {disabled ? null : <Link href={mailtoHref(user.email, invite.url)}>Email</Link>}
             <Button
               type="button"
               variant="ghost"
               size="sm"
               loading={pending}
+              disabled={disabled}
               onClick={() => issue(REGENERATE_CONFIRM)}
             >
               Regenerate
@@ -72,7 +73,7 @@ export function InviteCell({ user }: { user: AdminUserRow }) {
         <>
           <Status>Used {formatDate(invite.usedAt)}</Status>
           <Actions>
-            <Button type="button" variant="secondary" size="sm" loading={pending} onClick={() => issue()}>
+            <Button type="button" variant="secondary" size="sm" loading={pending} disabled={disabled} onClick={() => issue()}>
               New link
             </Button>
           </Actions>
@@ -81,7 +82,7 @@ export function InviteCell({ user }: { user: AdminUserRow }) {
         <>
           <Status>No link</Status>
           <Actions>
-            <Button type="button" variant="secondary" size="sm" loading={pending} onClick={() => issue()}>
+            <Button type="button" variant="secondary" size="sm" loading={pending} disabled={disabled} onClick={() => issue()}>
               Create link
             </Button>
           </Actions>

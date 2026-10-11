@@ -5,7 +5,9 @@ import type { AdminUserRow, InviteState } from "./users-types";
 
 export type AdminListRow = Database["public"]["Functions"]["admin_list_users"]["Returns"][number];
 
-export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined): AdminUserRow {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined, now: Date = new Date()): AdminUserRow {
   let invite: InviteState = { status: "none" };
   if (row.invite_used_at) {
     invite = { status: "used", usedAt: row.invite_used_at };
@@ -18,6 +20,8 @@ export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined): 
     name: row.name ?? null,
     role: row.role,
     createdAt: row.created_at,
+    // Deactivated = Supabase auth ban that hasn't expired yet.
+    deactivated: row.banned_until !== null && new Date(row.banned_until) > now,
     invite,
   };
 }
@@ -31,4 +35,16 @@ export async function listAdminUsers(
   const { data, error } = await db.rpc("admin_list_users");
   if (error) throw error;
   return (data ?? []).map((r) => toAdminUserRow(r, siteUrl));
+}
+
+// One user for /admin/users/[id]. Reuses admin_list_users (the role check
+// lives in Postgres); the list is small, so filtering in TS is fine.
+export async function getAdminUser(
+  db: SupabaseClient<Database>,
+  siteUrl: string | undefined,
+  id: string,
+): Promise<AdminUserRow | null> {
+  if (!UUID_RE.test(id)) return null;
+  const users = await listAdminUsers(db, siteUrl);
+  return users.find((u) => u.id === id) ?? null;
 }
