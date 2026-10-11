@@ -26,6 +26,7 @@ making a route public — a separate privacy decision, not a metadata change.
 |---|---|
 | Static page title | `export const metadata: Metadata = { title: 'Admin · Releases' }` |
 | Admin pages | `Admin · <Section>` (`Admin`, `Admin · Users`, `Admin · Upload`) |
+| Current titles | `/feed` `Feed`, `/albums/[id]` album title, `/dashboard` `Dashboard`, admin as above |
 | Title from data | `generateMetadata` + one `cache()`-wrapped loader shared with the page (see `src/app/(app)/albums/[id]/page.tsx`); missing row → return `{}` (default title) |
 | `/login` (incl. invite links) | no title → `Human Services` |
 | Absolute OG image URL | `metadataBase` = `SITE_URL`; unset/invalid → silently omitted (build never crashes) |
