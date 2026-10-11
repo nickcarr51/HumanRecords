@@ -12,15 +12,15 @@ import { iconSweepStyles } from '@/components/field/hoverStyles';
 const Bar = styled.div`
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: ${({ theme }) => theme.space.md};
   padding: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.lg};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
 
-  /* On phones, drop the scrubber onto its own full-width row below meta+controls. */
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+  /* Stack metadata, waveform/transport, and seek on narrow screens. */
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     grid-template-columns: minmax(0, 1fr);
     row-gap: ${({ theme }) => theme.space.sm};
     padding: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md};
@@ -56,11 +56,19 @@ const Controls = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.space.sm};
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+  min-width: 0;
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     grid-column: 1 / -1;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    width: 100%;
   }
+`;
+
+const Transport = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm};
+  flex-shrink: 0;
+  margin-left: auto;
 `;
 
 const IconButton = styled.button`
@@ -71,6 +79,7 @@ const IconButton = styled.button`
   cursor: pointer;
   width: 2.25rem;
   height: 2.25rem;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -83,8 +92,9 @@ const Scrubber = styled.div`
   align-items: center;
   gap: ${({ theme }) => theme.space.sm};
   justify-content: flex-end;
+  min-width: 0;
 
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     grid-column: 1 / -1;
     justify-content: stretch;
   }
@@ -96,7 +106,7 @@ const Range = styled.input`
   min-width: 0;
   accent-color: ${({ theme }) => theme.colors.accent};
 
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     max-width: none;
     flex: 1;
   }
@@ -145,15 +155,17 @@ export function PlayerBar() {
 
       <Controls>
         <PixelWaveform playing={isPlaying && status !== 'error'} status={status} />
-        <IconButton type="button" aria-label="Previous track" onClick={prev}>
-          <SweepIcon fill="currentColor"><path d="M17 5 6 12l11 7Z" /><path d="M5 5h2v14H5Z" /></SweepIcon>
-        </IconButton>
-        <PlaybackButton active={isPlaying && status !== "error"} type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={toggle}>
-          <PlaybackIcon playing={isPlaying} />
-        </PlaybackButton>
-        <IconButton type="button" aria-label="Next track" onClick={next}>
-          <SweepIcon fill="currentColor"><path d="m7 5 11 7-11 7Z" /><path d="M17 5h2v14h-2Z" /></SweepIcon>
-        </IconButton>
+        <Transport>
+          <IconButton type="button" aria-label="Previous track" onClick={prev}>
+            <SweepIcon fill="currentColor"><path d="M17 5 6 12l11 7Z" /><path d="M5 5h2v14H5Z" /></SweepIcon>
+          </IconButton>
+          <PlaybackButton active={isPlaying && status !== "error"} type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={toggle}>
+            <PlaybackIcon playing={isPlaying} />
+          </PlaybackButton>
+          <IconButton type="button" aria-label="Next track" onClick={next}>
+            <SweepIcon fill="currentColor"><path d="m7 5 11 7-11 7Z" /><path d="M17 5h2v14h-2Z" /></SweepIcon>
+          </IconButton>
+        </Transport>
       </Controls>
 
       <Scrubber>
