@@ -15,8 +15,23 @@ export const Row = styled.div`
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     gap: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md};
+    > :first-child {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: center;
+    }
+    /* Share rows with the metadata so the play control follows the title,
+       including titles that wrap onto multiple lines. */
+    > :nth-child(2) {
+      display: contents;
+      > * { grid-column: 2; }
+      > :first-child { grid-row: 1; }
+      > :nth-child(2) { grid-row: 2; align-self: center; }
+      > :nth-child(3) { grid-row: 3; }
+    }
     > :last-child {
       grid-column: 2;
+      grid-row: 4;
       justify-self: end;
     }
   }
@@ -81,9 +96,41 @@ export const Meta = styled.div`
 `;
 
 export const ExpandArea = styled.div`
-  padding: 0 0 ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.xl};
+  position: relative;
+  margin: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.xl};
+  padding: ${({ theme }) => theme.space.xs} ${({ theme }) => theme.space.md};
+  background: ${({ theme }) => theme.mode === 'light' ? '#dcdcdc' : theme.colors.raised};
+  box-shadow: ${({ theme }) => theme.mode === 'light'
+    ? '0 3px 10px rgba(17, 17, 17, 0.07)'
+    : '0 3px 10px rgba(0, 0, 0, 0.18)'};
+  border-left: 1px solid ${({ theme }) => theme.colors.border}18;
+  border-radius: 4px 0 0 4px;
+  &::before, &::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: ${({ theme }) => theme.colors.muted};
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  &::before {
+    top: 3px;
+    left: 3px;
+    opacity: 0.25;
+    box-shadow: 3px 0 currentColor, 0 3px currentColor;
+    color: ${({ theme }) => theme.colors.muted};
+  }
+  &::after {
+    bottom: 0;
+    right: 0;
+    box-shadow: -3px 0 currentColor, 0 -3px currentColor;
+    color: ${({ theme }) => theme.colors.muted};
+  }
+  ${Row}:last-child { border-bottom: 0; }
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    padding-left: 0;
+    margin-left: ${({ theme }) => theme.space.md};
+    padding-inline: ${({ theme }) => theme.space.sm};
   }
 `;
 

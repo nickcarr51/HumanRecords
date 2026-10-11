@@ -29,6 +29,15 @@ const GlobalTheme = createGlobalStyle`
     background: ${({ theme }) => theme.colors.bg};
     color: ${({ theme }) => theme.colors.text};
     color-scheme: ${({ theme }) => theme.mode};
+    accent-color: ${({ theme }) => theme.colors.accent};
+    -webkit-tap-highlight-color: ${({ theme }) => theme.colors.accent}26;
+  }
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accent};
+    outline-offset: 2px;
+  }
+  input, textarea {
+    caret-color: ${({ theme }) => theme.colors.accent};
   }
   body {
     text-shadow: ${({ theme }) => theme.mode === 'dark' ? `0 0 6px ${withAlpha(theme.colors.accent, 0.12)}` : 'none'};
