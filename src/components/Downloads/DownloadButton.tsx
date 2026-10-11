@@ -4,13 +4,13 @@ import { useRef, useState } from 'react';
 import { getTrackDownloadUrl } from '@/lib/storage/actions';
 import { PlayButton } from '@/components/Feed/feed.styles';
 import { Spinner } from '@/components/Spinner';
-import { useToast } from '@/components/Toast';
+import { useOptionalToast } from '@/components/Toast';
 import { useDownloads } from './DownloadsProvider';
 import { navigateTo } from './navigate';
 
 export function DownloadButton({ trackId, title }: { trackId: string; title: string }) {
   const { isDownloaded, markDownloaded } = useDownloads();
-  const { notify } = useToast();
+  const toast = useOptionalToast(); // null outside a provider: rows render anywhere
   const [signing, setSigning] = useState(false);
   const inFlight = useRef(false); // state updates are async; the ref blocks double taps
   const downloaded = isDownloaded(trackId);
@@ -26,7 +26,7 @@ export function DownloadButton({ trackId, title }: { trackId: string; title: str
       navigateTo(url);
     } catch (err) {
       console.error('Download failed', err);
-      notify(`Couldn't download "${title}" — try again.`, 'error');
+      toast?.notify(`Couldn't download "${title}" — try again.`, 'error');
     } finally {
       inFlight.current = false;
       setSigning(false);

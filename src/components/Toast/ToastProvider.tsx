@@ -25,6 +25,11 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
+// For components that may render outside a provider (tests, reuse): null if absent.
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 const slideIn = keyframes`
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
