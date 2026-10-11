@@ -49,6 +49,7 @@ function writeError(error: DbError, name: string): string {
     return "That user is already linked to another artist.";
   }
   if (error.code === "23505") return `An artist named "${name}" already exists.`;
+  if (error.code === "23503") return "That user no longer exists. Pick another.";
   if (error.code === "42501") return FORBIDDEN;
   console.error("Artist write failed", error);
   return "Couldn't save. Try again.";

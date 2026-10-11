@@ -90,6 +90,11 @@ describe("createArtist", () => {
     expect((await createArtist({ name: "New", bio: "", userId: U })).error).toBe("That user is already linked to another artist.");
   });
 
+  it("maps a linked user deleted meanwhile (FK violation)", async () => {
+    insertSingle.mockResolvedValue({ data: null, error: { code: "23503", message: "artists_user_id_fkey" } });
+    expect((await createArtist({ name: "X", bio: "", userId: U })).error).toBe("That user no longer exists. Pick another.");
+  });
+
   it("maps RLS refusal and unknown errors", async () => {
     insertSingle.mockResolvedValue({ data: null, error: { code: "42501", message: "row-level security" } });
     expect((await createArtist({ name: "X", bio: "", userId: null })).error).toBe("Only label members can do this.");
@@ -102,6 +107,11 @@ describe("createArtist", () => {
 describe("updateArtist", () => {
   it("rejects a malformed id", async () => {
     expect((await updateArtist("nope", { name: "X", bio: "", userId: null })).error).toBe("That artist no longer exists.");
+  });
+
+  it("maps a linked user deleted meanwhile (FK violation)", async () => {
+    updateSelect.mockResolvedValue({ data: null, error: { code: "23503", message: "artists_user_id_fkey" } });
+    expect((await updateArtist(A, { name: "X", bio: "", userId: U })).error).toBe("That user no longer exists. Pick another.");
   });
 
   it("updates, unlinks with null, and revalidates list, page and feed", async () => {
