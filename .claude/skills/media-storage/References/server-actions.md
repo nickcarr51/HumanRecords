@@ -13,14 +13,14 @@ Never throws to the client. Error strings are fixed and user-safe:
 | Error | When |
 |---|---|
 | `"Not authenticated."` | `getSessionUser()` returned null. Nothing is signed. |
-| `"Track not found."` | Supabase error or no row (bad id, or RLS hid it). |
+| `"Track not found."` | Supabase error, no row (bad id, or RLS hid it), **or the track is archived** (`archived_at` set; label members can read archived rows, so the action checks explicitly). |
 | `"Could not generate link."` | Signing threw (usually missing `R2_*` env). Real cause is `console.error`-ed server-side. |
 
 ## `getTrackStreamUrl(trackId)`
 
 1. `getSessionUser()` → bail if null.
-2. Server (cookie) client: `from('tracks').select('audio_url').eq('id', trackId).single()` —
-   the read goes through RLS as the user.
+2. Server (cookie) client: `from('tracks').select('audio_url, archived_at').eq('id', trackId).single()` —
+   the read goes through RLS as the user. Archived ⇒ "Track not found.", nothing signed.
 3. `signStreamUrl(data.audio_url)` inside `try/catch`.
 4. `{ url, error: null }`.
 
@@ -30,8 +30,8 @@ Caller: `PlayerProvider`'s load-and-play effect ([[timeline-player]]). It sets
 ## `getTrackDownloadUrl(trackId)`
 
 1. Session check; `userId = claims.sub`.
-2. Select `title, audio_url`.
-3. Filename = `${title}.${extension of audio_url}` (fallback `bin`).
+2. Select `title, audio_url, archived_at, track_artists ( position, artists ( name ) )`; archived ⇒ "Track not found.", nothing signed or recorded.
+3. `namesFrom(track_artists)` then `downloadFilename(names, title, extFromKey(audio_url))` → e.g. `A x B - Title.mp3` (rules in [signing.md](signing.md)).
 4. `signDownloadUrl(key, filename)` in `try/catch` — on failure return early, **without**
    recording.
 5. Record the download with the **service-role** client (no RLS insert policy on
@@ -46,9 +46,11 @@ Caller: `PlayerProvider`'s load-and-play effect ([[timeline-player]]). It sets
    a failed record doesn't block the download.
 6. `{ url, error: null }`.
 
-Not wired to UI yet. When adding a download button: call the action on click, then
-`window.location.href = url` (or an `<a download>` with the URL) — the URL expires in 5 minutes,
-so don't pre-fetch it at render time.
+Client side is `DownloadButton` (`src/components/Downloads/`): on click it calls the action, marks the
+track downloaded in `DownloadsProvider`, then `navigateTo(url)` (`navigate.ts`, a thin
+`window.location.assign`). The signed URL's `Content-Disposition: attachment` makes the browser save the
+file without leaving the page (the cross-origin `download` attribute is ignored). Errors show a toast. The URL
+expires in 5 minutes, so never pre-fetch it at render time.
 
 ## Adding a new signed-URL action
 

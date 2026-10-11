@@ -2,7 +2,9 @@
 
 import { getSessionUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { namesFrom, type ArtistNameRel } from "@/lib/supabase/artist-names";
 import { createServiceClient } from "@/lib/supabase/service";
+import { downloadFilename, extFromKey } from "./filename";
 import { signDownloadUrl, signStreamUrl } from "./sign";
 
 export type UrlResult = { url: string | null; error: string | null };
@@ -14,10 +16,10 @@ export async function getTrackStreamUrl(trackId: string): Promise<UrlResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tracks")
-    .select("audio_url")
+    .select("audio_url, archived_at")
     .eq("id", trackId)
     .single();
-  if (error || !data) return { url: null, error: "Track not found." };
+  if (error || !data || data.archived_at) return { url: null, error: "Track not found." };
 
   // Signing can throw on server misconfig (missing R2 env). Keep the
   // { url, error } contract instead of rejecting the action so the UI can
@@ -39,13 +41,15 @@ export async function getTrackDownloadUrl(trackId: string): Promise<UrlResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tracks")
-    .select("title, audio_url")
+    .select("title, audio_url, archived_at, track_artists ( position, artists ( name ) )")
     .eq("id", trackId)
     .single();
-  if (error || !data) return { url: null, error: "Track not found." };
+  if (error || !data || data.archived_at) return { url: null, error: "Track not found." };
 
-  const ext = data.audio_url.split(".").pop() ?? "bin";
-  const filename = `${data.title}.${ext}`;
+  // Saved as "A x B - Title.mp3" (credited order). Only the name changes;
+  // the R2 bytes (quality + ID3 tags) are served untouched.
+  const artistNames = namesFrom(data.track_artists as unknown as ArtistNameRel);
+  const filename = downloadFilename(artistNames, data.title, extFromKey(data.audio_url));
 
   // Signing can throw on server misconfig (missing R2 env). Keep the
   // { url, error } contract; log the real cause server-side. Recording

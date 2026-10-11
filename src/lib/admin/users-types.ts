@@ -22,6 +22,7 @@ export type AdminUserRow = {
   name: string | null;
   role: UserRole;
   createdAt: string;
+  deactivated: boolean;
   invite: InviteState;
 };
 

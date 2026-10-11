@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`), `createUser`/`issueInvite`/`setUserRole` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, or a card points at the wrong domain.
+description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -23,6 +23,12 @@ on the cookie-bound client → `redirect('/feed')`. If any step after the claim 
 token is **restored**. A used, unknown, or regenerated token is ignored silently: the normal
 form appears with the email pre-filled.
 
+**Link previews:** invite links (`/login?email=&invite=`) render the root OG/Twitter tags (title `Human Services`,
+`/og.png`). `metadataBase` comes from `SITE_URL` (`src/app/layout.tsx`), so a wrong `SITE_URL` breaks
+link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/login?invite=x' | grep og:`. Full rules: [[head-tags]].
+
+**Page titles:** admin pages use `Admin · <Section>` via `export const metadata = { title }` (e.g. `Admin · Users`).
+
 ## Pieces
 
 | Concern | Where |
@@ -32,7 +38,7 @@ form appears with the email pre-filled.
 | Token generator, `INVITE_TOKEN_RE` (`server-only`) | `src/lib/invites/token.ts` |
 | Link builder (`siteUrl` is a required argument) | `src/lib/invites/url.ts` (`inviteUrl`) |
 | Store: `upsertInvite`, `findUnusedInvite`, `claimInvite`, `restoreInvite` | `src/lib/invites/store.ts` |
-| Admin actions: `createUser`, `issueInvite`, `setUserRole` | `src/lib/admin/users-actions.ts` |
+| Admin actions: `createUser`, `issueInvite`, `setUserRole`, `updateUserProfile`, `setUserActive` | `src/lib/admin/users-actions.ts` |
 | List + row mapping (`inviteUrl` for unused rows) | `src/lib/admin/users.ts`, types in `users-types.ts` |
 | Welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Redeem (claim → sign-in → restore on failure) | `src/lib/auth/actions.ts` (`redeemInvite`) |
@@ -40,10 +46,57 @@ form appears with the email pre-filled.
 | Login UI | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
 | Users page | `src/app/(app)/admin/users/page.tsx` |
 | Users UI | `src/components/AdminUsers/{NewUserForm,UsersTable,RoleSelect,InviteCell,mailto}.*`, `users.styles.ts` |
+| User edit page (name/email form + deactivate toggle) | `src/app/(app)/admin/users/[id]/page.tsx`, `src/components/AdminUsers/{UserForm,ActiveToggle}.tsx` |
 | Env | `SITE_URL` in `.env.example` / `.env.local` (`http://127.0.0.1:3000`) |
 
 The server pages `/login` and `/admin/users` import components per folder
 (`@/components/Login`, `@/components/AdminUsers`), not from the `@/components` barrel.
+
+## Edit and deactivate (`/admin/users/[id]`)
+
+- **`updateUserProfile`** — email changes go through `auth.admin.updateUserById` with
+  `email_confirm: true` (no confirmation mail); the name is written to both `public.users.name`
+  and `user_metadata.name`. If the name write fails after the auth update, the message says the
+  email saved but the name didn't.
+- **`setUserActive(userId, active)`** — deactivate = Supabase auth ban:
+  `updateUserById(id, { ban_duration: '876000h' })`; reactivate = `'none'`. Reversible, download
+  history kept. A label member cannot deactivate **or reactivate** themself ("You can't deactivate yourself." /
+  "You can't reactivate yourself.") — otherwise a banned label member could lift their own ban.
+- **Caller check.** Every action starts with `labelMemberId()`, which is `activeLabelMemberId()` in
+  `src/lib/admin/caller.ts`: role must be `label_member` AND `supabase.auth.getUser()` must succeed
+  (it asks the auth server, which rejects banned users with `user_banned`; `getClaims()` would not).
+  So a deactivated label member is refused immediately in the app. Accepted gap: direct API calls
+  with the old access token can still pass `current_user_role()`-based RLS for up to 1h (the
+  function ignores bans); a future migration can make `current_user_role()` ban-aware.
+- **Email-change hint** (`UserForm`): "Sign-in codes will go to the new address. Invite links or
+  cards made before this change still show the old email."
+- **`AdminUserRow.deactivated`** is derived from `banned_until` in the list mapper. The table
+  shows a status and disables the invite controls (role select, link buttons) for deactivated
+  rows, so to issue a link for a deactivated user: reactivate, New link, deactivate.
+
+### Deactivation behaviour (verified locally 2026-10-10, GoTrue on local Supabase)
+
+Verified against the local stack with a script that reproduces the app's calls (no browser).
+Local JWTs are signed ES256 (asymmetric), so `getClaims()` verifies locally with no server
+call; `jwt_expiry = 3600`.
+
+1. **OTP refused, with a specific message.** `signInWithOtp({ shouldCreateUser: false })` for a
+   banned email still *succeeds* (no error, code mail goes out). `verifyOtp` (and the
+   generateLink + verifyOtp path) fails with 403 `user_banned` / "User is banned". `submitOtp`
+   now checks for the ban first (`user_banned` / `/banned/i`) and shows "This account has been
+   deactivated. Contact Human Records if you think this is a mistake." (no redirect).
+2. **Existing session is not kicked immediately (decided limitation).** After banning: `refreshSession()` fails
+   (400 `user_banned`, "Invalid Refresh Token: User Banned") and `getUser()` fails (403
+   `user_banned`), but `getClaims()` still returns valid claims until the access token
+   expires. The middleware and `getSessionUser` use `getClaims()`, so a banned user with an
+   open session keeps access for up to the remaining access-token life (up to 1 hour, the
+   `jwt_expiry`), then the refresh fails and they are signed out. No instant kick exists.
+3. **Invite link for a deactivated user.** `redeemInvite` claims the token,
+   `generateLink` still succeeds, `verifyOtp` fails with `user_banned`; the catch restores the
+   token and returns the deactivated message (same copy as check 1). The token is not burned,
+   so it works again after reactivation.
+
+Decided (owner, 2026-10-10): no instant kick on deactivate (admin server actions are the exception: they verify with `getUser()`, see Caller check). A banned user keeps access until the access token expires (≤1h), then the refresh fails and they are signed out. This is a documented limitation.
 
 ## References
 
@@ -66,10 +119,10 @@ The server pages `/login` and `/admin/users` import components per folder
 
 - **Invite email is still a `mailto:` link** with placeholder copy. (Hosted OTP/magic-link
   emails go through Resend SMTP: 30/hour cap, 60s per-email frequency; sender
-  `onboarding@resend.dev` delivers only to the Resend account owner until the domain is
-  verified — see [[release-ops]].)
+  `noreply@humanrecords.co` — see [[release-ops]].)
 - **No token expiry, Revoke, CSV export, search, or pagination** (under ~50 invitees).
-- **Per-environment `SITE_URL`** must be set in each Vercel environment and changed at domain
+- **Per-environment `SITE_URL`** must be set in each Vercel environment (prod:
+  `https://services.humanrecords.co`; develop: `https://humanservices-dev.vercel.app`); see the domain
   cut-over ([[release-ops]] `References/domain-cutover.md`). Hosted develop test accounts come
   from `scripts/invite-users.mts` + gitignored `scripts/users.local.json`. NFC: write the
   final-domain invite URL, verify a tap, then lock the tag.

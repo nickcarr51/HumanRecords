@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toAdminUserRow, type AdminListRow } from "./users";
+import { getAdminUser, toAdminUserRow, type AdminListRow } from "./users";
 
 const base = {
   id: "u1",
@@ -9,6 +9,7 @@ const base = {
   created_at: "2026-10-02T00:00:00Z",
   invite_token: null,
   invite_used_at: null,
+  banned_until: null,
 } as unknown as AdminListRow;
 const SITE = "http://127.0.0.1:3000";
 
@@ -42,5 +43,32 @@ describe("toAdminUserRow", () => {
 
   it("throws when a token exists but SITE_URL is missing", () => {
     expect(() => toAdminUserRow({ ...base, invite_token: "tok" }, undefined)).toThrow(/SITE_URL/);
+  });
+});
+
+describe("toAdminUserRow deactivated", () => {
+  const now = new Date("2026-10-10T12:00:00Z");
+  it("no ban → active", () => {
+    expect(toAdminUserRow(base, SITE, now).deactivated).toBe(false);
+  });
+  it("ban in the future → deactivated", () => {
+    expect(toAdminUserRow({ ...base, banned_until: "2126-01-01T00:00:00Z" }, SITE, now).deactivated).toBe(true);
+  });
+  it("ban already expired → active", () => {
+    expect(toAdminUserRow({ ...base, banned_until: "2026-10-09T00:00:00Z" }, SITE, now).deactivated).toBe(false);
+  });
+});
+
+describe("getAdminUser", () => {
+  const ID = "11111111-1111-4111-8111-111111111111";
+  const db = (rows: unknown[]) =>
+    ({ rpc: async () => ({ data: rows, error: null }) }) as unknown as Parameters<typeof getAdminUser>[0];
+  it("returns the matching row", async () => {
+    const row = await getAdminUser(db([{ ...base, id: ID }]), SITE, ID);
+    expect(row?.id).toBe(ID);
+  });
+  it("returns null for an unknown or malformed id", async () => {
+    expect(await getAdminUser(db([{ ...base, id: ID }]), SITE, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await getAdminUser(db([]), SITE, "not-a-uuid")).toBeNull();
   });
 });

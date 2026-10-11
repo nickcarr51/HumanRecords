@@ -1,23 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentRole = vi.fn();
-const getSessionUser = vi.fn();
+const getUser = vi.fn();
 const createUserApi = vi.fn();
 const rpc = vi.fn();
 const upsertInvite = vi.fn();
 const revalidatePath = vi.fn();
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
-vi.mock("@/lib/auth/session", () => ({ getSessionUser: () => getSessionUser() }));
+const getUserById = vi.fn();
+const updateUserById = vi.fn();
+const usersEq = vi.fn();
+const usersUpdate = vi.fn(() => ({ eq: usersEq }));
 vi.mock("@/lib/supabase/service", () => ({
-  createServiceClient: () => ({ auth: { admin: { createUser: createUserApi } } }),
+  createServiceClient: () => ({
+    auth: { admin: { createUser: createUserApi, getUserById, updateUserById } },
+    from: () => ({ update: usersUpdate }),
+  }),
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc }) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc, auth: { getUser: () => getUser() } }) }));
 vi.mock("@/lib/invites/store", () => ({ upsertInvite: (...a: unknown[]) => upsertInvite(...a) }));
 vi.mock("@/lib/invites/token", () => ({ generateInviteToken: () => "T".repeat(43) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
 
-import { createUser, issueInvite, setUserRole } from "./users-actions";
+import { createUser, issueInvite, setUserActive, setUserRole, updateUserProfile } from "./users-actions";
 
 const ME = "11111111-1111-1111-1111-111111111111";
 const OTHER = "22222222-2222-2222-2222-222222222222";
@@ -25,10 +31,28 @@ const OTHER = "22222222-2222-2222-2222-222222222222";
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
-  getSessionUser.mockResolvedValue({ sub: ME });
+  getUser.mockResolvedValue({ data: { user: { id: ME } }, error: null });
   createUserApi.mockResolvedValue({ data: { user: { id: OTHER } }, error: null });
   upsertInvite.mockResolvedValue(undefined);
   rpc.mockResolvedValue({ error: null });
+  getUserById.mockResolvedValue({ data: { user: { id: OTHER, email: "old@x.co" } }, error: null });
+  updateUserById.mockResolvedValue({ data: { user: {} }, error: null });
+  usersEq.mockResolvedValue({ error: null });
+});
+
+describe("banned caller", () => {
+  it("is refused by every action even though the stale token still has the label_member role", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: { code: "user_banned" } });
+    const forbidden = /label members/i;
+    expect((await createUser({ email: "a@b.co", name: "", role: "listener" })).error).toMatch(forbidden);
+    expect((await issueInvite(OTHER)).error).toMatch(forbidden);
+    expect((await setUserRole(OTHER, "artist")).error).toMatch(forbidden);
+    expect((await updateUserProfile(OTHER, { name: "A", email: "a@b.co" })).error).toMatch(forbidden);
+    expect((await setUserActive(OTHER, true)).error).toMatch(forbidden);
+    expect(createUserApi).not.toHaveBeenCalled();
+    expect(updateUserById).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("createUser", () => {
@@ -134,5 +158,99 @@ describe("setUserRole", () => {
     expect((await setUserRole(OTHER, "artist")).error).toBe("That user no longer exists.");
     rpc.mockResolvedValue({ error: { code: "42501", message: "x" } });
     expect((await setUserRole(OTHER, "artist")).error).toMatch(/label members/i);
+  });
+});
+
+describe("updateUserProfile", () => {
+  it("refuses non-label-members without touching Supabase", async () => {
+    getCurrentRole.mockResolvedValue("artist");
+    const res = await updateUserProfile(OTHER, { name: "A", email: "a@x.co" });
+    expect(res.error).toMatch(/label members/i);
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  it("rejects a bad email or id", async () => {
+    expect((await updateUserProfile(OTHER, { name: "", email: "nope" })).error).toMatch(/valid email/i);
+    expect((await updateUserProfile("x", { name: "", email: "a@x.co" })).error).toMatch(/unknown user/i);
+  });
+
+  it("changes email without a confirmation email and saves the name in both places", async () => {
+    const res = await updateUserProfile(OTHER, { name: "  New Name ", email: " New@X.co " });
+    expect(res.error).toBeNull();
+    expect(updateUserById).toHaveBeenCalledWith(OTHER, {
+      email: "new@x.co",
+      email_confirm: true,
+      user_metadata: { name: "New Name" },
+    });
+    expect(usersUpdate).toHaveBeenCalledWith({ name: "New Name" });
+    expect(usersEq).toHaveBeenCalledWith("id", OTHER);
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
+    expect(revalidatePath).toHaveBeenCalledWith(`/admin/users/${OTHER}`);
+  });
+
+  it("does not send the email when only the name (or email case) changed", async () => {
+    await updateUserProfile(OTHER, { name: "", email: "OLD@x.co" });
+    expect(updateUserById).toHaveBeenCalledWith(OTHER, { user_metadata: { name: null } });
+    expect(usersUpdate).toHaveBeenCalledWith({ name: null });
+  });
+
+  it("allows editing yourself", async () => {
+    getUserById.mockResolvedValue({ data: { user: { id: ME, email: "me@x.co" } }, error: null });
+    expect((await updateUserProfile(ME, { name: "Me", email: "me2@x.co" })).error).toBeNull();
+  });
+
+  it("maps a duplicate email", async () => {
+    updateUserById.mockResolvedValue({
+      data: { user: null },
+      error: { message: "A user with this email address has already been registered" },
+    });
+    expect((await updateUserProfile(OTHER, { name: "", email: "taken@x.co" })).error).toBe(
+      "That email already has an account.",
+    );
+    expect(usersUpdate).not.toHaveBeenCalled();
+  });
+
+  it("reports a missing user", async () => {
+    getUserById.mockResolvedValue({ data: { user: null }, error: { message: "User not found" } });
+    expect((await updateUserProfile(OTHER, { name: "", email: "a@x.co" })).error).toBe(
+      "That user no longer exists.",
+    );
+  });
+
+  it("reports a partial failure when the name save fails after the auth save", async () => {
+    usersEq.mockResolvedValue({ error: { message: "boom" } });
+    expect((await updateUserProfile(OTHER, { name: "N", email: "new@x.co" })).error).toBe(
+      "Email saved, but the name didn't. Try again.",
+    );
+  });
+});
+
+describe("setUserActive", () => {
+  it("refuses non-label-members", async () => {
+    getCurrentRole.mockResolvedValue("listener");
+    expect((await setUserActive(OTHER, false)).error).toMatch(/label members/i);
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  it("blocks deactivating yourself", async () => {
+    expect((await setUserActive(ME, false)).error).toBe("You can't deactivate yourself.");
+    expect((await setUserActive(ME, true)).error).toBe("You can't reactivate yourself.");
+    expect(updateUserById).not.toHaveBeenCalled();
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  it("bans for 100 years to deactivate and lifts it to reactivate", async () => {
+    expect((await setUserActive(OTHER, false)).error).toBeNull();
+    expect(updateUserById).toHaveBeenCalledWith(OTHER, { ban_duration: "876000h" });
+    expect((await setUserActive(OTHER, true)).error).toBeNull();
+    expect(updateUserById).toHaveBeenCalledWith(OTHER, { ban_duration: "none" });
+    expect(revalidatePath).toHaveBeenCalledWith(`/admin/users/${OTHER}`);
+  });
+
+  it("maps a missing user and generic failures", async () => {
+    updateUserById.mockResolvedValue({ data: { user: null }, error: { message: "User not found" } });
+    expect((await setUserActive(OTHER, false)).error).toBe("That user no longer exists.");
+    updateUserById.mockResolvedValue({ data: { user: null }, error: { message: "boom" } });
+    expect((await setUserActive(OTHER, false)).error).toBe("Couldn't save. Try again.");
   });
 });

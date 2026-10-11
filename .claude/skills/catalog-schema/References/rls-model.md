@@ -13,8 +13,18 @@
 
 | Table | Policy |
 |---|---|
-| `users`, `artists`, `albums`, `tracks`, `track_artists`, `album_artists`, `track_albums`, `releases` | `authenticated … for select using (true)` |
+| `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
+| `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
+| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; service role only |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
+
+Because label members can read archived rows, listener-facing code (`getFeed`, `getAlbum`, the stream/download actions, `search_feed`) also filters `archived_at` explicitly (`getAlbum` treats a missing release row as not found, since RLS hides archived releases from listeners; `getFeed` drops singles whose track is archived); RLS alone is not enough. See [[content-lifecycle]].
+
+**`downloads` stays owner-only.** `getMyDownloadedTrackIds` (`src/lib/supabase/downloads.ts`) reads it with
+the user client and no `user_id` filter, so the feed/album ✓ state relies on this policy. Adding a
+label-member select policy would make label members see everyone's downloads as their own ✓ — admin
+download stats (v1 pass 2) must use a `security definer` function (pattern: `admin_list_users`), or add
+`.eq("user_id", <caller>)` to that query first. Pinned by `downloads.data.test.ts`.
 
 `(select auth.uid())` (wrapped in a subselect) lets Postgres evaluate it once per query
 instead of per row — use that form in new policies.
@@ -35,7 +45,15 @@ RLS filters rows, not columns. To hide `users.role` from peers while keeping nam
 
 ## Writes
 
-No insert/update/delete policy exists on any table. Under RLS, a write that no policy allows
+The only write policies are on `artists`, for label members (`/admin/artists`):
+
+| Policy | Rule |
+|---|---|
+| `"label members insert artists"` | `with check (current_user_role() = 'label_member' and length(trim(name)) > 0)` |
+| `"label members update artists"` | `using (current_user_role() = 'label_member')`, `with check` adds `length(trim(name)) > 0` (blank name → `42501`) — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
+
+No delete policy: deletes go through `admin_delete_artist`. No other table has an insert/update/delete
+policy. Under RLS, a write that no policy allows
 is **silently a no-op** (zero rows, `error: null`) — tests assert the value is unchanged, not
 that the call errored (see `catalog.test.ts`).
 
@@ -46,6 +64,10 @@ Sanctioned write paths:
 | New `users` row | `handle_new_user` trigger (definer) on `auth.users` insert | Supabase Auth (invite-only) |
 | Increment `play_count` | `rpc('increment_play_count')` (definer) | `authenticated` only; `public`/`anon` revoked |
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
+| Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
+| Search the feed | `rpc('search_feed')` (**invoker**, so RLS applies) | `authenticated` only |
+| Create / edit an artist | cookie client `insert`/`update` on `artists` (RLS policies above) | `label_member`; insert by others → `42501`, update by others → 0 rows (no error). Duplicate name or `user_id` → `23505` (`artists_name_ci_key` / `artists_user_id_key`) |
+| Delete an artist | `rpc('admin_delete_artist')` (definer) | `label_member`, else `42501`; unknown id `P0002`; still credited → `23503` (FK restrict); queues `profile_photo_url` in `r2_cleanup_queue` |
 | List users / change a role | `rpc('admin_list_users')`, `rpc('admin_set_user_role')` (definer) | `label_member`, else `42501`; own id → `22023` |
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |

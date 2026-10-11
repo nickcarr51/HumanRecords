@@ -9,6 +9,16 @@ import { safeNextPath } from "./safe-next";
 
 type Result = { error: string | null };
 
+const DEACTIVATED =
+  "This account has been deactivated. Contact Human Records if you think this is a mistake.";
+
+// Supabase refuses sign-in for banned users with code "user_banned" (403).
+function isBanned(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const { code, message } = e as { code?: unknown; message?: unknown };
+  return code === "user_banned" || (typeof message === "string" && /banned/i.test(message));
+}
+
 export async function requestOtp(email: string): Promise<Result> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return { error: "Email is required." };
@@ -47,6 +57,7 @@ export async function submitOtp(
     type: "email",
   });
   if (error) {
+    if (isBanned(error)) return { error: DEACTIVATED };
     return {
       error: /expired|invalid|incorrect|token/i.test(error.message)
         ? "That code is invalid or expired — request a new one."
@@ -113,7 +124,7 @@ export async function redeemInvite(token: string): Promise<Result> {
     } catch (restoreErr) {
       console.error("restoreInvite failed", describe(restoreErr));
     }
-    return { error: INVITE_FAILED };
+    return { error: isBanned(err) ? DEACTIVATED : INVITE_FAILED };
   }
 
   // redirect() throws to navigate; keep it outside any try/catch.

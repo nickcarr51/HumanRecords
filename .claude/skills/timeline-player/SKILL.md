@@ -1,11 +1,11 @@
 ---
 name: timeline-player
-description: Use when working on the listener timeline (the `/feed` page), the persistent music player (PlayerProvider / usePlayer / PlayerBar), the album page (`/albums/[id]`), the feed/album data layer (getFeed / getAlbum), or the auth redirects that land signed-in users on `/feed`. Covers how playback persists across navigation, how the chronological feed is assembled, and how these routes are guarded.
+description: Use when working on the listener timeline (the `/feed` page), the persistent music player (PlayerProvider / usePlayer / PlayerBar), the album page (`/albums/[id]`), the feed/album data layer (getFeed / getAlbum), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`, the ↓/✓ downloaded state), or the auth redirects that land signed-in users on `/feed`. Covers how playback persists across navigation, how the feed (pinned first, then `sort_at` order, archived items hidden) is assembled, and how these routes are guarded.
 ---
 
 # Timeline + Persistent Player
 
-The listener MVP: a single chronological **timeline** at `/feed` (a mix of album and
+The listener MVP: a single **timeline** at `/feed` (pinned releases first, then newest `sort_at`) (a mix of album and
 single releases) and a **music player** that keeps playing while the user navigates the
 app — SoundCloud-style. Built on branch `feature/media-player-and-refactor` (2026-09-29).
 
@@ -24,11 +24,18 @@ never unmount. No global state library, no refresh-resume.
 |---|---|
 | Player state + `<audio>` + actions | `src/components/Player/PlayerProvider.tsx` |
 | Player control bar (UI) | `src/components/Player/PlayerBar.tsx` |
-| Feed data (releases, newest first) | `src/lib/supabase/feed.ts` (`getFeed`) |
+| Queue model (sources, paging, dedup) | `src/components/Player/queue.ts` |
+| Lock-screen controls | `src/components/Player/useMediaSession.ts` |
+| Next-page server actions | `src/lib/feed/actions.ts` (`loadFeedPage`, `continueAfterRelease`) |
+| Follow-the-music on /feed | `src/components/Feed/FollowPlayingPage.tsx` |
+| Feed search box + pager | `src/components/{SearchInput,Pagination}/` (shared with [[artists-read]]); `src/app/(app)/feed/{page.tsx,params.ts}` |
+| Feed data (pinned + `sort_at` order, archived hidden) | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Album detail data | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Shared artist-name flattener | `src/lib/supabase/artist-names.ts` |
 | Timeline page | `src/app/(app)/feed/page.tsx` |
 | Album page | `src/app/(app)/albums/[id]/page.tsx` |
+| Downloaded-state ids (user client) | `src/lib/supabase/downloads.ts` (`feedTrackIds`, `getMyDownloadedTrackIds`) |
+| Download button + provider | `src/components/Downloads/{DownloadsProvider,DownloadButton}.tsx` |
 | Feed rows | `src/components/Feed/{FeedList,SingleTrackRow,AlbumRow,AlbumTracks}.tsx` |
 | Player mount | `src/components/AppShell/AppShell.tsx` |
 | Auth redirects → `/feed` | `src/lib/auth/{route-guard,safe-next}.ts`, `src/app/not-found.tsx` |
@@ -37,10 +44,14 @@ never unmount. No global state library, no refresh-resume.
 ## References
 
 - [persistent-player.md](References/persistent-player.md) — the player context, its state
-  machine (load/play/pause/next/prev/seek), signed-URL playback, and error/autoplay handling.
-- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one query on
-  `releases`, newest first, SQL pagination) and `getAlbum` (tracks in `position` order);
-  position ordering and the "Various Artists" label.
+  machine (load/play/pause/next/prev/seek), signed-URL playback, error/autoplay handling, queue
+  sources and paging (a search queue that runs out continues into the main feed after its last
+  release; the view stays on the search), pre-signing, Media Session, and `FollowPlayingPage`.
+- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
+  or `search_feed` via `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
+  `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`, and `getAlbum` (tracks in `position`
+  order); position ordering and the "Various Artists" label.
+  Also how both pages seed downloaded state (`getMyDownloadedTrackIds` + `DownloadsProvider`).
 - [routing-and-auth.md](References/routing-and-auth.md) — the `(app)` route group, `/feed`
   as the authenticated home, `/albums/[id]`, the auth retarget, retired `/artists`, the
   global 404 bounce, and the error boundary.
@@ -54,17 +65,19 @@ never unmount. No global state library, no refresh-resume.
   action; the client only ever passes a `trackId`.
 - [[catalog-schema]] — `getFeed`/`getAlbum` read `releases`/`albums`/`tracks`/
   `track_albums`/`track_artists`/`album_artists` and rely on the "authenticated" RLS policies.
+- [[content-lifecycle]] — owns `archived_at`, `pinned`/`sort_at` and `move_release`, which decide what the feed shows and in what order.
 - [[admin-upload]] — owns the `releases` table, `position` columns, and the publish path
   that creates what the feed shows.
+- [[media-storage]] also serves downloads: rows render `DownloadButton`, which calls `getTrackDownloadUrl`.
 - [[component-library]] — all UI is styled-components using the theme tokens.
 - [[auth]] — the `(app)` layout session guard and the redirect model that lands users on `/feed`.
 
-## Known deferrals (as of 2026-10-02)
+## Known deferrals (as of 2026-10-10)
 
 - **Releases model** — shipped in `feature/admin-release-upload`: the feed reads a
   `releases` table and link rows carry `position`. See [[admin-upload]].
-- Feed search bar and Load-More/pagination UI are deferred (data layer supports paging).
-- Player icons/artwork are placeholder pending a design pass.
+- Feed rows show no artwork; lock screen uses the fixed logo.
+- Player icons are placeholder pending a design pass.
 
 A code guide (mount chain, player state machine, feed data, reading order) is in
 `Walkthrough/walkthrough.md` (gitignored).

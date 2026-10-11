@@ -183,26 +183,65 @@ export type Database = {
         }
         Relationships: []
       }
+      r2_cleanup_queue: {
+        Row: {
+          cleaned_at: string | null
+          id: string
+          object_key: string
+          queued_at: string
+          reason: string
+          source_id: string
+          source_table: string
+        }
+        Insert: {
+          cleaned_at?: string | null
+          id?: string
+          object_key: string
+          queued_at?: string
+          reason: string
+          source_id: string
+          source_table: string
+        }
+        Update: {
+          cleaned_at?: string | null
+          id?: string
+          object_key?: string
+          queued_at?: string
+          reason?: string
+          source_id?: string
+          source_table?: string
+        }
+        Relationships: []
+      }
       releases: {
         Row: {
           album_id: string | null
+          archived_at: string | null
           created_at: string
           id: string
           kind: Database["public"]["Enums"]["release_kind"]
+          pinned: boolean
+          sort_at: string
           track_id: string | null
         }
         Insert: {
           album_id?: string | null
+          archived_at?: string | null
           created_at?: string
           id?: string
           kind: Database["public"]["Enums"]["release_kind"]
+          pinned?: boolean
+          sort_at: string
           track_id?: string | null
         }
         Update: {
           album_id?: string | null
+          archived_at?: string | null
           created_at?: string
           id?: string
           kind?: Database["public"]["Enums"]["release_kind"]
+          pinned?: boolean
+          sort_at?: string
           track_id?: string | null
         }
         Relationships: [
@@ -290,6 +329,7 @@ export type Database = {
       }
       tracks: {
         Row: {
+          archived_at: string | null
           audio_url: string
           created_at: string
           id: string
@@ -298,6 +338,7 @@ export type Database = {
           track_art_url: string | null
         }
         Insert: {
+          archived_at?: string | null
           audio_url: string
           created_at?: string
           id?: string
@@ -306,6 +347,7 @@ export type Database = {
           track_art_url?: string | null
         }
         Update: {
+          archived_at?: string | null
           audio_url?: string
           created_at?: string
           id?: string
@@ -341,9 +383,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_album_track: {
+        Args: { p_release_id: string; payload: Json }
+        Returns: string
+      }
+      admin_delete_artist: { Args: { target: string }; Returns: undefined }
       admin_list_users: {
         Args: never
         Returns: {
+          banned_until: string
           created_at: string
           email: string
           id: string
@@ -360,13 +408,49 @@ export type Database = {
         }
         Returns: undefined
       }
+      archive_release: { Args: { p_release_id: string }; Returns: undefined }
+      archive_track: { Args: { p_track_id: string }; Returns: undefined }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       increment_play_count: { Args: { p_track_id: string }; Returns: undefined }
+      move_release: {
+        Args: { direction: string; target: string }
+        Returns: undefined
+      }
       publish_release: { Args: { payload: Json }; Returns: string }
+      release_for_track: { Args: { p_track_id: string }; Returns: string }
+      replace_track_audio: {
+        Args: { p_audio_key: string; p_track_id: string }
+        Returns: undefined
+      }
       resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
+      restore_release: { Args: { p_release_id: string }; Returns: undefined }
+      restore_track: { Args: { p_track_id: string }; Returns: undefined }
+      search_feed: {
+        Args: { q: string }
+        Returns: {
+          album_id: string | null
+          archived_at: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["release_kind"]
+          pinned: boolean
+          sort_at: string
+          track_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "releases"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      update_release: {
+        Args: { p_release_id: string; payload: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       release_kind: "single" | "album"

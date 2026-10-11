@@ -97,6 +97,37 @@ describe("getTrackDownloadUrl", () => {
     });
   });
 
+  it("names the file 'A x B - Title.ext' with artists in credited (position) order", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({
+      data: {
+        title: "Night Drive",
+        audio_url: "tracks/abc.mp3",
+        archived_at: null,
+        track_artists: [
+          { position: 2, artists: { name: "Juno" } },
+          { position: 1, artists: { name: "Nova" } },
+        ],
+      },
+      error: null,
+    });
+    signDownloadUrl.mockResolvedValue("https://signed.example/download");
+    await getTrackDownloadUrl("track-1");
+    expect(signDownloadUrl).toHaveBeenCalledWith("tracks/abc.mp3", "Nova x Juno - Night Drive.mp3");
+    expect(select).toHaveBeenCalledWith(expect.stringContaining("track_artists"));
+  });
+
+  it("uses .bin when the key has no extension", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({
+      data: { title: "Song", audio_url: "tracks/abc", archived_at: null, track_artists: [] },
+      error: null,
+    });
+    signDownloadUrl.mockResolvedValue("https://signed.example/download");
+    await getTrackDownloadUrl("track-1");
+    expect(signDownloadUrl).toHaveBeenCalledWith("tracks/abc", "Song.bin");
+  });
+
   it("does not sign or record when unauthenticated", async () => {
     getSessionUser.mockResolvedValue(null);
     const res = await getTrackDownloadUrl("track-1");
@@ -120,5 +151,24 @@ describe("getTrackDownloadUrl", () => {
     expect(upsert).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+});
+
+describe("archived tracks", () => {
+  it("refuses to stream an archived track", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: "tracks/a.mp3", archived_at: "2026-10-10T00:00:00Z" }, error: null });
+    const res = await getTrackStreamUrl("track-1");
+    expect(res).toEqual({ url: null, error: "Track not found." });
+    expect(signStreamUrl).not.toHaveBeenCalled();
+  });
+
+  it("refuses to download an archived track and records nothing", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { title: "T", audio_url: "tracks/a.mp3", archived_at: "2026-10-10T00:00:00Z" }, error: null });
+    const res = await getTrackDownloadUrl("track-1");
+    expect(res).toEqual({ url: null, error: "Track not found." });
+    expect(signDownloadUrl).not.toHaveBeenCalled();
+    expect(serviceFrom).not.toHaveBeenCalled();
   });
 });

@@ -20,8 +20,13 @@ export const Table = styled.table`
 
   td {
     vertical-align: top;
+    overflow-wrap: anywhere;
     padding: ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.sm};
     border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  }
+
+  tr[data-deactivated='true'] td {
+    opacity: 0.6;
   }
 
   /* Phones: each row becomes a stacked card. */
@@ -40,6 +45,11 @@ export const Table = styled.table`
     }
     td {
       border-bottom: 0;
+    }
+    td[data-label]::before {
+      content: attr(data-label) ': ';
+      color: ${({ theme }) => theme.colors.muted};
+      font-family: ${({ theme }) => theme.fonts.mono};
     }
   }
 `;

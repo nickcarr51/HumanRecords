@@ -16,8 +16,8 @@ Do these once, by hand, in the prod Supabase dashboard (no bootstrap workflow, D
    The role-sync trigger copies the role into `public.users.role`.
 3. Sign in on the prod site; everyone else is added at `/admin/users` (the `invites` skill).
 
-Until Resend's domain is verified, only the Resend account owner receives codes
-([environments.md](environments.md)).
+Codes come from `noreply@humanrecords.co` and reach any address (Resend domain verified
+2026-10-09; [environments.md](environments.md)).
 
 ## Develop
 

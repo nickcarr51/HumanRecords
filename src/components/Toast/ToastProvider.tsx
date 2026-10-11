@@ -25,6 +25,11 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
+// For components that may render outside a provider (tests, reuse): null if absent.
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 const slideIn = keyframes`
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -32,7 +37,9 @@ const slideIn = keyframes`
 
 const Region = styled.div`
   position: fixed;
-  bottom: ${({ theme }) => theme.space.lg};
+  /* --toast-offset lets a host (AppShell) lift toasts above bottom-docked UI
+     like the player bar. Defaults to 0 (style guide). */
+  bottom: calc(${({ theme }) => theme.space.lg} + var(--toast-offset, 0px));
   right: ${({ theme }) => theme.space.lg};
   display: flex;
   flex-direction: column;

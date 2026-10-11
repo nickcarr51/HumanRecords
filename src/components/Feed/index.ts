@@ -2,3 +2,4 @@ export * from './FeedList';
 export * from './SingleTrackRow';
 export * from './AlbumRow';
 export * from './AlbumTracks';
+export * from './FollowPlayingPage';

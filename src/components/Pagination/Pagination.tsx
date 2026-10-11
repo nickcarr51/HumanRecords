@@ -2,14 +2,7 @@
 
 import Link from 'next/link';
 import styled from 'styled-components';
-
-export function pageHref(query: string, page: number): string {
-  const params = new URLSearchParams();
-  if (query) params.set('q', query);
-  if (page > 1) params.set('page', String(page));
-  const qs = params.toString();
-  return qs ? `/artists?${qs}` : '/artists';
-}
+import { pageHref } from './pageHref';
 
 const Bar = styled.nav`
   display: flex;
@@ -32,10 +25,12 @@ const PageLink = styled(Link)`
 `;
 
 export function Pagination({
+  basePath,
   query,
   page,
   totalPages,
 }: {
+  basePath: string;
   query: string;
   page: number;
   totalPages: number;
@@ -43,12 +38,12 @@ export function Pagination({
   if (totalPages <= 1) return null;
   return (
     <Bar aria-label="Pagination">
-      {page > 1 ? <PageLink href={pageHref(query, page - 1)}>‹ prev</PageLink> : <span />}
+      {page > 1 ? <PageLink href={pageHref(basePath, query, page - 1)}>‹ prev</PageLink> : <span />}
       <span>
         page {page} of {totalPages}
       </span>
       {page < totalPages ? (
-        <PageLink href={pageHref(query, page + 1)}>next ›</PageLink>
+        <PageLink href={pageHref(basePath, query, page + 1)}>next ›</PageLink>
       ) : (
         <span />
       )}

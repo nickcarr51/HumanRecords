@@ -13,6 +13,7 @@ function state(overrides: Partial<ReturnType<typeof usePlayer>> = {}) {
     queue: [{ id: "t1", title: "One", artistName: "Alpha" }],
     currentIndex: 0,
     currentTrack: { id: "t1", title: "One", artistName: "Alpha" },
+    source: { kind: "none" as const },
     isPlaying: false,
     currentTime: 0,
     duration: 100,

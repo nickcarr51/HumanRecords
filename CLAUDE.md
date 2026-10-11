@@ -17,7 +17,7 @@ here so future work doesn't contradict it.
 
 ## Environments
 
-- `main` branch → Vercel Production (`https://humanservices.vercel.app`), "production" Supabase project
+- `main` branch → Vercel Production (`https://services.humanrecords.co`; `humanservices.vercel.app` also works), "production" Supabase project
 - `develop` branch → Vercel Preview/staging (`https://humanservices-dev.vercel.app`), "develop" Supabase project
 - Feature branches get no Vercel previews (`vercel.json` disables all git-triggered deploys)
 - Three R2 media buckets, one bucket-scoped token each: `humanrecords-media-local`
@@ -37,7 +37,9 @@ here so future work doesn't contradict it.
 - The user merges PRs manually on GitHub. Never merge your own PR.
 - CI exists (`.github/workflows/ci.yml`: `app`, `test`, `migrations`, `types`, and
   `main-source` for PRs into `main`); these are required checks on `develop` and `main`.
-  Copilot review is planned, not set up.
+- **Never use GitHub Copilot on this repo** (no `--add-reviewer @copilot`, no Copilot review
+  rulesets, no Copilot coding agent). The owner's only Copilot license is an employer seat; the
+  auto-review ruleset was deleted 2026-10-11. Code review here is done by Claude agents.
 - Deploys happen only through `.github/workflows/deploy.yml` on push to `develop`/`main`.
 - Migrations are add-only and must keep the currently deployed code working
   (expand/contract); see the `release-ops` skill.
