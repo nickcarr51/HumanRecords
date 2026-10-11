@@ -37,6 +37,16 @@ can't alter it. `region: "auto"` is R2's region.
 
 All GET signers share the private `signObjectUrl(key, { expiresIn, downloadFilename? })`.
 
+Signing says nothing about CORS. A stream URL is consumed by `<audio crossOrigin="anonymous">`,
+so the **bucket** must also answer with `Access-Control-Allow-Origin` for the site origin
+(`GET`/`HEAD` in `infra/r2/cors.<env>.json`) or the browser refuses the media; a download URL is
+consumed by navigation and an image URL by `<img>`, neither of which needs CORS. A correctly
+signed URL that plays in a new tab but errors in the player is a CORS problem, not a signing one
+— see [object-keys.md](object-keys.md#cors).
+
+`signImageUrl` is the intended way to render `*_art_url` keys (they are keys, not URLs); it has
+no caller yet because the album page hides artwork until image upload ships.
+
 ### Download filename (RFC 6266)
 
 `signDownloadUrl` adds `response-content-disposition` so R2 serves the file as an attachment:
@@ -69,6 +79,16 @@ and the downloaded MP3 was byte-identical to the upload (SHA-256), same bitrate/
 `aws: { signQuery: true, allHeaders: true }`. aws4fetch skips `Content-Type` by default;
 `allHeaders` includes it in the signature. Consequence: the browser **must** send exactly that
 Content-Type (`audio/mpeg`) or R2 returns 403 `SignatureDoesNotMatch`.
+
+### `SignatureDoesNotMatch` in general
+
+R2 recomputes the signature over the method, path, every query param present at signing time,
+and (for uploads) the signed headers. So a 403 `SignatureDoesNotMatch` means one of: the PUT sent
+a different `Content-Type` than was signed; a signed URL was edited after signing (adding or
+re-ordering a query param, re-encoding the key); the `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`
+pair belongs to a different bucket token than `R2_BUCKET_NAME`; or the server clock is far off.
+Re-mint the URL from the action; never patch one by hand. Browser CORS failures look different
+(no status reached the page, `MediaError`/preflight error in the console).
 
 ## `headObject(key)`
 

@@ -17,6 +17,11 @@ Vercel git auto-deploy is disabled for those two branches (`vercel.json`), so a 
 migration means no new code goes live. Claude never pushes migrations from a laptop and never
 touches hosted data without explicit permission in the moment (guard hook enforces a prompt).
 
+Deploy checklist addition: if a change alters what the browser requests from R2 (e.g.
+`crossOrigin` media, a new method or header), apply the CORS JSON to that env's bucket
+**before** the deploy — the owner pastes `infra/r2/cors.<env>.json` into Cloudflare and updates
+the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.md)).
+
 ## Pieces
 
 | Concern | Where |
@@ -34,7 +39,7 @@ touches hosted data without explicit permission in the moment (guard hook enforc
 | Develop-only account creation | `scripts/invite-users.mts` (+ gitignored `scripts/users.local.json`, template `users.example.json`) |
 | Hosted-data guard hook | `.claude/hooks/guard-db.sh` (wired in `.claude/settings.json`) |
 | Seed split | `supabase/seed.sql`, gitignored `supabase/seed.local.sql` ([[catalog-schema]]) |
-| R2 CORS per bucket | `infra/r2/cors.{local,dev,prod}.json` (files created during setup; not in the repo as of 2026-10-05) |
+| R2 CORS per bucket (`GET`/`HEAD`/`PUT`, applied to all three buckets 2026-10-11) | `infra/r2/cors.{local,dev,prod}.json`, status table in `infra/r2/README.md` |
 | Sentry (errors only) | `instrumentation-client.ts`, `src/instrumentation.ts`, `sentry.{server,edge}.config.ts`, `src/lib/observability/errors-only-integrations.ts`, `withSentryConfig` in `next.config.ts` |
 | Typecheck | `yarn typecheck` (CI runs it) |
 | Secrets: DB URLs + Vercel hooks | GitHub environment secrets (`develop`, `production-release`; prod DB URL also in `production-preflight`) |
@@ -66,5 +71,5 @@ touches hosted data without explicit permission in the moment (guard hook enforc
   (no dev subdomain, decided). Auth email sends from `noreply@humanrecords.co`.
 - No develop DB backups and no backup encryption (deliberate).
 - Release edit/delete is built (`/admin/releases`); "delete" is a soft-delete via archive (prod bucket is locked, nothing is removed from R2).
-- Copilot review not set up. `infra/r2/cors.*.json` are user-pasted into Cloudflare.
+- Copilot review is permanently off. `infra/r2/cors.*.json` are user-pasted into Cloudflare (all three buckets on `GET`/`HEAD`/`PUT` since 2026-10-11).
 - Never add a payment method to Sentry (free Developer plan only).

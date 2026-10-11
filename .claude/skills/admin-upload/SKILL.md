@@ -51,6 +51,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx`. Each exports `metadata = { title: 'Admin · <Section>' }` (tab `Admin · Upload · Human Services`); new admin pages follow [[head-tags]] |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
+| Copy: admin UI says "album" (`KindToggle`, `UploadForm`, release admin); listener copy says "Pack" (CLAUDE.md Vocabulary) | `src/components/Upload/KindToggle.tsx` vs `src/components/Feed/AlbumRow.tsx` |
 | Release admin actions (role check first, then RPCs; `setPinned` uses the service client): `setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio` | `src/lib/admin/release-actions.ts` |
 | Release admin reads | `src/lib/admin/releases.ts` (`getAdminReleases`, `getAdminRelease`) |
 | Release admin UI | `src/components/AdminReleases/*` (`ReleasesTable`, `ArchiveControl`, `ConfirmModal`, `useAdminAction`, `uploadOne`, `edit-reducer` incl. `draftKey`, `TrackEditor`, `ReplaceAudio`, `RemoveTrack`, `RemovedTracks`, `AddTrackForm`, `EditReleaseForm`) |

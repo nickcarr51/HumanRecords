@@ -47,7 +47,11 @@ pager pinned to the bottom.
 ## `ArtistCard` (`src/components/ArtistCard/ArtistCard.tsx`)
 
 `{ id, name, photoUrl, trackCount }` → a `next/link` row to `/artists/{id}`: photo or initials
-tile, name (accent on hover), "N track(s)". Re-exports `initials` from `@/lib/initials`.
+tile, name, "N track(s)". The photo renders through `GlitchArt`
+(`src/components/GlitchArt/GlitchArt.tsx`: a hover-only glitch canvas over an `<img>`, off under
+reduced motion) and the name uses the shared `textSweepStyles` / `textHoverState` hover
+(`src/components/field/hoverStyles.ts`; [[component-library]]). The route itself remains retired.
+Re-exports `initials` from `@/lib/initials`.
 
 ## `/artists/[id]` — `src/app/(app)/artists/[id]/page.tsx`
 

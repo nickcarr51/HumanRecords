@@ -1,33 +1,88 @@
 # Reference: The persistent player
 
-Files: `src/components/Player/PlayerProvider.tsx`, `src/components/Player/PlayerBar.tsx`,
+Files: `src/components/Player/PlayerProvider.tsx`, `src/components/Player/audioMeter.ts`,
+`src/components/Player/PlayerBar.tsx`, `src/components/Player/PixelWaveform.tsx`,
+`src/components/Player/PlaybackButton.tsx`, `src/components/Player/{PlaybackIcon,SweepIcon}.tsx`,
 `src/components/Player/queue.ts`, `src/components/Player/useMediaSession.ts`,
 `src/components/Player/index.ts` (barrel, re-exported from `src/components/index.ts`),
 `src/lib/feed/actions.ts`, `src/components/Feed/FollowPlayingPage.tsx`.
 
-## Provider + hook
+## Playback path (read this before touching `<audio>`)
+
+```
+click → playQueue(...)            (client; also calls enableMeter() — see "Web Audio meter")
+      → load effect               (PlayerProvider)
+      → getTrackStreamUrl(trackId) (server action, src/lib/storage/actions.ts; see [[media-storage]])
+      → presigned R2 URL (2 h)    ({ url, error }, never throws to the client)
+      → audio.src = url; play()   (the single <audio preload="metadata" crossOrigin="anonymous">)
+```
+
+- The browser fetches the presigned URL **directly from R2**. There is no proxy / stream API
+  route in this app and no feature flag choosing between modes; if you find a reference to
+  `/api/tracks/[id]/stream` or `NEXT_PUBLIC_AUDIO_REACTIVITY`, it is stale.
+- The element **always** has `crossOrigin="anonymous"`. That is what lets Web Audio
+  (`createMediaElementSource`) read the signal for the waveform and particles, and it turns
+  the media request into a CORS request. **Consequence: every R2 media bucket must allow
+  `GET` and `HEAD` from its site origin, or playback fails entirely** — the browser refuses
+  CORS-mode media the bucket hasn't allowed, the element fires `error`, `status` becomes
+  `"error"`, `isPlaying` false, and PlayerBar shows "Couldn't play this track." Nothing is
+  logged server-side because the signing succeeded. The rules live in
+  `infra/r2/cors.{local,dev,prod}.json` with a status table in `infra/r2/README.md` (all
+  three applied 2026-10-11 with GET/HEAD/PUT); paste them in Cloudflare → R2 → bucket →
+  Settings → CORS Policy after any domain change. Downloads (navigation) and `<img>` artwork
+  do not need CORS.
+- Debug order when a track won't play on one environment: (1) that bucket's CORS rule
+  (`infra/r2/README.md`), (2) `getTrackStreamUrl` returning `{ error }` (missing object,
+  env vars — [[media-storage]]), (3) autoplay (the player lands in `status: "idle"`, not
+  `"error"`, when `play()` is blocked).
+
+## Provider + hooks
 
 `PlayerProvider` is a client component (`'use client'`) that owns:
 
-- one `<audio>` ref (rendered once, hidden, `preload="metadata"`),
-- state: `queue: PlayerTrack[]`, `currentIndex`, `isPlaying`, `currentTime`, `duration`,
-  `status: "idle" | "loading" | "playing" | "error"`,
-- actions exposed via `usePlayer()`: `playQueue(tracks, startIndex?, source?)`, `toggle()`,
-  `next()`, `prev()`, `seek(seconds)`.
+- one `<audio>` ref (rendered once, hidden, `preload="metadata" crossOrigin="anonymous"`),
+- state: `queueState: { tracks: PlayerTrack[]; index; source }`, `isPlaying`, `currentTime`,
+  `duration`, `status: "idle" | "loading" | "playing" | "error"`,
+- the Web Audio meter (`useAudioMeterSource(audioRef)` → `enable`, `readLevel`, `readWaveform`).
 
-`PlayerTrack = { id; title; artistName; page? }` (`page` = the feed page it came from; absent on the album page). Convert feed/album data with
-`toPlayerTrack({ id, title, artistNames })` — it joins names or falls back to
-`"Unknown Artist"`. `usePlayer()` throws if used outside the provider.
+It exposes **two contexts** — pick the right one:
+
+| Hook | Value | Re-renders when |
+|---|---|---|
+| `usePlayer()` | `queue`, `currentIndex`, `currentTrack`, `source`, `isPlaying`, `status`, `playQueue(tracks, startIndex?, source?)`, `toggle()`, `next()`, `prev()`, `seek(seconds)` | the queue, track, play state or status changes (the value is `useMemo`d, so a time tick hands consumers the same object) |
+| `usePlayerTime()` | `{ currentTime, duration }` | every `timeupdate` (~4×/s) and `loadedmetadata` |
+
+**Rule:** anything that only needs track / playing / status — every play button
+(`usePlayButton`), `FollowPlayingPage`, the Media Session hook — must call `usePlayer()` and
+**must not** call `usePlayerTime()`. Only the scrubber in `PlayerBar` needs the time. Before
+the split, `currentTime` lived on the one context and every play button on the page
+re-rendered four times a second during playback; `PixelAccordion` unmounting collapsed
+rows (see routing-and-auth.md) is the other half of that fix. Both hooks throw outside the
+provider. A component that needs both (PlayerBar) calls both.
+
+Two more contexts come from `audioMeter.ts` and are provided by the same tree:
+`AudioMeterContext` (`useAudioMeter()` → `readLevel` or `null`) and `AudioWaveformContext`
+(`useAudioWaveform()` → `readWaveform` or `null`). They hand out stable functions, never
+per-frame values, so reading them causes no React updates.
+
+`PlayerTrack = { id; catalogNumber?; title; artistName; page?; from? }` (`page` = the feed
+page it came from, absent on the album page; `from` = its `ReleaseRef`). Convert feed/album
+data with `toPlayerTrack({ id, catalogNumber?, title, artistNames }, page?, from?)` — it
+joins names or falls back to `"Unknown Artist"` and copies `catalogNumber` through when
+present (PlayerBar's `CatalogId` reads it; `feedQueue` always passes it because
+`FeedTrack`/`FeedItem` carry it).
 
 ## The load-and-play effect (the core)
 
-A `useEffect` keyed on `[currentTrack]` does the work whenever the selected track changes:
+A `useEffect` keyed on `[currentTrack]` does the work whenever the selected track changes
+(unless `moveTo` already started it from a pre-signed URL — `startedRef`):
 
 1. `setStatus("loading")`, reset time/duration, and **`audioRef.current?.pause()`** — stop
    the previous track immediately so audio never overlaps during the async URL fetch.
-2. `await getTrackStreamUrl(currentTrack.id)` — the server action returns
-   `{ url, error }` (never throws to the client). The client only ever sends a `trackId`;
-   the object key is resolved server-side (see [[media-storage]]).
+2. Use the fresh pre-signed URL if there is one, else `await getTrackStreamUrl(currentTrack.id)` —
+   the server action returns `{ url, error }` (never throws to the client); a rejected call
+   (network loss, stale action id) is caught and treated as `{ url: null, error }`. The client
+   only ever sends a `trackId`; the object key is resolved server-side (see [[media-storage]]).
 3. On `{ error }` / no url: **clear the element** (`removeAttribute("src")` + `load()`),
    `setStatus("error")`, `setIsPlaying(false)`. Clearing src is important — otherwise a
    later `toggle()` would resume the *previous* track under the failed track's title.
@@ -40,31 +95,85 @@ signed URL win the race.
 
 ## Media-element event listeners
 
-A separate `useEffect` (dep `[next]`) attaches/detaches listeners with 1:1 symmetry:
-`timeupdate`→currentTime, `loadedmetadata`→duration (guarded finite), `play`→playing,
-`pause`→`isPlaying:false`, `ended`→`setIsPlaying(false)` then `next()`, `error`→`status:error`.
+A separate `useEffect` (dep `[goNext]`) attaches/detaches listeners with 1:1 symmetry:
+`timeupdate`→currentTime, `loadedmetadata`→duration (guarded finite), `play`→`isPlaying:true` +
+`status:"playing"`, `pause`→`isPlaying:false`, `ended`→`setIsPlaying(false)` then `goNext(true)`,
+`error`→`status:"error"`, `isPlaying:false` (this is where a CORS-refused load lands).
 
 ## Action semantics
 
 - `next()` moves on, fetching the next page first when the queue ends but can be extended (see
   "Queue sources and paging"); with nothing after it, it is a no-op.
 - `prev()` restarts the current track if `currentTime > 3`, else goes to the previous track.
-- `toggle()` is a **no-op while `status === "error"`** (nothing valid is loaded); otherwise
-  plays if paused / pauses if playing.
+- `toggle()` reads `audio.paused`: paused → `play()`, else `pause()`. `play()` is a **no-op
+  while `status === "error"`** (nothing valid is loaded; src was cleared) and also calls
+  `enableMeter()` (see below). `playQueue` calls `enableMeter()` too.
 - `seek(s)` sets `audio.currentTime` and mirrors it into state.
+
+## Web Audio meter (`audioMeter.ts`)
+
+`useAudioMeterSource(audioRef)` creates **one** `AudioContext` + `AnalyserNode`
+(`fftSize 256`) + `createMediaElementSource(audio)` for the app's single element, wired
+`source → analyser → destination` (so the audio still comes out of the speakers).
+
+- **Created only inside a user gesture.** `enable()` is called from `playQueue` and `play`
+  (both run in click handlers); browsers refuse an `AudioContext` created elsewhere. It is
+  idempotent (reuses the node graph, calls `context.resume()`), bails out when
+  `audio.crossOrigin !== 'anonymous'` or `AudioContext` is undefined, and wraps the rest in
+  try/catch so an unsupported browser never breaks the controls.
+- **Requires `crossOrigin="anonymous"` + bucket CORS.** Without them the source node gets
+  silence (and, with crossOrigin set but no CORS, playback itself fails — see "Playback path").
+- `readLevel()` → smoothed 0–1 RMS. Several buttons read it per frame, so it samples the
+  analyser **once per ~8 ms** and smooths once (`level += (rms - level) * 0.25`); it returns 0
+  while the context isn't running or the element is paused.
+- `readWaveform()` → the raw `Uint8Array` time-domain bytes (or `null` when paused / not running).
+- Closes the context and disconnects nodes when the provider unmounts.
+
+Consumers:
+
+- `PlayerBar` → `<PixelWaveform playing status>`: a 96×24 canvas (36 px wide ≤ `sm`) with
+  32 pixel columns, redrawn at ≤30 fps via `requestAnimationFrame` while `playing`; each
+  column's height is the peak of its slice of `readWaveform()`. Paused → one static dim
+  frame; `document.hidden` → no sampling; `prefers-reduced-motion` → no animation loop. It
+  also renders the text label `Playing` / `Paused` / `Loading` / `Error` from `status`.
+- `PlaybackButton` (`active` prop) — the circular play/pause button used by **every** play
+  control (PlayerBar, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`). While `active` it tints
+  accent (`withAlpha` glow) and mounts a 130 px `<canvas>` of particles whose emission rate
+  is `readLevel()`; the loop stops when not active, when `useAudioMeter()` is `null`, or under
+  `prefers-reduced-motion`. `PlaybackIcon playing` is the ▶ / ❚❚ SVG; `SweepIcon` is the SVG
+  wrapper that reveals an accent copy left-to-right on the parent's `:hover` via
+  `--hover-progress` (`iconSweepStyles` in `src/components/field/hoverStyles.ts`,
+  [[component-library]]). Prev/next in the bar, the chevron, the open-pack arrow and the
+  download glyphs all use `SweepIcon`.
+
+Symptoms: **waveform not moving / no particles while audio plays** → the meter never
+enabled (play started outside a gesture path that calls `enableMeter`, or `AudioContext`
+unsupported) or the context is suspended; check `crossOrigin` is still `"anonymous"` and
+that the bucket's CORS rule includes `GET`. **Nothing plays at all** → CORS, see above.
+
+Known gap: **iOS lock-screen playback with Web Audio connected is untested / known not to
+work** per the owner (routing the element through an `AudioContext` changes iOS background
+behaviour). Tests can't cover it — jsdom has no `AudioContext`.
 
 ## PlayerBar
 
-Fixed bottom bar (rendered in `AppShell` below `<Main>`), consumes `usePlayer()`:
+Fixed bottom bar (rendered in `AppShell` below `<Main>`, inside `ToastProvider`), consumes
+`usePlayer()` **and** `usePlayerTime()`:
 
-- Renders `null` when the queue is empty.
-- Play/pause chrome is driven by **`isPlaying`**, not `status` (a manual pause leaves
-  `status:"playing"` — a known cosmetic quirk; always key play-state UI off `isPlaying`).
-- Scrubber `<input type="range">` guards non-finite duration: `HTMLMediaElement.duration`
-  is `NaN` before `loadedmetadata`, so `max`/`value` are clamped to a finite `safeDuration`
+- Renders `null` when there is no `currentTrack`.
+- Layout: a 3-column grid `1fr auto 1fr` — `Meta` (`<CatalogId kind="track" number={currentTrack.catalogNumber}>`
+  → `HSS###`, title, artist or the error note), `Controls` (`PixelWaveform`, prev `IconButton`,
+  `PlaybackButton` + `PlaybackIcon`, next `IconButton`), `Scrubber` (time, `<input type="range">`,
+  duration). On phones (`<= theme.breakpoints.sm`) it collapses to one column: controls span
+  the row with `space-between`, the scrubber drops to its own full-width row, and the bottom
+  padding respects `env(safe-area-inset-bottom)`.
+- Play/pause chrome is driven by **`isPlaying`**, not `status` (`aria-label` "Play"/"Pause";
+  `PlaybackButton active={isPlaying && status !== "error"}`). Always key play-state UI off `isPlaying`.
+- Scrubber guards non-finite duration: `HTMLMediaElement.duration` is `NaN` before
+  `loadedmetadata`, so `max`/`value` are clamped to a finite `safeDuration`
   (otherwise React renders `max="NaN"`).
-- On phones (`<= theme.breakpoints.sm`) the scrubber drops to its own full-width row.
-- Shows a short error note when `status === "error"`.
+- Shows "Couldn't play this track." in place of the artist when `status === "error"`.
+- Button aria-labels: "Previous track", "Play"/"Pause", "Next track", slider "Seek".
 
 ## Queue sources and paging
 
@@ -112,15 +221,26 @@ state and effects in `PlayerProvider`.
   `/human_records_main_logo.png` for every track), `playbackState`, handlers for play, pause,
   previoustrack, nexttrack and seekto (registered once, reading the latest callbacks through a ref;
   unsupported actions are swallowed), and `setPositionState` on loadedmetadata/play/pause/seeked/
-  ratechange. Every part is skipped where `navigator.mediaSession` is missing.
+  ratechange. Every part is skipped where `navigator.mediaSession` is missing. Reads the
+  `<audio>` element directly for position, not `usePlayerTime`.
 - **`FollowPlayingPage`** (on `/feed`): when playback crosses from the viewed page to the next one
   (`from === viewedPage && playing === from + 1`, same `q`), `router.replace` the view to that page.
   Viewing any other page or search is never moved. While `document.hidden` the move is deferred:
-  on `visibilitychange` it goes to wherever the music got to.
+  on `visibilitychange` it goes to wherever the music got to. Uses `usePlayer()` only.
 
 ## Gotchas
 
+- **A bucket without `GET`/`HEAD` CORS breaks playback, not just the visuals.** After any
+  CORS or domain change, re-check `infra/r2/README.md` and play a track on that environment.
+  The `media-storage` skill owns the CORS files; this skill owns the consequence.
+- **Don't call `usePlayerTime()` from anything that isn't the scrubber.** It re-renders on
+  every `timeupdate`.
 - jsdom doesn't implement `HTMLMediaElement.play/pause/load` — tests stub them (see
-  [testing.md](testing.md)); `audio.paused` stays `true` in jsdom.
+  [testing.md](testing.md)); `audio.paused` stays `true` in jsdom. jsdom also has **no
+  `AudioContext`**, so `enable()` returns early and the meter is never exercised by tests;
+  `PixelWaveform`/`PlaybackButton` tests inject `AudioWaveformContext`/`AudioMeterContext`
+  values and stub `HTMLCanvasElement.prototype.getContext`, `requestAnimationFrame` and `matchMedia`.
+- `createMediaElementSource` can be called **once per element** — never create a second
+  `AudioContext` for the same `<audio>`; read via `useAudioMeter()`/`useAudioWaveform()`.
 - The player is server-action-adjacent but fully client-side; never import `@/lib/storage/*`
   modules (they read the R2 secret) into it — only call the `getTrackStreamUrl` action.

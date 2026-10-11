@@ -41,7 +41,9 @@ making a route public — a separate privacy decision, not a metadata change.
 | `public/og.png` | 1200×630 | keep art inside the centred 630×630 (some apps crop square) |
 
 Icons: keep the logo inside the middle 80%. `src/app/manifest.ts`: `start_url: '/'`, `display: 'standalone'`,
-colors `palette.bgBase`.
+colors `palette.bgBase`. `theme_color` derives from `palette.bgBase`, now light gray `#e8e8e8` (day theme);
+entrance pages (`/`, `/login`) render amber, so a future amber `theme_color` is a design call. The OG/icon
+artwork may want a refresh for the new palette (owner task, not done).
 
 ## Logged-out reachability
 

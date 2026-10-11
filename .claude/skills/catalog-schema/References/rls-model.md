@@ -72,6 +72,7 @@ Sanctioned write paths:
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |
 | Test fixtures, scripts | service-role client | Never shipped to the browser |
+| `catalog_number` (albums, tracks) | **none** — assigned by the identity sequence on insert | Any explicit insert/update value → `428C9`; `set … = default` → `keep_catalog_number` raises `P0001`. Applies to the service role too; the column has no write path at all. Readable wherever the row is (no new grants/policies). |
 
 ## Adding a new write path — checklist
 

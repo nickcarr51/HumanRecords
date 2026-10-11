@@ -40,6 +40,8 @@ plus `enable_signup = false`.
 | Own role + label-member gate | `src/lib/auth/role.ts` (`getCurrentRole`, `requireLabelMember`) |
 | `/login` page (server component; invite branch) | `src/app/login/page.tsx` |
 | Login UI (email step → code step, invite welcome) | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
+| Sign-in glitch wrapper (page wraps the box, heading and logo in it: brief randomized tracking tears, respects reduced motion, keeps input focus) | `src/components/Login/SignInGlitch.tsx` |
+| Entrance theme: `/` and `/login*` always render the amber night theme regardless of the saved `hs-theme` cookie | `src/lib/theme/ThemeModeProvider.tsx` (`entrance`); see [[component-library]] |
 | Magic-link / invite landing | `src/app/auth/confirm/route.ts` |
 | Signed-in shell guard | `src/app/(app)/layout.tsx` |
 | Signed-in 404 → `/feed` | `src/app/not-found.tsx` |

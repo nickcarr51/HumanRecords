@@ -80,10 +80,13 @@ navigation isn't mistaken for a failure.
 The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
 upload fails at the PUT step (the preflight is rejected). One rule per bucket, pasted by the user
 into Cloudflare -> R2 -> bucket -> Settings -> CORS policy. The source of truth is
-`infra/r2/cors.{local,dev,prod}.json` (only `PUT` with `content-type`; streaming, downloads and
-artwork don't need CORS — see `infra/r2/README.md`).
+`infra/r2/cors.{local,dev,prod}.json` (`GET`, `HEAD`, `PUT` with `content-type`). Uploads need
+only `PUT`; `GET`/`HEAD` exist for the CORS-mode `<audio>` element (`crossOrigin="anonymous"`,
+see [[media-storage]]). Downloads (navigation) and artwork (`<img>`) don't need CORS — see
+`infra/r2/README.md`.
 
-Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09); the exact rules live in
+Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09; `GET`/`HEAD` added to
+all three 2026-10-11); the exact rules live in
 `infra/r2/cors.*.json` (local: localhost + 127.0.0.1; dev: `https://humanservices-dev.vercel.app`;
 prod: `https://services.humanrecords.co` + `https://humanservices.vercel.app`). Re-paste after a domain change
 ([[release-ops]] `References/domain-cutover.md`).

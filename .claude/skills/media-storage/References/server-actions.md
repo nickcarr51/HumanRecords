@@ -25,7 +25,14 @@ Never throws to the client. Error strings are fixed and user-safe:
 4. `{ url, error: null }`.
 
 Caller: `PlayerProvider`'s load-and-play effect ([[timeline-player]]). It sets
-`audio.src = url`; on `{ error }` it clears `src` and shows the error state.
+`audio.src = url` on the app's single `<audio preload="metadata" crossOrigin="anonymous">`
+element — the bytes go R2 → browser directly, there is no proxy route in between. Because the
+element requests in CORS mode (so Web Audio can read the signal for the waveform/particles), the
+bucket's CORS policy must allow `GET`/`HEAD` from the site origin or the `error` event fires and
+the player shows its error state even with a valid URL
+([object-keys.md](object-keys.md#cors)). On `{ error }` from the action it clears `src` and
+shows the error state. The provider also pre-signs the *next* track (`presignedRef`) and re-signs
+anything older than `PRESIGN_MAX_AGE_MS` (1 h) so a URL can't expire mid-track.
 
 ## `getTrackDownloadUrl(trackId)`
 

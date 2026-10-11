@@ -73,8 +73,19 @@ historical record (e.g. the original project bootstrap spec).
 ## Project skills
 
 `.claude/skills/` holds project-specific Claude Code skills, added as
-features are built. `release-ops` covers environments, the CI/deploy pipeline,
-migrations, backups/restore, prod onboarding, and the domain cut-over.
+features are built (index: `.claude/skills/README.md`). `release-ops` covers
+environments, the CI/deploy pipeline, migrations, backups/restore, prod
+onboarding, and the domain cut-over. `visual-effects` covers the canvas/Web
+Audio ambient layer and the conventions every new effect must follow.
+
+## Vocabulary
+
+- Database/code: a release is a `single` or an `album`. Listener-facing copy
+  (feed, aria-labels) calls an album a **"Pack"** and a single a "Single".
+  Admin UI keeps saying "album".
+- Catalog numbers: `HS###` for albums, `HSS###` for tracks (every track,
+  not just singles). Assigned on insert, permanent, never reused. Formatted
+  by `CatalogId`; see the `catalog-schema` skill.
 
 ## Out of scope so far
 
