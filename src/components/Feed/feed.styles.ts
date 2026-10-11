@@ -1,6 +1,7 @@
 'use client';
 
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
+import Link from 'next/link';
 
 export const Row = styled.div`
   display: grid;
@@ -11,7 +12,7 @@ export const Row = styled.div`
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
-export const PlayButton = styled.button`
+const circularControlStyles = css`
   background: none;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.pill};
@@ -23,15 +24,25 @@ export const PlayButton = styled.button`
   align-items: center;
   justify-content: center;
   font: inherit;
+  flex-shrink: 0;
   &:hover:not(:disabled),
   &:focus-visible {
     border-color: ${({ theme }) => theme.colors.accent};
     color: ${({ theme }) => theme.colors.accent};
   }
+`;
+
+export const PlayButton = styled.button`
+  ${circularControlStyles}
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
+`;
+
+export const AlbumLink = styled(Link)`
+  ${circularControlStyles}
+  text-decoration: none;
 `;
 
 export const Title = styled.span`

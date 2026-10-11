@@ -3,10 +3,10 @@
 import styled from 'styled-components';
 
 export const Link = styled.a`
-  color: ${({ theme }) => theme.colors.accent};
+  color: ${({ theme }) => theme.colors.text};
   font-family: ${({ theme }) => theme.fonts.mono};
   text-decoration: none;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid currentColor;
   transition: border-color ${({ theme }) => theme.motion.base}
     ${({ theme }) => theme.motion.ease};
   &:hover {

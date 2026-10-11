@@ -73,6 +73,22 @@ describe('FeedList download buttons', () => {
 });
 
 describe('FeedList playback queue', () => {
+  it('links the accordion toggle to its panel and disables collapsed controls', () => {
+    renderWithTheme(<FeedList items={items} />);
+    const toggle = screen.getByRole('button', { name: 'Expand tracks' });
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+    expect(panel).toHaveAttribute('inert');
+    expect(panel).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('inert');
+    expect(screen.getByRole('button', { name: 'Play NIGHT SHIFT' })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).toHaveAttribute('inert');
+    expect(screen.queryByRole('button', { name: 'Play NIGHT SHIFT' })).toBeNull();
+  });
+
   it('playing a single queues the whole feed, starting at that single', () => {
     renderWithTheme(<FeedList items={items} />);
     fireEvent.click(screen.getByRole('button', { name: 'Play Older Single' }));

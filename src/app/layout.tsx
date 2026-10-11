@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import StyledComponentsRegistry from '@/lib/registry';
 import { TYPEKIT_KIT_URL } from '@/lib/theme/fonts';
+import { CRTTexture } from '@/components/CRTTexture/CRTTexture';
 import './globals.css';
 
 const DESCRIPTION = "Human Records' invite-only music repository.";
@@ -46,7 +47,10 @@ export default function RootLayout({
         <link rel="stylesheet" href={TYPEKIT_KIT_URL} />
       </head>
       <body>
-        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
+        <StyledComponentsRegistry>
+          {children}
+          <CRTTexture />
+        </StyledComponentsRegistry>
       </body>
     </html>
   );

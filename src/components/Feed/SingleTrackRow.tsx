@@ -1,6 +1,7 @@
 'use client';
 
 import { usePlayer, toPlayerTrack, type PlayerTrack } from '@/components/Player';
+import { PlaybackIcon } from '@/components/Player/PlaybackIcon';
 import { DownloadButton } from '@/components/Downloads';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions } from './feed.styles';
@@ -27,7 +28,7 @@ export function SingleTrackRow({
         aria-label={`${playing ? 'Pause' : 'Play'} ${item.title}`}
         onClick={onClick}
       >
-        {playing ? '⏸' : '▶'}
+        <PlaybackIcon playing={playing} />
       </PlayButton>
       <Meta>
         <Title>{item.title}</Title>

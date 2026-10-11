@@ -1,13 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useId, useState } from 'react';
+import styled from 'styled-components';
 import { usePlayer, type PlayerTrack } from '@/components/Player';
+import { PlaybackIcon } from '@/components/Player/PlaybackIcon';
 import type { FeedItem } from '@/lib/supabase/feed';
-import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
+import { Row, PlayButton, AlbumLink, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
 import { AlbumTracks } from './AlbumTracks';
 import { usePlayButton } from './usePlayButton';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
+import { PixelAccordion } from './PixelAccordion';
+
+const Chevron = styled.svg<{ $expanded: boolean }>`
+  transform: rotate(${({ $expanded }) => $expanded ? '180deg' : '0deg'});
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`;
 
 export function AlbumRow({
   item,
@@ -21,6 +31,7 @@ export function AlbumRow({
 }) {
   const { playQueue } = usePlayer();
   const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
   const hasTracks = item.tracks.length > 0;
   const artist = albumArtistLabel(item.artistNames);
   const { playing, onClick } = usePlayButton(
@@ -37,7 +48,7 @@ export function AlbumRow({
           disabled={!hasTracks}
           onClick={onClick}
         >
-          {playing ? '⏸' : '▶'}
+          <PlaybackIcon playing={playing} />
         </PlayButton>
         <Meta>
           <Title>{item.title}</Title>
@@ -51,20 +62,25 @@ export function AlbumRow({
             type="button"
             aria-label={expanded ? 'Collapse tracks' : 'Expand tracks'}
             aria-expanded={expanded}
+            aria-controls={panelId}
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded ? '▲' : '▼'}
+            <Chevron $expanded={expanded} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true" focusable="false">
+              <path d="m6 9 6 6 6-6" />
+            </Chevron>
           </PlayButton>
-          <Link href={`/albums/${item.id}`} aria-label={`Open album ${item.title}`}>
-            ↗
-          </Link>
+          <AlbumLink href={`/albums/${item.id}`} aria-label={`Open album ${item.title}`}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true" focusable="false">
+              <path d="M6 18 18 6M6 6h12v12" />
+            </svg>
+          </AlbumLink>
         </RowActions>
       </Row>
-      {expanded ? (
+      <PixelAccordion open={expanded} id={panelId}>
         <ExpandArea>
           <AlbumTracks tracks={item.tracks} queue={queue} queueStart={queueStart} />
         </ExpandArea>
-      ) : null}
+      </PixelAccordion>
     </div>
   );
 }

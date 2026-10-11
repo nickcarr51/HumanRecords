@@ -2,6 +2,7 @@
 
 import styled from "styled-components";
 import { usePlayer } from "./PlayerProvider";
+import { PlaybackIcon } from "./PlaybackIcon";
 
 const Bar = styled.div`
   flex-shrink: 0;
@@ -137,7 +138,7 @@ export function PlayerBar() {
           ⏮
         </IconButton>
         <IconButton type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={toggle}>
-          {isPlaying ? "⏸" : "▶"}
+          <PlaybackIcon playing={isPlaying} />
         </IconButton>
         <IconButton type="button" aria-label="Next track" onClick={next}>
           ⏭

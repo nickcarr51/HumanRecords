@@ -1,17 +1,17 @@
 export const palette = {
-  bgBase: '#282723',
-  surface: '#32312c',
-  raised: '#3c3a35',
-  text: '#d1ccc1',
-  muted: '#9a958b',
-  faint: '#85817a',
-  border: '#4a4842',
-  accent: '#eb4601',
-  accentDim: '#c93c01',
-  success: '#3fb950',
-  error: '#f85149',
-  warning: '#d29922',
-  info: '#58a6ff',
+  bgBase: '#e8e8e8',
+  surface: '#e8e8e8',
+  raised: '#f2f2f2',
+  text: '#111111',
+  muted: '#484848',
+  faint: '#626262',
+  border: '#111111',
+  accent: '#ff6b1b',
+  accentDim: '#e85b0d',
+  success: '#111111',
+  error: '#a33800',
+  warning: '#a33800',
+  info: '#484848',
 } as const;
 
 export const space = {
@@ -37,7 +37,7 @@ export const fontSizes = {
 
 export const fonts = {
   mono: "'dico-mono', 'Courier New', ui-monospace, monospace",
-  display: "'dico-mono', 'Courier New', ui-monospace, monospace",
+  display: "Arial, Helvetica, sans-serif",
 } as const;
 
 export const fontWeights = {
@@ -49,9 +49,9 @@ export const fontWeights = {
 
 export const radii = {
   none: '0',
-  sm: '2px',
-  md: '4px',
-  lg: '8px',
+  sm: '0',
+  md: '0',
+  lg: '0',
   pill: '999px',
 } as const;
 

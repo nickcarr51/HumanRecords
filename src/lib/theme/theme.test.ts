@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { theme } from './theme';
 
 describe('theme', () => {
-  it('exposes the dark palette hero + surfaces', () => {
-    expect(theme.colors.accent).toBe('#eb4601');
-    expect(theme.colors.bg).toBe('#282723');
-    expect(theme.colors.error).toBe('#f85149');
+  it('exposes the gray, monochrome, and orange palette', () => {
+    expect(theme.colors.accent).toBe('#ff6b1b');
+    expect(theme.colors.bg).toBe('#e8e8e8');
+    expect(theme.colors.error).toBe('#a33800');
   });
 
   it('exposes spacing, type, motion scales', () => {
@@ -13,6 +13,6 @@ describe('theme', () => {
     expect(theme.fontSizes.md).toBe('1rem');
     expect(theme.motion.base).toBe('160ms');
     expect(theme.fonts.mono).toContain('dico-mono');
-    expect(theme.fonts.display).toContain('dico-mono');
+    expect(theme.fonts.display).toContain('Arial');
   });
 });
