@@ -45,6 +45,14 @@ describe("signDownloadUrl", () => {
     // ASCII fallback keeps the non-ASCII char replaced, not dropped
     expect(disp).toContain('filename="Caf_.mp3"');
   });
+
+  it("percent-encodes RFC 5987 non-attr-chars (' ( ) *) in filename*", async () => {
+    const url = await signDownloadUrl("tracks/abc/audio.mp3", "Björk - X (Original Mix) 'Live'*.mp3");
+    const disp = new URL(url).searchParams.get("response-content-disposition");
+    expect(disp).toContain(
+      "filename*=UTF-8''Bj%C3%B6rk%20-%20X%20%28Original%20Mix%29%20%27Live%27%2A.mp3",
+    );
+  });
 });
 
 describe("signImageUrl", () => {

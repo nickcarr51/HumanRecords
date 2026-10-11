@@ -1,6 +1,7 @@
 'use client';
 
 import { usePlayer, toPlayerTrack, type PlayerTrack } from '@/components/Player';
+import { DownloadButton } from '@/components/Downloads';
 import type { FeedTrack } from '@/lib/supabase/feed';
 import { Row, PlayButton, Meta, Title, Sub, Empty } from './feed.styles';
 import { usePlayButton } from './usePlayButton';
@@ -54,7 +55,7 @@ function AlbumTrackRow({
         <Title>{track.title}</Title>
         <Sub>{track.artistNames.length ? track.artistNames.join(', ') : 'Unknown Artist'}</Sub>
       </Meta>
-      <span />
+      <DownloadButton trackId={track.id} title={track.title} />
     </Row>
   );
 }

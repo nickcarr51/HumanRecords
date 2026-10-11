@@ -1,6 +1,6 @@
 ---
 name: component-library
-description: Use when building or restyling any UI in Human Services — adding a component under `src/components/`, writing a `*.styles.ts` file, using theme tokens (`src/lib/theme/tokens.ts`, `theme.ts`, `fonts.ts`), touching the styled-components SSR registry (`src/lib/registry.tsx`, `src/app/layout.tsx`), the `/style-guide` page, `globals.css`, or `renderWithTheme` in tests. Also when a styled-component errors inside a Server Component, styles flash unstyled on first load, or a `$`-prefixed prop warning appears.
+description: Use when building or restyling any UI in Human Services — adding a component under `src/components/`, writing a `*.styles.ts` file, using theme tokens (`src/lib/theme/tokens.ts`, `theme.ts`, `fonts.ts`), touching the styled-components SSR registry (`src/lib/registry.tsx`, `src/app/layout.tsx`), the `/style-guide` page, `globals.css`, `renderWithTheme` in tests, or toasts (`ToastProvider`/`useToast`/`useOptionalToast`, mounted once in `AppShell`, `--toast-offset`). Also when a styled-component errors inside a Server Component, styles flash unstyled on first load, a `$`-prefixed prop warning appears, or "useToast must be used within a ToastProvider" is thrown.
 ---
 
 # Component Library + Theme
@@ -36,6 +36,7 @@ the HTML `<head>`, so the first paint is styled.
 | Shared input styles (`Input`/`Textarea`/`Select`) | `src/components/field/fieldStyles.ts` |
 | Full-height centered shell for standalone screens | `src/app/screen.styles.ts` (`Screen`) |
 | Live catalog of every component (dev only) | `src/app/style-guide/page.tsx` (404s in production via `layout.tsx`) |
+| Toasts: `ToastProvider` mounted once in `AppShell`; `--toast-offset` (set on its Wrapper: 4rem, 6rem at ≤`sm` where the player bar wraps to two rows) lifts them above the player bar; any page under `(app)` can call `useToast()`, so don't add another provider; components that may render outside it (feed rows in tests/reuse) use `useOptionalToast()` → `null` | `src/components/AppShell/AppShell.tsx`, `src/components/Toast/` |
 | Test render helper | `src/test/renderWithTheme.tsx` |
 
 ## References

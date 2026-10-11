@@ -1,8 +1,9 @@
 'use client';
 
 import { usePlayer, toPlayerTrack, type PlayerTrack } from '@/components/Player';
+import { DownloadButton } from '@/components/Downloads';
 import type { FeedItem } from '@/lib/supabase/feed';
-import { Row, PlayButton, Meta, Title, Sub, Kind } from './feed.styles';
+import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions } from './feed.styles';
 import { usePlayButton } from './usePlayButton';
 
 export function SingleTrackRow({
@@ -32,7 +33,10 @@ export function SingleTrackRow({
         <Title>{item.title}</Title>
         <Sub>{track.artistName}</Sub>
       </Meta>
-      <Kind>Track</Kind>
+      <RowActions>
+        <Kind>Track</Kind>
+        <DownloadButton trackId={item.id} title={item.title} />
+      </RowActions>
     </Row>
   );
 }

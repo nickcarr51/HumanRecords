@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { renderWithTheme } from "@/test/renderWithTheme";
+import { useToast } from "@/components/Toast";
 
 vi.mock("@/components/Player", () => ({
   PlayerProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -19,5 +20,18 @@ describe("AppShell admin link", () => {
   it("hides Admin for everyone else", () => {
     renderWithTheme(<AppShell>content</AppShell>);
     expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
+  });
+});
+
+function Notifier() {
+  const { notify } = useToast();
+  return <button type="button" onClick={() => notify("Hello toast", "error")}>notify</button>;
+}
+
+describe("AppShell toasts", () => {
+  it("provides useToast to page content", async () => {
+    renderWithTheme(<AppShell><Notifier /></AppShell>);
+    fireEvent.click(screen.getByRole("button", { name: "notify" }));
+    expect(await screen.findByText("Hello toast")).toBeInTheDocument();
   });
 });

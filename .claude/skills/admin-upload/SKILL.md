@@ -48,7 +48,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Artist chip combobox | `src/components/Upload/ArtistCombobox.tsx` |
 | Browser upload + publish orchestration | `src/components/Upload/upload-engine.ts` (`putFile`, `runPool`, `runPublish`) |
 | Form UI | `src/components/Upload/{UploadForm,TrackWidget,KindToggle}.tsx`, `upload.styles.ts`, `index.ts` |
-| Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx` |
+| Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx`. Each exports `metadata = { title: 'Admin · <Section>' }` (tab `Admin · Upload · Human Services`); new admin pages follow [[head-tags]] |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
