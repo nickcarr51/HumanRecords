@@ -16,6 +16,9 @@ const t = (id: string, page?: number): PlayerTrack => ({ id, title: id, artistNa
 const feed = (hasMore: boolean, lastPage = 1, q = ""): QueueSource => ({ kind: "feed", q, lastPage, hasMore });
 
 describe("toPlayerTrack", () => {
+  it('preserves the catalog number for the player footer', () => {
+    expect(toPlayerTrack({ id: 'a', title: 'Track', artistNames: [], catalogNumber: 12 }).catalogNumber).toBe(12);
+  });
   it("joins artists, falls back to Unknown Artist, and carries the page", () => {
     expect(toPlayerTrack({ id: "a", title: "x", artistNames: ["A", "B"] }, 2)).toEqual({
       id: "a", title: "x", artistName: "A, B", page: 2,

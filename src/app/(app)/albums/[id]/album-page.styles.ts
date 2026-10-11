@@ -1,6 +1,7 @@
 'use client';
 
 import styled from 'styled-components';
+import { GlitchArt } from '@/components/GlitchArt/GlitchArt';
 
 export const Page = styled.div`
   flex: 1;
@@ -36,7 +37,7 @@ export const Head = styled.header`
   }
 `;
 
-export const Art = styled.img`
+export const Art = styled(GlitchArt)`
   width: 96px;
   height: 96px;
   object-fit: cover;

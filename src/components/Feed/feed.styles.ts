@@ -2,6 +2,7 @@
 
 import styled, { css } from 'styled-components';
 import Link from 'next/link';
+import { iconSweepStyles } from '@/components/field/hoverStyles';
 
 export const Row = styled.div`
   display: grid;
@@ -25,11 +26,7 @@ const circularControlStyles = css`
   justify-content: center;
   font: inherit;
   flex-shrink: 0;
-  &:hover:not(:disabled),
-  &:focus-visible {
-    border-color: ${({ theme }) => theme.colors.accent};
-    color: ${({ theme }) => theme.colors.accent};
-  }
+  ${iconSweepStyles}
 `;
 
 export const PlayButton = styled.button`

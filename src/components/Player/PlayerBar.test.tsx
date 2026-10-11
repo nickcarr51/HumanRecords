@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
@@ -7,6 +7,8 @@ import { usePlayer } from "./PlayerProvider";
 import { PlayerBar } from "./PlayerBar";
 
 const mockUse = vi.mocked(usePlayer);
+beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); });
+afterEach(() => { vi.restoreAllMocks(); });
 
 function state(overrides: Partial<ReturnType<typeof usePlayer>> = {}) {
   return {
@@ -57,10 +59,13 @@ describe("PlayerBar", () => {
     mockUse.mockReturnValue(state({ isPlaying: false }));
     const { rerender } = renderWithTheme(<PlayerBar />);
     expect(screen.getByRole("button", { name: /^play$/i })).toBeInTheDocument();
+    expect(screen.getByText('Paused')).toBeInTheDocument();
 
     mockUse.mockReturnValue(state({ isPlaying: true }));
     rerender(<PlayerBar />);
     expect(screen.getByRole("button", { name: /^pause$/i })).toBeInTheDocument();
+    expect(screen.getByText('Playing')).toBeInTheDocument();
+    expect(screen.getByText('Playing').compareDocumentPosition(screen.getByRole('button', { name: /previous/i })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("scrubbing calls seek", () => {

@@ -22,7 +22,13 @@ export const NavBrand = styled.span`
 
 export const NavLinks = styled.div`
   display: flex;
+  align-items: center;
   gap: ${({ theme }) => theme.space.lg};
   font-family: ${({ theme }) => theme.fonts.mono};
   font-size: ${({ theme }) => theme.fontSizes.sm};
+  > form {
+    display: flex;
+    align-items: center;
+    margin: 0;
+  }
 `;

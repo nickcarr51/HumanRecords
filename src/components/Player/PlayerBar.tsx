@@ -2,7 +2,12 @@
 
 import styled from "styled-components";
 import { usePlayer } from "./PlayerProvider";
+import { PlaybackButton } from './PlaybackButton';
+import { PixelWaveform } from './PixelWaveform';
+import { CatalogId } from '@/components/CatalogId/CatalogId';
 import { PlaybackIcon } from "./PlaybackIcon";
+import { SweepIcon } from './SweepIcon';
+import { iconSweepStyles } from '@/components/field/hoverStyles';
 
 const Bar = styled.div`
   flex-shrink: 0;
@@ -49,6 +54,10 @@ const Controls = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.space.sm};
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
 `;
 
 const IconButton = styled.button`
@@ -63,11 +72,7 @@ const IconButton = styled.button`
   align-items: center;
   justify-content: center;
   font: inherit;
-  &:hover:not(:disabled),
-  &:focus-visible {
-    border-color: ${({ theme }) => theme.colors.accent};
-    color: ${({ theme }) => theme.colors.accent};
-  }
+  ${iconSweepStyles}
 `;
 
 const Scrubber = styled.div`
@@ -125,6 +130,7 @@ export function PlayerBar() {
   return (
     <Bar>
       <Meta>
+        <CatalogId kind="track" number={currentTrack.catalogNumber} />
         <Title>{currentTrack.title}</Title>
         {status === "error" ? (
           <ErrorNote>Couldn&apos;t play this track.</ErrorNote>
@@ -134,14 +140,15 @@ export function PlayerBar() {
       </Meta>
 
       <Controls>
+        <PixelWaveform playing={isPlaying && status !== 'error'} status={status} />
         <IconButton type="button" aria-label="Previous track" onClick={prev}>
-          ⏮
+          <SweepIcon fill="currentColor"><path d="M17 5 6 12l11 7Z" /><path d="M5 5h2v14H5Z" /></SweepIcon>
         </IconButton>
-        <IconButton type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={toggle}>
+        <PlaybackButton active={isPlaying && status !== "error"} type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={toggle}>
           <PlaybackIcon playing={isPlaying} />
-        </IconButton>
+        </PlaybackButton>
         <IconButton type="button" aria-label="Next track" onClick={next}>
-          ⏭
+          <SweepIcon fill="currentColor"><path d="m7 5 11 7-11 7Z" /><path d="M17 5h2v14h-2Z" /></SweepIcon>
         </IconButton>
       </Controls>
 

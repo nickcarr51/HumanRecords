@@ -8,6 +8,7 @@ import { getMyDownloadedTrackIds } from '@/lib/supabase/downloads';
 import { AlbumTracks, DownloadsProvider } from '@/components';
 import { Page, Back, Head, Art, ArtPlaceholder, Title, Artists } from './album-page.styles';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
+import { CatalogId } from '@/components/CatalogId/CatalogId';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -44,6 +45,7 @@ export default async function AlbumPage({ params }: Props) {
           <ArtPlaceholder aria-hidden />
         )}
         <div>
+          <CatalogId kind="album" number={album.catalogNumber} />
           <Title>{album.title}</Title>
           <Artists>{artist}</Artists>
         </div>

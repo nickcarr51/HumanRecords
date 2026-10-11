@@ -24,7 +24,7 @@ export const Tag = styled.span<{ $tone?: Tone }>`
   padding: 0.2rem 0.6rem;
   border-radius: ${({ theme }) => theme.radii.sm};
   background: ${({ theme, $tone }) => $tone === 'accent' ? theme.colors.accent : 'transparent'};
-  color: ${({ theme, $tone = 'default' }) => $tone === 'accent' ? theme.colors.text : toneColor($tone, theme.colors)};
+  color: ${({ theme, $tone = 'default' }) => $tone === 'accent' ? (theme.mode === 'dark' ? theme.colors.bg : theme.colors.text) : toneColor($tone, theme.colors)};
   border: 1px solid
     ${({ theme, $tone = 'default' }) => toneColor($tone, theme.colors)};
 `;

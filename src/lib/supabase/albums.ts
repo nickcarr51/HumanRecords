@@ -5,6 +5,7 @@ import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type AlbumDetail = {
   id: string;
+  catalogNumber?: number;
   title: string;
   albumArtUrl: string | null;
   artistNames: string[];
@@ -25,7 +26,7 @@ export async function getAlbum(
   const { data, error } = await supabase
     .from("albums")
     .select(
-      "id, title, album_art_url, releases ( archived_at ), album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, title, archived_at, track_artists ( position, artists ( name ) ) ) )",
+      "id, catalog_number, title, album_art_url, releases ( archived_at ), album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, catalog_number, title, archived_at, track_artists ( position, artists ( name ) ) ) )",
     )
     .eq("id", id)
     .maybeSingle();
@@ -43,15 +44,16 @@ export async function getAlbum(
 
   const trackRel = (data.track_albums ?? []) as unknown as Array<{
     position: number;
-    tracks: { id: string; title: string; archived_at: string | null; track_artists: ArtistNameRel } | null;
+    tracks: { id: string; catalog_number: number; title: string; archived_at: string | null; track_artists: ArtistNameRel } | null;
   }>;
   const tracks: FeedTrack[] = byPosition(trackRel)
     .map((r) => r.tracks)
     .filter((t): t is NonNullable<typeof t> => t !== null && !t.archived_at)
-    .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
+    .map((t) => ({ id: t.id, catalogNumber: t.catalog_number, title: t.title, artistNames: namesFrom(t.track_artists) }));
 
   return {
     id: data.id,
+    catalogNumber: data.catalog_number,
     title: data.title,
     albumArtUrl: data.album_art_url,
     artistNames: namesFrom(data.album_artists as unknown as ArtistNameRel),

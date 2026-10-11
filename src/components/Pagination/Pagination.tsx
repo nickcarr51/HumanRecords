@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import styled from 'styled-components';
 import { pageHref } from './pageHref';
+import { textSweepStyles } from '@/components/field/hoverStyles';
 
 const Bar = styled.nav`
   display: flex;
@@ -16,7 +17,7 @@ const Bar = styled.nav`
 `;
 
 const PageLink = styled(Link)`
-  color: ${({ theme }) => theme.colors.accent};
+  ${textSweepStyles}
   text-decoration: none;
   &:hover,
   &:focus-visible {

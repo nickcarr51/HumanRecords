@@ -1,7 +1,9 @@
+import { SweepIcon } from './SweepIcon';
+
 /** Shared geometric icons; the enclosing button supplies the circle and label. */
 export function PlaybackIcon({ playing }: { playing: boolean }) {
   return (
-    <svg
+    <SweepIcon
       xmlns="http://www.w3.org/2000/svg"
       width="18"
       height="18"
@@ -18,6 +20,6 @@ export function PlaybackIcon({ playing }: { playing: boolean }) {
       ) : (
         <path d="M7 4 21 12 7 20Z" />
       )}
-    </svg>
+    </SweepIcon>
   );
 }

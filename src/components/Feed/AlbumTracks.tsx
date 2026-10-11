@@ -1,11 +1,13 @@
 'use client';
 
 import { usePlayer, toPlayerTrack, type PlayerTrack, type QueueSource } from '@/components/Player';
+import { PlaybackButton } from '@/components/Player/PlaybackButton';
 import { PlaybackIcon } from '@/components/Player/PlaybackIcon';
 import { DownloadButton } from '@/components/Downloads';
 import type { FeedTrack } from '@/lib/supabase/feed';
-import { Row, PlayButton, Meta, Title, Sub, Empty } from './feed.styles';
+import { Row, Meta, Title, Sub, Empty } from './feed.styles';
 import { usePlayButton } from './usePlayButton';
+import { CatalogLine } from '@/components/CatalogId/CatalogLine';
 
 export function AlbumTracks({
   tracks,
@@ -31,7 +33,7 @@ export function AlbumTracks({
   return (
     <div>
       {tracks.map((t, i) => (
-        <AlbumTrackRow key={t.id} track={t} queue={playable} queueIndex={queueStart + i} source={playSource} />
+        <AlbumTrackRow key={t.id} track={t} slot={i + 1} total={tracks.length} queue={playable} queueIndex={queueStart + i} source={playSource} />
       ))}
     </div>
   );
@@ -39,28 +41,33 @@ export function AlbumTracks({
 
 function AlbumTrackRow({
   track,
+  slot,
+  total,
   queue,
   queueIndex,
   source,
 }: {
   track: FeedTrack;
+  slot: number;
+  total: number;
   queue: PlayerTrack[];
   queueIndex: number;
   source?: QueueSource;
 }) {
   const { playQueue } = usePlayer();
-  const { playing, onClick } = usePlayButton([track.id], () => playQueue(queue, queueIndex, source));
+  const { playing, activePlaying, onClick } = usePlayButton([track.id], () => playQueue(queue, queueIndex, source));
 
   return (
     <Row>
-      <PlayButton
+      <PlaybackButton active={activePlaying}
         type="button"
         aria-label={`${playing ? 'Pause' : 'Play'} ${track.title}`}
         onClick={onClick}
       >
         <PlaybackIcon playing={playing} />
-      </PlayButton>
+      </PlaybackButton>
       <Meta>
+        <CatalogLine kind="track" number={track.catalogNumber} slot={slot} total={total} />
         <Title>{track.title}</Title>
         <Sub>{track.artistNames.length ? track.artistNames.join(', ') : 'Unknown Artist'}</Sub>
       </Meta>

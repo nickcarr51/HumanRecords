@@ -23,6 +23,7 @@ import {
   type QueueState,
 } from "./queue";
 import { useMediaSession } from "./useMediaSession";
+import { AudioMeterContext, AudioWaveformContext, useAudioMeterSource } from './audioMeter';
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
 
@@ -70,6 +71,7 @@ export function usePlayer(): PlayerContextValue {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const { enable: enableMeter, readLevel, readWaveform } = useAudioMeterSource(audioRef);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -96,10 +98,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
-  const startAudio = useCallback((url: string, isCurrent: () => boolean) => {
+  const startAudio = useCallback((url: string, isCurrent: () => boolean, trackId: string) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.src = url;
+    audio.src = process.env.NEXT_PUBLIC_AUDIO_REACTIVITY === 'true'
+      ? `/api/tracks/${encodeURIComponent(trackId)}/stream`
+      : url;
     void audio
       .play()
       .then(() => {
@@ -136,6 +140,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         startAudio(
           url,
           () => gen === genRef.current && queueRef.current.tracks[queueRef.current.index]?.id === track.id,
+          track.id,
         );
       }
       commit(s);
@@ -233,22 +238,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(
     (tracks: PlayerTrack[], startIndex = 0, source: QueueSource = NO_SOURCE) => {
+      enableMeter();
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
       prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
-    [commit],
+    [commit, enableMeter],
   );
 
   const play = useCallback(() => {
+    enableMeter();
     const audio = audioRef.current;
     // No-op while errored: there is no valid loaded track to play, and the
     // element's src has been cleared, so play must not resume stale audio.
     if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-  }, [currentTrack, status]);
+  }, [currentTrack, status, enableMeter]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -337,7 +344,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setIsPlaying(false);
           return;
         }
-        startAudio(res.url, () => !cancelled);
+        startAudio(res.url, () => !cancelled, currentTrack.id);
       });
     return () => {
       cancelled = true;
@@ -395,9 +402,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PlayerContext.Provider value={value}>
-      {children}
+      <AudioMeterContext.Provider value={readLevel}>
+        <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
+      </AudioMeterContext.Provider>
       {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
-      <audio ref={audioRef} preload="metadata" />
+      <audio ref={audioRef} preload="metadata" crossOrigin={process.env.NEXT_PUBLIC_AUDIO_REACTIVITY === 'true' ? 'anonymous' : undefined} />
     </PlayerContext.Provider>
   );
 }
