@@ -1,6 +1,7 @@
 'use client';
 
 import NextLink from 'next/link';
+import { Link } from '@/components/Link';
 import { Text } from '@/components/Text';
 import { Cell, Table } from '@/components/AdminUsers/users.styles';
 import { userLabel, type AdminArtistRow } from '@/lib/admin/artists-types';
@@ -36,7 +37,7 @@ export function ArtistsTable({ artists, query }: ArtistsTableProps) {
             <td>
               <Cell>
                 <strong>
-                  <NextLink href={`/admin/artists/${a.id}`}>{a.name}</NextLink>
+                  <Link as={NextLink} href={`/admin/artists/${a.id}`}>{a.name}</Link>
                 </strong>
               </Cell>
             </td>

@@ -127,7 +127,9 @@ describe("UsersTable", () => {
   });
   it("links each row to the user's edit page", () => {
     renderWithTheme(<UsersTable users={users} selfId="me" />);
-    expect(within(row("new@x.co")).getByRole("link", { name: "Edit" })).toHaveAttribute("href", "/admin/users/new");
+    const edit = within(row("new@x.co")).getByRole("link", { name: "Edit" });
+    expect(edit).toHaveAttribute("href", "/admin/users/new");
+    expect(edit.getAttribute("class")).toBeTruthy();
   });
 
   it("tags deactivated users and locks their role and invite controls", () => {

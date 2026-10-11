@@ -1,6 +1,7 @@
 'use client';
 
 import NextLink from 'next/link';
+import { Link } from '@/components/Link';
 import { Mono } from '@/components/Mono';
 import { Tag } from '@/components/Tag';
 import { Text } from '@/components/Text';
@@ -38,7 +39,7 @@ export function UsersTable({ users, selfId }: UsersTableProps) {
                   </strong>
                   <Mono>{u.email}</Mono>
                   {u.deactivated ? <Tag $tone="warning">Deactivated</Tag> : null}
-                  <NextLink href={`/admin/users/${u.id}`}>Edit</NextLink>
+                  <Link as={NextLink} href={`/admin/users/${u.id}`}>Edit</Link>
                 </Cell>
               </td>
               <td>

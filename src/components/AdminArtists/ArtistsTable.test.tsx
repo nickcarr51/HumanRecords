@@ -11,7 +11,9 @@ const rows = [
 describe("ArtistsTable", () => {
   it("links each name to its edit page and shows counts and linked user", () => {
     renderWithTheme(<ArtistsTable artists={rows} query="" />);
-    expect(screen.getByRole("link", { name: "Halcyon" })).toHaveAttribute("href", "/admin/artists/a1");
+    const link = screen.getByRole("link", { name: "Halcyon" });
+    expect(link).toHaveAttribute("href", "/admin/artists/a1");
+    expect(link.getAttribute("class")).toBeTruthy();
     const r = within(screen.getByText("Halcyon").closest("tr")!);
     expect(r.getByText("Ada (ada@x.co)")).toBeInTheDocument();
     expect(r.getByText("3")).toBeInTheDocument();
