@@ -125,6 +125,34 @@ describe("EditReleaseForm", () => {
     expect(screen.getByRole("button", { name: "Archive Night" })).toBeDisabled();
   });
 
+  it("shows Saved. after a successful save and hides it on the next edit", async () => {
+    renderWithTheme(<EditReleaseForm release={album} />);
+    await userEvent.type(screen.getByLabelText("Album title"), "!");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Album title"), "?");
+    expect(screen.queryByText("Saved.")).not.toBeInTheDocument();
+  });
+
+  it("hides Saved. on Discard", async () => {
+    renderWithTheme(<EditReleaseForm release={album} />);
+    await userEvent.type(screen.getByLabelText("Album title"), "!");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Album title"), "?");
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByText("Saved.")).not.toBeInTheDocument();
+  });
+
+  it("locks the draft while the Remove dialog is open, and unlocks on cancel", async () => {
+    renderWithTheme(<EditReleaseForm release={album} />);
+    expect(screen.getAllByLabelText("Track title")[0]).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Remove One" }));
+    expect(screen.getAllByLabelText("Track title")[0]).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getAllByLabelText("Track title")[0]).toBeEnabled();
+  });
+
   it("Discard clears a shown save error", async () => {
     saveRelease.mockResolvedValueOnce({ error: "Boom" });
     renderWithTheme(<EditReleaseForm release={album} />);

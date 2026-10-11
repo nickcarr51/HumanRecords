@@ -92,7 +92,7 @@ export function ReleasesTable({ releases, showArchived }: { releases: AdminRelea
   return (
     <>
       <ReleaseGroup name="Pinned" rows={pinned} empty="Nothing pinned." />
-      <ReleaseGroup name="Feed" rows={feed} empty="No releases yet." />
+      <ReleaseGroup name="Feed" rows={feed} empty="No unpinned releases." />
       <Link as={NextLink} href={showArchived ? '/admin/releases' : '/admin/releases?archived=1'}>
         {showArchived ? 'Hide archived' : `Show archived (${archived.length})`}
       </Link>

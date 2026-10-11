@@ -160,6 +160,13 @@ describe("saveRelease", () => {
     expect(await saveRelease(ID, ok)).toEqual({ error: null });
   });
 
+  it("refuses artist refs with neither a uuid id nor a non-blank newName", async () => {
+    for (const bad of [{}, { newName: 123 }, { newName: "  " }, null]) {
+      expect(await saveRelease(ID, { tracks: [{ id: ID, title: "t", artists: [bad] }] } as unknown as ReleaseEditPayload)).toEqual({ error: "Invalid request." });
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("passes the stale-draft message through", async () => {
     rpc.mockResolvedValueOnce({ error: { code: "22023", message: "This release changed since you opened it. Reload the page." } });
     expect(await saveRelease(ID, draft)).toEqual({ error: "This release changed since you opened it. Reload the page." });
@@ -186,6 +193,14 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
 
   it("refuses malformed artist id refs in addAlbumTrack without storage or DB calls", async () => {
     expect(await addAlbumTrack(ID, { ...add, artists: [{ id: "nope" }] })).toEqual({ error: "Invalid request." });
+    expect(headObject).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses artist refs with neither a uuid id nor a non-blank newName in addAlbumTrack", async () => {
+    for (const bad of [{}, { newName: 123 }, { newName: "  " }]) {
+      expect(await addAlbumTrack(ID, { ...add, artists: [bad] } as never)).toEqual({ error: "Invalid request." });
+    }
     expect(headObject).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });

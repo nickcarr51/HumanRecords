@@ -103,13 +103,17 @@ export async function restoreTrack(trackId: string): Promise<AdminResult> {
   return finish(error);
 }
 
-// resolve_artist_refs would raise a raw 22P02 on a malformed { id }, so check here.
+// Each ref must be an object with a UUID `id` OR a non-blank string `newName`.
+// resolve_artist_refs would raise a raw 22P02 on a malformed { id } (and
+// misbehave on a ref with neither), so check here.
 function artistRefsValid(refs: unknown): refs is ArtistRef[] {
   return (
     Array.isArray(refs) &&
     refs.every((r) => {
       if (!r || typeof r !== "object") return false;
-      return "id" in r ? isUuid((r as { id: unknown }).id) : true;
+      const { id, newName } = r as { id?: unknown; newName?: unknown };
+      if (id !== undefined) return isUuid(id);
+      return typeof newName === "string" && newName.trim().length > 0;
     })
   );
 }

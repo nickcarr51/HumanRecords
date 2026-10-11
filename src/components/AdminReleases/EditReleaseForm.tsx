@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { FormField } from '@/components/FormField';
@@ -14,7 +14,7 @@ import type { AdminRelease } from '@/lib/admin/releases';
 import { saveRelease } from '@/lib/admin/release-actions';
 import { AddTrackForm } from './AddTrackForm';
 import { ArchiveControl } from './ArchiveControl';
-import { buildEditPayload, draftFrom, draftKey, editReducer, hasDraftErrors, isDraftDirty, pendingInDraft, validateDraft } from './edit-reducer';
+import { buildEditPayload, draftFrom, draftKey, editReducer, type EditAction, hasDraftErrors, isDraftDirty, pendingInDraft, validateDraft } from './edit-reducer';
 import { RemovedTracks } from './RemovedTracks';
 import { HeaderRow, Status } from './releases.styles';
 import { TrackEditor } from './TrackEditor';
@@ -25,7 +25,7 @@ const ID3_HINT = "Downloads keep the MP3's own tags — replace the MP3 with a r
 // atomic call; file and track-lifecycle actions apply immediately and are
 // locked while the draft is dirty, so the draft never goes stale under us.
 export function EditReleaseForm({ release }: { release: AdminRelease }) {
-  const [state, dispatch] = useReducer(editReducer, release, draftFrom);
+  const [state, rawDispatch] = useReducer(editReducer, release, draftFrom);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   // Instant actions that run while the draft is clean (add track, restore).
@@ -33,7 +33,14 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
   // server content, which would wipe anything typed in the gap.
   const [adding, setAdding] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const instantBusy = adding || restoring;
+  const [removing, setRemoving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // "Saved." only describes the draft as it was saved; any user edit hides it.
+  const dispatch = useCallback((a: EditAction) => {
+    if (a.type !== 'reset' && a.type !== 'showErrors') setSaved(false);
+    rawDispatch(a);
+  }, []);
+  const instantBusy = adding || restoring || removing;
 
   // Server data changes after every successful action (revalidatePath).
   // Only when the data actually changed: a new object with the same content
@@ -45,7 +52,7 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
     appliedKey.current = key;
     dispatch({ type: 'reset', release });
     setFormError(null);
-  }, [release]);
+  }, [release, dispatch]);
 
   const dirty = isDraftDirty(state, release);
   const locked = dirty || saving || instantBusy;
@@ -70,9 +77,11 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
     }
     setSaving(true);
     setFormError(null);
+    setSaved(false);
     try {
       const res = await saveRelease(release.id, buildEditPayload(state));
       if (res.error) setFormError(res.error);
+      else setSaved(true);
     } catch {
       setFormError("Couldn't reach the server. Try again.");
     } finally {
@@ -106,6 +115,7 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
     <>
       {header}
       {formError ? <Alert $tone="error" role="alert">{formError}</Alert> : null}
+      {saved ? <Status role="status">Saved.</Status> : null}
 
       {state.album ? (
         <Section aria-label="Album details">
@@ -140,6 +150,7 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
             dispatch={dispatch}
             disabled={fieldsOff}
             locked={locked}
+            onRemoveBusyChange={setRemoving}
           />
         ))}
       </Section>
@@ -155,6 +166,7 @@ export function EditReleaseForm({ release }: { release: AdminRelease }) {
         <Button type="button" variant="secondary" disabled={!dirty || fieldsOff} onClick={() => {
           dispatch({ type: 'reset', release });
           setFormError(null);
+          setSaved(false);
         }}>Discard</Button>
         <Button type="button" loading={saving} disabled={!dirty || instantBusy} onClick={save}>Save changes</Button>
       </Footer>

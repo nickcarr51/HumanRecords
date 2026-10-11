@@ -20,10 +20,11 @@ export interface TrackEditorProps {
   pending: ArtistChip[];
   dispatch: (a: EditAction) => void;
   disabled: boolean; // draft fields (true while saving or while an instant action is in flight)
+  onRemoveBusyChange?: (busy: boolean) => void;
   locked: boolean; // instant actions (true while the draft is dirty or saving)
 }
 
-export function TrackEditor({ track, index, total, kind, errors, pending, dispatch, disabled, locked }: TrackEditorProps) {
+export function TrackEditor({ track, index, total, kind, errors, pending, dispatch, disabled, locked, onRemoveBusyChange }: TrackEditorProps) {
   const id = track.id;
   return (
     <TrackCard>
@@ -52,7 +53,7 @@ export function TrackEditor({ track, index, total, kind, errors, pending, dispat
       />
       <Actions>
         <ReplaceAudio trackId={id} title={track.title} disabled={locked} />
-        {kind === 'album' ? <RemoveTrack trackId={id} title={track.title} isLastLive={total === 1} disabled={locked} /> : null}
+        {kind === 'album' ? <RemoveTrack trackId={id} title={track.title} isLastLive={total === 1} disabled={locked} onBusyChange={onRemoveBusyChange} /> : null}
       </Actions>
     </TrackCard>
   );

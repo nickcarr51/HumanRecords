@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Alert } from '@/components/Alert';
 import { Heading } from '@/components/Heading';
 import { ReleasesTable } from '@/components/AdminReleases';
@@ -5,6 +6,8 @@ import { getAdminReleases, type AdminReleaseRow } from '@/lib/admin/releases';
 import { requireLabelMember } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/server';
 import { Back, Page } from '../admin.styles';
+
+export const metadata: Metadata = { title: 'Admin · Releases' };
 
 export default async function AdminReleasesPage({
   searchParams,
