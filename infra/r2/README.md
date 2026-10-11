@@ -11,7 +11,11 @@ Each bucket allows its own environment's site to:
   waveform and button particles. Without `GET`, playback fails entirely
   (the browser refuses CORS-mode media the bucket hasn't allowed).
 
-Downloads (navigation) and artwork (`<img>`) don't need CORS. `*_art_url` columns
+Downloads (navigation) and artwork (`<img>`) don't need CORS.
+
+**Testing on a phone over LAN** (`http://192.168.x.x:3000`): that is a different origin
+from `localhost`, so playback fails until you add it to the local bucket's policy by hand
+in the dashboard. Don't commit LAN addresses to `cors.local.json`; they change per network. `*_art_url` columns
 hold R2 object keys, signed via `signImageUrl` (see the `media-storage` skill).
 
 | File | Bucket | Status |
