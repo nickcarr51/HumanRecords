@@ -41,10 +41,10 @@ export function ArtistsTable({ artists, query }: ArtistsTableProps) {
                 </strong>
               </Cell>
             </td>
-            <td>{a.linkedUser ? userLabel(a.linkedUser) : '—'}</td>
-            <td aria-label="Tracks">{a.trackCount}</td>
-            <td aria-label="Albums">{a.albumCount}</td>
-            <td>{formatDate(a.createdAt)}</td>
+            <td data-label="Linked user">{a.linkedUser ? userLabel(a.linkedUser) : '—'}</td>
+            <td data-label="Tracks">{a.trackCount}</td>
+            <td data-label="Albums">{a.albumCount}</td>
+            <td data-label="Created">{formatDate(a.createdAt)}</td>
           </tr>
         ))}
       </tbody>

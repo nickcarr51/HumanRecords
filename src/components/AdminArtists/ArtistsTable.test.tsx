@@ -20,6 +20,16 @@ describe("ArtistsTable", () => {
     expect(within(screen.getByText("Ember").closest("tr")!).getByText("—")).toBeInTheDocument();
   });
 
+  it("labels the value cells so phone cards read without the hidden header", () => {
+    renderWithTheme(<ArtistsTable artists={rows} query="" />);
+    const r = within(screen.getByText("Halcyon").closest("tr")!);
+    expect(r.getByText("Ada (ada@x.co)")).toHaveAttribute("data-label", "Linked user");
+    expect(r.getByText("3")).toHaveAttribute("data-label", "Tracks");
+    expect(r.getByText("1")).toHaveAttribute("data-label", "Albums");
+    expect(r.getByText("Oct 1, 2026")).toHaveAttribute("data-label", "Created");
+    expect(screen.getByText("Halcyon").closest("td")).not.toHaveAttribute("data-label");
+  });
+
   it("shows the right empty state", () => {
     const { rerender } = renderWithTheme(<ArtistsTable artists={[]} query="" />);
     expect(screen.getByText("No artists yet.")).toBeInTheDocument();
