@@ -18,3 +18,7 @@ export function audioFileError(file: { name: string; size: number }): string | n
   if (file.size > MAX_AUDIO_BYTES) return "MP3s must be 50 MB or smaller.";
   return null;
 }
+
+// Catalog ids are UUIDs; server actions refuse anything else before
+// touching the database.
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

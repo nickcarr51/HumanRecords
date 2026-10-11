@@ -34,4 +34,5 @@ export * from './Downloads';
 export * from './Upload';
 export * from './Login';
 export * from './AdminUsers';
+export * from './AdminReleases';
 export * from './AdminArtists';

@@ -8,7 +8,7 @@ description: Use when archiving, restoring, or removing releases, tracks, or art
 What happens to catalog content after it is published: how it is hidden (soft delete), how
 the feed is ordered and reordered, which R2 keys are queued for a future cleanup, and why
 artists can't be deleted while credited. The **schema and read-side guards are built**
-(branch `feature/v1-schema`, 2026-10-10); the admin UI that drives them is not. The atomic archive/restore/edit SQL functions are built
+(branch `feature/v1-schema`, 2026-10-10); the admin UI that drives them is built too (`/admin/releases`, branch `feature/admin-release`; see [[admin-upload]]). The atomic archive/restore/edit SQL functions are built
 (branch `feature/release-admin-functions`).
 
 ## The one thing to understand first
@@ -56,13 +56,14 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 - [[catalog-schema]] — the tables, RLS policies, definer-function pattern, generated types.
 - [[media-storage]] — R2 keys, the prod bucket lock, the stream/download actions.
 
-Used by: [[admin-upload]] (the future edit/delete UI), [[invites]] (user deactivation is a
+Used by: [[admin-upload]] (the release admin UI), [[invites]] (user deactivation is a
 reversible auth ban, `admin_list_users.banned_until`, not a delete), [[timeline-player]]
 (feed order and archived filtering).
 
 ## Known deferrals (as of 2026-10-10)
 
-- **Admin UI** for archive/restore/reorder/pin and replace is the release-admin branch;
-  artist and user admin is a later branch. The SQL functions exist (see Pieces) but no app code
-  calls them or `move_release` yet. `search_feed` is called by `getFeed` when `q` is set (`/feed?q=`).
+- **Admin UI** for pin/reorder/archive/restore/edit/replace/add-remove track is built
+  (`src/lib/admin/release-actions.ts`, `/admin/releases`; [[admin-upload]]); artist admin is
+  `/admin/artists`. `search_feed` is called by `getFeed` when `q` is set (`/feed?q=`); the
+  admin pages don't call it.
 - **The cleanup job itself** is not built; nothing deletes from R2.

@@ -42,7 +42,7 @@ Verified byte-identical (SHA-256) on 2026-10-10 through `signUploadUrl` then `si
 | Download filename (pure) | `src/lib/storage/filename.ts` (`downloadFilename`, `extFromKey`) |
 | Download button (client) | `src/components/Downloads/DownloadButton.tsx` (calls `getTrackDownloadUrl`) |
 | Service-role client (download recording) | `src/lib/supabase/service.ts` |
-| Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts` ([[admin-upload]]) |
+| Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts`; replace/add-track in `src/lib/admin/release-actions.ts` ([[admin-upload]]) |
 | Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
 | CORS rule per bucket | `infra/r2/cors.{local,dev,prod}.json` (to be committed during setup, Task B2 pending; user pastes into Cloudflare) |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
@@ -74,7 +74,7 @@ Used by: [[timeline-player]] (player calls `getTrackStreamUrl`), [[admin-upload]
 
 - `signImageUrl` is built and tested but unused (no artwork yet). Downloads are wired: `DownloadButton` on feed and album track rows ([[timeline-player]]).
 - No artwork upload; art columns are null, so image signing is unused.
-- Orphaned objects (failed/replaced uploads) are not cleaned up. `r2_cleanup_queue` records archived and replaced keys; the job that reads it is not built ([[content-lifecycle]]).
+- Orphaned objects (failed uploads, retried add/replace) are not cleaned up. `r2_cleanup_queue` records archived and replaced keys; the job that reads it is not built ([[content-lifecycle]]).
 - R2 CORS rule must be applied per bucket before browser uploads work (see
   [object-keys.md](References/object-keys.md); files to be committed in `infra/r2/` during setup, Task B2 pending).
 - Orphan cleanup must never delete from the prod bucket (lock + soft-delete rule above); the future job runs only where deletion is allowed.

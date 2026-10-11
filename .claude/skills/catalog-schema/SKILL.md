@@ -86,10 +86,10 @@ reach hosted databases).
 
 ## Known deferrals (as of 2026-10-10)
 
-- Soft delete exists in the schema (`archived_at`); the admin UI for it is the release-admin
-  branch ([[content-lifecycle]]).
+- Soft delete exists in the schema (`archived_at`); the release admin UI for it is built
+  ([[content-lifecycle]]).
 - `play_count` has an RPC but nothing in the app calls it yet.
-- No ORM. Raw supabase-js + SQL functions; revisit (likely Drizzle) with edit/delete.
+- No ORM. Raw supabase-js + SQL functions; edit/delete shipped as SQL functions without one; revisit (likely Drizzle) only if more multi-table writes appear.
 
 A code guide (migration-by-migration read, with why each security fix exists) is in
 `Walkthrough/walkthrough.md` (gitignored).

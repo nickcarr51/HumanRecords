@@ -29,6 +29,12 @@ describe("AdminPage", () => {
     expect(requireLabelMember).toHaveBeenCalledTimes(1);
   });
 
+  it("links to the releases admin", async () => {
+    requireLabelMember.mockResolvedValue(undefined);
+    renderWithTheme(await AdminPage());
+    expect(screen.getByRole("link", { name: /Releases/ })).toHaveAttribute("href", "/admin/releases");
+  });
+
   it("links to the artists admin", async () => {
     requireLabelMember.mockResolvedValue(undefined);
     renderWithTheme(await AdminPage());

@@ -12,7 +12,7 @@ check exists at four layers because each one alone has a hole.
 2. **Layout + page gates → 404 bounce** — `requireLabelMember()` in `src/lib/auth/role.ts`
    calls `notFound()` unless the role is `label_member`. It is called first in
    `src/app/(app)/admin/layout.tsx` **and** at the top of every admin page
-   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`). The page call is required: on client-side
+   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`, `admin/releases/page.tsx`, `admin/releases/[id]/page.tsx`). The page call is required: on client-side
    (RSC) navigation Next can render a child page without re-running its layout, so a
    layout-only gate is bypassable. `notFound()` renders `src/app/not-found.tsx`, which
    redirects signed-in users to `/feed` — a non-member sees the same thing as for any
@@ -22,10 +22,12 @@ check exists at four layers because each one alone has a hole.
 3. **Per-action role check** — every admin server action starts with a role check and returns
    `"Only label members can do this."` otherwise:
    - `src/lib/admin/actions.ts` (`searchArtists`, `createUploadUrls`, `publishRelease`): `isLabelMember()` → `getCurrentRole()`.
+   - `src/lib/admin/release-actions.ts` (`setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`,
+     `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio`): `getCurrentRole()`.
    - `src/lib/admin/users-actions.ts` (`createUser`, `issueInvite`, `setUserRole`, `updateUserProfile`, `setUserActive`) and
      `src/lib/admin/artists-actions.ts` (`createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers`):
      `activeLabelMemberId()` (`src/lib/admin/caller.ts`) — role check **plus** `auth.getUser()`, so a deactivated label
-     member is refused even while their access token is still valid. The upload actions don't do this yet. Server actions are public
+     member is refused even while their access token is still valid. The upload and release actions don't do this yet. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
    `admin_list_users` and `admin_set_user_role` re-check the same way. Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is
