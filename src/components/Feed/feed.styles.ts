@@ -99,8 +99,12 @@ export const ExpandArea = styled.div`
   position: relative;
   margin: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.xl};
   padding: ${({ theme }) => theme.space.xs} ${({ theme }) => theme.space.md};
-  background: ${({ theme }) => theme.colors.raised};
-  border-left: 1px solid ${({ theme }) => theme.colors.border}40;
+  background: ${({ theme }) => theme.mode === 'light' ? '#dcdcdc' : theme.colors.raised};
+  box-shadow: ${({ theme }) => theme.mode === 'light'
+    ? '0 3px 10px rgba(17, 17, 17, 0.07)'
+    : '0 3px 10px rgba(0, 0, 0, 0.18)'};
+  border-left: 1px solid ${({ theme }) => theme.colors.border}18;
+  border-radius: 4px 0 0 4px;
   &::before, &::after {
     content: '';
     position: absolute;
@@ -111,8 +115,9 @@ export const ExpandArea = styled.div`
     pointer-events: none;
   }
   &::before {
-    top: 0;
-    left: 0;
+    top: 3px;
+    left: 3px;
+    opacity: 0.25;
     box-shadow: 3px 0 currentColor, 0 3px currentColor;
     color: ${({ theme }) => theme.colors.muted};
   }
