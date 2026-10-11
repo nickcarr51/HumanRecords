@@ -22,6 +22,8 @@ describe('theme', () => {
     expect(amberTheme.colors.bg).toBe('#15110b');
     expect(amberTheme.effects.ink).toBe(amberTheme.colors.accent);
     expect(theme.effects.ink).toBe('#646464');
+    expect(theme.effects.panel).toBe('#dcdcdc');
+    expect(amberTheme.effects.panel).toBe(amberTheme.colors.raised);
     expect(amberTheme.space).toBe(theme.space);
   });
 });

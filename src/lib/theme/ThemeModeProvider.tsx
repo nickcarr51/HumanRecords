@@ -30,7 +30,7 @@ const GlobalTheme = createGlobalStyle`
     color: ${({ theme }) => theme.colors.text};
     color-scheme: ${({ theme }) => theme.mode};
     accent-color: ${({ theme }) => theme.colors.accent};
-    -webkit-tap-highlight-color: ${({ theme }) => theme.colors.accent}26;
+    -webkit-tap-highlight-color: ${({ theme }) => withAlpha(theme.colors.accent, 0.15)};
   }
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accent};

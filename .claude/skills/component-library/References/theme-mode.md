@@ -73,6 +73,12 @@ colors in `globals.css`, and the inlined amber rules override them in the same d
 
 ## `GlobalTheme`
 
+Besides `html, body` background/color/`color-scheme`, `GlobalTheme` sets the themed
+`accent-color` (native checkboxes/range inputs), `-webkit-tap-highlight-color`
+(`withAlpha(accent, 0.15)`), a global `:focus-visible` ring (`2px solid accent`, offset 2px,
+via `:where(a, button, input, select, textarea, [tabindex])`), and `caret-color` on text
+inputs. Components should not re-declare focus rings; they inherit this one.
+
 A `createGlobalStyle` rendered inside the `ThemeProvider`, so it re-renders with the mode:
 
 - `html, body { background: theme.colors.bg; color: theme.colors.text; color-scheme: theme.mode }`

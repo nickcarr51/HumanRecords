@@ -28,7 +28,7 @@ says, because the root layout reads that cookie on the server.
 
 | Concern | Where |
 |---|---|
-| Raw values: `palette` (day), `paletteAmber` (night), `effects` (ink/vignette/particle per mode), space, type, radii (all `0` except `pill`), motion, breakpoints, zIndex | `src/lib/theme/tokens.ts` |
+| Raw values: `palette` (day), `paletteAmber` (night), `effects` (ink/vignette/particle/panel/shadow per mode), space, type, radii (all `0` except `pill`), motion, breakpoints, zIndex | `src/lib/theme/tokens.ts` |
 | Semantic themes `theme` (`mode: 'light'`) + `amberTheme` (`mode: 'dark'`), `theme.effects`, `AppTheme` / `SpaceKey` types | `src/lib/theme/theme.ts` |
 | `hexToRgb` / `rgbTriplet` / `withAlpha` — the only sanctioned way to get translucent or canvas colors from a token | `src/lib/theme/color.ts` |
 | `DefaultTheme` augmentation (typed `theme` in every template) | `src/lib/theme/styled.d.ts` |

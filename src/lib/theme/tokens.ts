@@ -34,8 +34,8 @@ export const paletteAmber = {
 // Ambient-effect colors (CRT scanline ink, vignette, pixel particles) that
 // aren't UI colors. Components read them via theme.effects.*.
 export const effects = {
-  light: { ink: '#646464', vignette: '#505050', particle: '#b8b8b8' },
-  dark: { ink: paletteAmber.accent, vignette: '#505050', particle: paletteAmber.accent },
+  light: { ink: '#646464', vignette: '#505050', particle: '#b8b8b8', panel: '#dcdcdc', shadow: '#111111' },
+  dark: { ink: paletteAmber.accent, vignette: '#505050', particle: paletteAmber.accent, panel: paletteAmber.raised, shadow: '#000000' },
 } as const;
 
 export const space = {

@@ -131,7 +131,7 @@ A separate `useEffect` (dep `[goNext]`) attaches/detaches listeners with 1:1 sym
 
 Consumers:
 
-- `PlayerBar` → `<PixelWaveform playing status>`: a 96×24 canvas (36 px wide ≤ `sm`) with
+- `PlayerBar` → `<PixelWaveform playing status>`: a 24 px-tall canvas, 96 px wide on desktop and stretched to the row (`ResizeObserver`, columns = width/3) ≤ `md`, with
   32 pixel columns, redrawn at ≤30 fps via `requestAnimationFrame` while `playing`; each
   column's height is the peak of its slice of `readWaveform()`. Paused → one static dim
   frame; `document.hidden` → no sampling; `prefers-reduced-motion` → no animation loop. It
@@ -164,7 +164,7 @@ Fixed bottom bar (rendered in `AppShell` below `<Main>`, inside `ToastProvider`)
 - Layout: a 3-column grid `1fr auto 1fr` — `Meta` (`<CatalogId kind="track" number={currentTrack.catalogNumber}>`
   → `HSS###`, title, artist or the error note), `Controls` (`PixelWaveform`, prev `IconButton`,
   `PlaybackButton` + `PlaybackIcon`, next `IconButton`), `Scrubber` (time, `<input type="range">`,
-  duration). On phones (`<= theme.breakpoints.sm`) it collapses to one column: controls span
+  duration). Below `theme.breakpoints.md` it collapses to one column (`Transport` groups prev/play/next, `min-width: 0` guards overflow): controls span
   the row with `space-between`, the scrubber drops to its own full-width row, and the bottom
   padding respects `env(safe-area-inset-bottom)`.
 - Play/pause chrome is driven by **`isPlaying`**, not `status` (`aria-label` "Play"/"Pause";

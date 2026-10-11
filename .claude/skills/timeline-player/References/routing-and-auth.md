@@ -77,7 +77,7 @@ other icon is an inline SVG wrapped in `SweepIcon` (hover sweep). Shared styles 
 `feed.styles.ts`: `Row` (3-column grid `auto minmax(0,1fr) auto`; 2 columns ≤ `sm` with the
 last child dropping under the meta), `PlayButton`/`AlbumLink` (the circular control styles +
 `iconSweepStyles`), `Meta`, `Title`, `Sub`, `Kind` (uppercase xs label), `RowActions`,
-`ExpandArea`, `Empty`.
+`ExpandArea` (recessed panel: `theme.effects.panel` background, `withAlpha(theme.effects.shadow, …)` drop shadow, pixel corner marks, `4px` left radius), `Empty`. On ≤ `sm` the `Row` grid uses `display: contents` on `Meta` so the play button sits beside the title row even when the title wraps.
 
 ### Listener vocabulary
 

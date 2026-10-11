@@ -3,6 +3,7 @@
 import styled, { css } from 'styled-components';
 import Link from 'next/link';
 import { iconSweepStyles } from '@/components/field/hoverStyles';
+import { withAlpha } from '@/lib/theme/color';
 
 export const Row = styled.div`
   display: grid;
@@ -99,11 +100,9 @@ export const ExpandArea = styled.div`
   position: relative;
   margin: ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.sm} ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.xl};
   padding: ${({ theme }) => theme.space.xs} ${({ theme }) => theme.space.md};
-  background: ${({ theme }) => theme.mode === 'light' ? '#dcdcdc' : theme.colors.raised};
-  box-shadow: ${({ theme }) => theme.mode === 'light'
-    ? '0 3px 10px rgba(17, 17, 17, 0.07)'
-    : '0 3px 10px rgba(0, 0, 0, 0.18)'};
-  border-left: 1px solid ${({ theme }) => theme.colors.border}18;
+  background: ${({ theme }) => theme.effects.panel};
+  box-shadow: 0 3px 10px ${({ theme }) => withAlpha(theme.effects.shadow, theme.mode === 'light' ? 0.07 : 0.18)};
+  border-left: 1px solid ${({ theme }) => withAlpha(theme.colors.border, 0.094)};
   border-radius: 4px 0 0 4px;
   &::before, &::after {
     content: '';

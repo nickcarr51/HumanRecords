@@ -121,7 +121,7 @@ can't run. Line numbers are as of 2026-10-11 on `feat/playback-vector-icons`.
 
 ## PixelWaveform — 30 fps dot waveform
 
-- 96 × 24 px canvas (36 px wide at ≤ `breakpoints.sm`) next to a text label
+- 24 px-tall canvas, 96 px wide on desktop; ≤ `breakpoints.md` it flexes to the row width via a `ResizeObserver` (guarded for jsdom) and draws `width / 3` columns, next to a text label
   (`Playing`/`Paused`/`Loading`/`Error`).
 - 32 columns, 3 px apart; each column's peak is the max `|sample - 128| / 128` over its
   slice of `readWaveform()`, quantised to 3 px steps up to ±10 px, drawn as 2 × 2 dots.
@@ -204,6 +204,6 @@ can't run. Line numbers are as of 2026-10-11 on `feat/playback-vector-icons`.
   for canvas strings that add their own alpha, `withAlpha(hex, 0..1)` → `rgba(...)`.
   Non-hex input passes through unchanged, so a token that is already `rgba` is safe.
 - `tokens.ts` `effects.light = { ink: '#646464', vignette: '#505050', particle: '#b8b8b8' }`,
-  `effects.dark = { ink: accent, vignette: '#505050', particle: accent }`; exposed as
+  `effects.dark = { ink: accent, vignette: '#505050', particle: accent, panel: raised, shadow: '#000000' }` (plus `panel: '#dcdcdc'`, `shadow: '#111111'` in light); exposed as
   `theme.effects` (typed in `AppTheme`). Add a new effect color here, per mode, rather
   than in a component.

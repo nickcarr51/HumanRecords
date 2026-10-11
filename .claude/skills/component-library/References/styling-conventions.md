@@ -60,7 +60,7 @@ ctx.fillStyle = `rgba(${ink}, ${0.014 + pulse * 0.012})`;
 
 Don't write `${theme.colors.accent}22` (hex-concat alpha) or `rgba(255, 107, 27, 0.2)`. The
 first breaks on any non-6-digit token and hides intent; the second stops following the mode.
-Ambient-effect inks come from `theme.effects.{ink,vignette,particle}`, not `theme.colors`.
+Ambient-effect colors come from `theme.effects.{ink,vignette,particle,panel,shadow}`, not `theme.colors`.
 
 ## 4. Branch on `theme.mode`, not on colors
 
