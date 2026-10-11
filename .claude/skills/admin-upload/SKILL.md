@@ -100,8 +100,8 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - **Replace MP3** shows a `role="status"` "MP3 replaced." line next to the control; picking another file clears it.
   - **Per-row controls** have accessible names with the title (`Pin <title>`, `Archive <title>`, `Remove <title>`, `Replace MP3 for <title>`); visible text is unchanged.
   - **Errors are inline** (`role="alert"`), not toasts: `ToastProvider` is not mounted in the app.
-  - Every action checks the role first, validates UUIDs and artist refs, and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
-  - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
+  - Every action checks the role first, validates UUIDs and artist refs (each ref must be a UUID `id` or a non-blank string `newName`; anything else is "Invalid request." with no DB call), and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
+  - **Edit page**: a failed read shows an inline "Couldn't load this release." (unknown id → 404); "‹ releases" returns to `?archived=1` for an archived release. Tab titles: `Admin · Releases`, `Admin · Edit release`.  - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
   - **ID3 hint**: edits don't rewrite MP3 tags; the page tells users to replace the MP3 with a re-tagged file.
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
