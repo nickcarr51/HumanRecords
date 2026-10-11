@@ -64,5 +64,5 @@ reversible auth ban, `admin_list_users.banned_until`, not a delete), [[timeline-
 
 - **Admin UI** for archive/restore/reorder/pin and replace is the release-admin branch;
   artist and user admin is a later branch. The SQL functions exist (see Pieces) but no app code
-  calls them, `move_release`, or `search_feed` yet.
+  calls them or `move_release` yet. `search_feed` is called by `getFeed` when `q` is set (`/feed?q=`).
 - **The cleanup job itself** is not built; nothing deletes from R2.

@@ -7,10 +7,9 @@ import { listAdminArtists } from '@/lib/admin/artists';
 import type { AdminArtistsPage } from '@/lib/admin/artists-types';
 import { requireLabelMember } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/server';
-// SearchInput/Pagination still live under the retired /artists route; worktree 2
-// moves them to src/components/. Update these imports after that merges.
-import { SearchInput } from '../../artists/SearchInput';
-import { Pagination, pageHref } from '../../artists/Pagination';
+import { SearchInput } from '@/components/SearchInput';
+import { Pagination } from '@/components/Pagination';
+import { pageHref } from '@/components/Pagination/pageHref';
 import { Back, ButtonLink, Page, PageHead } from '../admin.styles';
 
 export const metadata: Metadata = { title: 'Admin · Artists' };
@@ -39,7 +38,7 @@ export default async function AdminArtistsPage({
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   // redirect() throws; keep it outside the try/catch above.
-  if (result && result.total > 0 && page > totalPages) redirect(pageHref(query, totalPages, BASE));
+  if (result && result.total > 0 && page > totalPages) redirect(pageHref(BASE, query, totalPages));
 
   return (
     <Page>
@@ -54,7 +53,7 @@ export default async function AdminArtistsPage({
       {result ? (
         <>
           <ArtistsTable artists={result.artists} query={query} />
-          <Pagination query={query} page={page} totalPages={totalPages} basePath={BASE} />
+          <Pagination basePath={BASE} query={query} page={page} totalPages={totalPages} />
         </>
       ) : (
         <Alert $tone="error" role="alert">

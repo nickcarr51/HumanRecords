@@ -25,6 +25,8 @@ export * from './Modal';
 export * from './Nav';
 export * from './Footer';
 export * from './ArtistCard';
+export * from './Pagination';
+export * from './SearchInput';
 export * from './AppShell';
 export * from './Player';
 export * from './Feed';

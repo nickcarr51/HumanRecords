@@ -49,7 +49,7 @@ export default async function AlbumPage({ params }: Props) {
         </div>
       </Head>
       <DownloadsProvider initialIds={downloadedIds}>
-        <AlbumTracks tracks={album.tracks} />
+        <AlbumTracks tracks={album.tracks} albumId={album.id} />
       </DownloadsProvider>
     </Page>
   );

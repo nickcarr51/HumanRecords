@@ -55,7 +55,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
 | Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
 | Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
-| Reused list pagination (optional `basePath`, e.g. `/admin/artists`) | `src/app/(app)/artists/Pagination.tsx` (used by `src/app/(app)/admin/artists/page.tsx`; may move to `src/components/` later) |
+| Reused list search + pagination (`basePath="/admin/artists"`) | `src/components/SearchInput/`, `src/components/Pagination/` (`pageHref(basePath, query, page)`); see [[artists-read]] |
 | Admin index cards (Upload, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
 | Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
