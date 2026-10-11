@@ -50,7 +50,7 @@ DOM). Plain props on function components (`Button`, `FormField`, `Modal`) are no
 |---|---|---|
 | `Alert` | `$tone?: 'success' \| 'error' \| 'warning' \| 'info'` (default `info`) | Left-bordered box. Add `role="alert"` yourself for errors (login does). |
 | `Spinner` | `$size?: string` | Used as Suspense fallback on `/login`. |
-| `ToastProvider` + `useToast()` | `notify(message, tone?)` | Auto-dismiss after 4s, fixed bottom-right, `role="status"`. **Not mounted app-wide** — only the style guide wraps itself in one. Mount a provider before calling `useToast()` (it throws outside one). |
+| `ToastProvider` + `useToast()` | `notify(message, tone?)` | Auto-dismiss after 4s, fixed bottom-right (lifted by `--toast-offset`), `role="status"`. Mounted once in `AppShell`, so any `(app)` page can `useToast()`; the style guide wraps itself in its own. Outside a provider `useToast()` throws; `useOptionalToast()` returns `null` instead (used by `DownloadButton`, which falls back to `console.error`). |
 | `Modal` | `open`, `onClose`, `label?`, `children` | `role="dialog"` + `aria-modal`; closes on Escape and overlay click. Renders `null` when closed. No focus trap. |
 
 ## Chrome
@@ -70,6 +70,7 @@ feature skill — read that skill before changing them.
 | `AppShell/` — nav, Admin link, sign-out, mounts the player | [[timeline-player]] (mount), [[admin-upload]] (Admin link) |
 | `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack` | [[timeline-player]] |
 | `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton` | [[timeline-player]] |
+| `Downloads/` — `DownloadsProvider`, `useDownloads` (`isDownloaded`, `markDownloaded`; no-op fallback outside a provider), `DownloadButton` (reuses Feed's `PlayButton` style; `Spinner` while signing, `aria-busy`; `↓` / `✓` once downloaded) | [[timeline-player]], [[media-storage]] |
 | `Upload/` — `UploadForm`, `TrackWidget`, `ArtistCombobox`, reducer, engine | [[admin-upload]] |
 | `AdminArtists/` — `ArtistsTable`, `ArtistForm`, `UserCombobox` (single-pick user search), `DeleteArtist`, `admin-artists.styles` (`Danger` section) | [[admin-upload]] |
 | `AdminUsers/` — `NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell` (`disabled`), `UserForm`, `ActiveToggle`, `users.styles` (`Table`: stacked cards below `md`; `td[data-label]` shows a label on phones) | [[invites]] |

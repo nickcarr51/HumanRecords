@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { signOut } from '@/lib/auth/actions';
 import { Nav, NavLinks } from '@/components/Nav';
 import { PlayerProvider, PlayerBar } from '@/components/Player';
+import { ToastProvider } from '@/components/Toast';
 
 const Wrapper = styled.div`
   height: 100dvh;
@@ -12,6 +13,12 @@ const Wrapper = styled.div`
   flex-direction: column;
   overflow: hidden;
   background: ${({ theme }) => theme.colors.bg};
+  /* Keep toasts clear of the PlayerBar docked at the bottom: ≈3.5rem tall on
+     wide screens, ≈5.3rem on phones where it wraps to two rows. */
+  --toast-offset: 4rem;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    --toast-offset: 6rem;
+  }
 `;
 
 // Fills the space between the nav and the universal player (PlayerBar,
@@ -81,20 +88,22 @@ export function AppShell({
   return (
     <PlayerProvider>
       <Wrapper>
-        <Nav>
-          <Brand href="/feed">
-            <BrandName>Human Services</BrandName>
-            <BrandBy>by Human Records</BrandBy>
-          </Brand>
-          <NavLinks>
-            {isLabelMember ? <NavLink href="/admin">Admin</NavLink> : null}
-            <form action={signOut}>
-              <SignOutButton type="submit">Sign out</SignOutButton>
-            </form>
-          </NavLinks>
-        </Nav>
-        <Main>{children}</Main>
-        <PlayerBar />
+        <ToastProvider>
+          <Nav>
+            <Brand href="/feed">
+              <BrandName>Human Services</BrandName>
+              <BrandBy>by Human Records</BrandBy>
+            </Brand>
+            <NavLinks>
+              {isLabelMember ? <NavLink href="/admin">Admin</NavLink> : null}
+              <form action={signOut}>
+                <SignOutButton type="submit">Sign out</SignOutButton>
+              </form>
+            </NavLinks>
+          </Nav>
+          <Main>{children}</Main>
+          <PlayerBar />
+        </ToastProvider>
       </Wrapper>
     </PlayerProvider>
   );

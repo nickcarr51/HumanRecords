@@ -46,7 +46,22 @@ attachment; filename="<ascii fallback>"; filename*=UTF-8''<percent-encoded>
 ```
 
 The ASCII fallback strips `"` and `\` (so they can't break out of the quotes) and replaces
-non-ASCII with `_`; `filename*` carries the real name (e.g. "Café.mp3").
+non-ASCII with `_`; `filename*` carries the real name (e.g. "Café.mp3"), with `' ( ) *` also
+percent-encoded (`encodeURIComponent` leaves them, but RFC 5987 `attr-char` forbids them; strict parsers like Firefox
+otherwise fall back to the ASCII name).
+
+The name itself comes from `downloadFilename(artistNames, title, ext)` in
+`src/lib/storage/filename.ts` (pure, no `server-only`; tests in `filename.test.ts`):
+
+- Format `A x B - Title.ext`, artists in credited order. No artists → `Title.ext`. Empty title → `track`.
+- Base name (before `.ext`) is capped at 150 code points. Over the cap, trailing artists collapse to
+  `A x N more - Title`; if even one artist + title won't fit, the title is cut.
+- `/ \ :` become `-`; `? * " < > |` and control characters are removed; whitespace collapses;
+  trailing dots/spaces are trimmed.
+- `extFromKey(key)` takes the lowercase extension of the last path segment (1-5 alnum chars), else `bin`.
+
+Verified 2026-10-10 (local bucket): `Content-Disposition: attachment; filename="Test Artist x Second Artist - ID3 Check.mp3"; filename*=UTF-8''...`,
+and the downloaded MP3 was byte-identical to the upload (SHA-256), same bitrate/sample rate, same ID3 tags.
 
 ### Upload: Content-Type is signed
 

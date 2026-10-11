@@ -1,21 +1,35 @@
+import { cache } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getAlbum } from '@/lib/supabase/albums';
-import { AlbumTracks } from '@/components';
+import { getMyDownloadedTrackIds } from '@/lib/supabase/downloads';
+import { AlbumTracks, DownloadsProvider } from '@/components';
 import { Page, Back, Head, Art, ArtPlaceholder, Title, Artists } from './album-page.styles';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
 
-export default async function AlbumPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+type Props = { params: Promise<{ id: string }> };
+
+// Per-request memo: generateMetadata and the page share one getAlbum query.
+const loadAlbum = cache(async (id: string) => getAlbum(await createClient(), id));
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const album = await getAlbum(supabase, id);
+  const album = await loadAlbum(id);
+  return album ? { title: album.title } : {};
+}
+
+export default async function AlbumPage({ params }: Props) {
+  const { id } = await params;
+  const album = await loadAlbum(id);
   if (!album) notFound();
 
+  const supabase = await createClient();
+  const downloadedIds = await getMyDownloadedTrackIds(
+    supabase,
+    album.tracks.map((t) => t.id),
+  );
   const artist = albumArtistLabel(album.artistNames);
 
   return (
@@ -34,7 +48,9 @@ export default async function AlbumPage({
           <Artists>{artist}</Artists>
         </div>
       </Head>
-      <AlbumTracks tracks={album.tracks} />
+      <DownloadsProvider initialIds={downloadedIds}>
+        <AlbumTracks tracks={album.tracks} />
+      </DownloadsProvider>
     </Page>
   );
 }

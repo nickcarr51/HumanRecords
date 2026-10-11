@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, or a card points at the wrong domain.
+description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -22,6 +22,12 @@ turns our long-lived single-use token into a real Supabase session server-side: 
 on the cookie-bound client → `redirect('/feed')`. If any step after the claim fails, the
 token is **restored**. A used, unknown, or regenerated token is ignored silently: the normal
 form appears with the email pre-filled.
+
+**Link previews:** invite links (`/login?email=&invite=`) render the root OG/Twitter tags (title `Human Services`,
+`/og.png`). `metadataBase` comes from `SITE_URL` (`src/app/layout.tsx`), so a wrong `SITE_URL` breaks
+link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/login?invite=x' | grep og:`. Full rules: [[head-tags]].
+
+**Page titles:** admin pages use `Admin · <Section>` via `export const metadata = { title }` (e.g. `Admin · Users`).
 
 ## Pieces
 

@@ -10,7 +10,7 @@ vi.mock("@/lib/admin/actions", () => ({
   publishRelease: vi.fn(),
 }));
 
-import AdminPage from "./page";
+import AdminPage, { metadata } from "./page";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -35,3 +35,5 @@ describe("AdminPage", () => {
     expect(screen.getByRole("link", { name: /Artists/ })).toHaveAttribute("href", "/admin/artists");
   });
 });
+
+it("sets the tab title", () => expect(metadata.title).toBe("Admin"));

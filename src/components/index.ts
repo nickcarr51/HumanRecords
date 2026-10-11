@@ -28,6 +28,7 @@ export * from './ArtistCard';
 export * from './AppShell';
 export * from './Player';
 export * from './Feed';
+export * from './Downloads';
 export * from './Upload';
 export * from './Login';
 export * from './AdminUsers';
