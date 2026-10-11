@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`), `createUser`/`issueInvite`/`setUserRole` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, or a card points at the wrong domain.
+description: Use when working on the `/admin/users` page (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`), `createUser`/`issueInvite`/`setUserRole` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -25,7 +25,7 @@ form appears with the email pre-filled.
 
 **Link previews:** invite links (`/login?email=&invite=`) render the root OG/Twitter tags (title `Human Services`,
 `/og.png`). `metadataBase` comes from `SITE_URL` (`src/app/layout.tsx`), so a wrong `SITE_URL` breaks
-link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/login?invite=x' | grep og:`.
+link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/login?invite=x' | grep og:`. Full rules: [[head-tags]].
 
 **Page titles:** admin pages use `Admin · <Section>` via `export const metadata = { title }` (e.g. `Admin · Users`).
 

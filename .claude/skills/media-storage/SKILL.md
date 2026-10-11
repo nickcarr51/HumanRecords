@@ -1,6 +1,6 @@
 ---
 name: media-storage
-description: Use when working with audio or image files in Cloudflare R2 — signing stream, download, image, or upload URLs (`src/lib/storage/sign.ts`), the `getTrackStreamUrl` / `getTrackDownloadUrl` server actions (`src/lib/storage/actions.ts`), R2 env config (`src/lib/storage/config.ts`, `R2_*` vars), `headObject`, recording downloads with the service-role client, object-key conventions for `audio_url` / `*_art_url`, `r2_cleanup_queue` (which keys may be deleted later), or R2 CORS. Also when playback or a download link returns 403/SignatureDoesNotMatch, a signed URL expires mid-track, or "Missing R2 env vars" is thrown.
+description: Use when working with audio or image files in Cloudflare R2 — signing stream, download, image, or upload URLs (`src/lib/storage/sign.ts`), the `getTrackStreamUrl` / `getTrackDownloadUrl` server actions (`src/lib/storage/actions.ts`), R2 env config (`src/lib/storage/config.ts`, `R2_*` vars), `headObject`, recording downloads with the service-role client, the download filename (`src/lib/storage/filename.ts`: `downloadFilename`, `extFromKey`, `Content-Disposition`/`filename*`), object-key conventions for `audio_url` / `*_art_url`, `r2_cleanup_queue` (which keys may be deleted later), or R2 CORS. Also when playback or a download link returns 403/SignatureDoesNotMatch, a signed URL expires mid-track, a downloaded file has the wrong name or altered bytes/ID3 tags, or "Missing R2 env vars" is thrown.
 ---
 
 # Media Storage (Cloudflare R2)

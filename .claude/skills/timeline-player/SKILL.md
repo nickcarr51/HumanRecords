@@ -1,6 +1,6 @@
 ---
 name: timeline-player
-description: Use when working on the listener timeline (the `/feed` page), the persistent music player (PlayerProvider / usePlayer / PlayerBar), the album page (`/albums/[id]`), the feed/album data layer (getFeed / getAlbum), or the auth redirects that land signed-in users on `/feed`. Covers how playback persists across navigation, how the feed (pinned first, then `sort_at` order, archived items hidden) is assembled, and how these routes are guarded.
+description: Use when working on the listener timeline (the `/feed` page), the persistent music player (PlayerProvider / usePlayer / PlayerBar), the album page (`/albums/[id]`), the feed/album data layer (getFeed / getAlbum), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`, the ↓/✓ downloaded state), or the auth redirects that land signed-in users on `/feed`. Covers how playback persists across navigation, how the feed (pinned first, then `sort_at` order, archived items hidden) is assembled, and how these routes are guarded.
 ---
 
 # Timeline + Persistent Player

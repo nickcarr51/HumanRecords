@@ -50,7 +50,7 @@ DOM). Plain props on function components (`Button`, `FormField`, `Modal`) are no
 |---|---|---|
 | `Alert` | `$tone?: 'success' \| 'error' \| 'warning' \| 'info'` (default `info`) | Left-bordered box. Add `role="alert"` yourself for errors (login does). |
 | `Spinner` | `$size?: string` | Used as Suspense fallback on `/login`. |
-| `ToastProvider` + `useToast()` | `notify(message, tone?)` | Auto-dismiss after 4s, fixed bottom-right (lifted by `--toast-offset`), `role="status"`. Mounted once in `AppShell`, so any `(app)` page can `useToast()`; the style guide wraps itself in its own. Outside a provider `useToast()` throws. |
+| `ToastProvider` + `useToast()` | `notify(message, tone?)` | Auto-dismiss after 4s, fixed bottom-right (lifted by `--toast-offset`), `role="status"`. Mounted once in `AppShell`, so any `(app)` page can `useToast()`; the style guide wraps itself in its own. Outside a provider `useToast()` throws; `useOptionalToast()` returns `null` instead (used by `DownloadButton`, which falls back to `console.error`). |
 | `Modal` | `open`, `onClose`, `label?`, `children` | `role="dialog"` + `aria-modal`; closes on Escape and overlay click. Renders `null` when closed. No focus trap. |
 
 ## Chrome

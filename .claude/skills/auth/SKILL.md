@@ -1,6 +1,6 @@
 ---
 name: auth
-description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, or a new route needs protecting.
+description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, a new route needs protecting, or a public asset (icon, `og.png`, manifest) redirects to `/login` when logged out.
 ---
 
 # Auth: Invite-only Passwordless Sign-in
