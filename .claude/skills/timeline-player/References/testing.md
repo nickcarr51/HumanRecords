@@ -7,7 +7,7 @@ React Testing Library). jsdom has no media playback, so `beforeAll` stubs
 `HTMLMediaElement.prototype.play/pause/load`. `getTrackStreamUrl` is mocked. A small
 `Harness` component drives the actions. Covers: `toPlayerTrack` fallback; `playQueue` sets
 current + requests signed URL; `next` advances + re-signs; `ended` auto-advances; `next()`
-end-of-queue no-op; `prev()` back-nav; signing error → `status:"error"` (never stuck on
+at the end of a queue that can't extend is a no-op; `prev()` back-nav; signing error → `status:"error"` (never stuck on
 loading); autoplay-block → off loading; `toggle()` plays; and `toggle()` no-op + `src`
 cleared after an error.
 
@@ -35,7 +35,14 @@ positive + null (missing + non-UUID + archived) paths and position (not title) t
 (single, album, and a track inside an expanded album each start at the right index) and the
 `usePlayButton` rules: pause shown for the current track and toggles instead of restarting,
 paused current track resumes, album button reflects any of its tracks, clicks ignored while
-loading, errored track retries via `playQueue`.
+loading, errored track retries via `playQueue`. Also asserts rows pass their `source`.
+`AlbumTracks.test.tsx` covers the album-page source (`{ kind: "album", albumId }`).
+
+**Feed page** — `src/app/(app)/feed/page.test.tsx` (redirect past the end keeping `q`, trimmed
+`q`, past-the-end empty search → its page 1, empty search on page 1 not redirected), `params.test.ts` (`parsePage`),
+`src/components/Feed/FollowPlayingPage.test.tsx` (follows only from the viewed page with the
+same `q`; deferred while hidden). `Pagination`/`SearchInput` tests live with the components in
+`src/components/` ([[artists-read]]).
 
 ## What is deliberately NOT tested (agreed scope)
 

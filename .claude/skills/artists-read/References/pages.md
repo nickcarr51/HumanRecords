@@ -20,7 +20,10 @@ URL is the state: `?q=<search>&page=<n>`.
 Layout (`artists.styles.ts`): fixed-height page filling `Main` — header pinned, list scrolls,
 pager pinned to the bottom.
 
-## `SearchInput` (client)
+## `SearchInput` (client) — `src/components/SearchInput/`
+
+- Props: `initialQuery`, `label?` (aria-label + placeholder; default `Search artists`; `/feed`
+  passes `Search artists, tracks, albums`).
 
 - Uncontrolled `<Input type="search">` seeded with `defaultValue={initialQuery}`.
 - Each keystroke resets a 250 ms timer; on fire it rebuilds the query string from the current
@@ -29,7 +32,9 @@ pager pinned to the bottom.
   new params.
 - Clears the timer on unmount.
 
-## `Pagination` (client)
+## `Pagination` (client) — `src/components/Pagination/`
+
+- Props: `basePath` (`/artists` or `/feed`), `query`, `page`, `totalPages`.
 
 - `pageHref(basePath, query, page)` — pure helper in the plain module `pageHref.ts` (no
   `'use client'`, so server pages can use it): `/artists`, `/artists?q=x`,
@@ -56,9 +61,9 @@ can't call a function exported from a `'use client'` module.
 
 ## Tests
 
-- `Pagination.test.tsx` — `pageHref` omits `page=1` and keeps `q`; renders position + links,
+- `src/components/Pagination/Pagination.test.tsx` — `pageHref` omits `page=1`, keeps `q`, uses `basePath`; renders position + links,
   no prev on page 1; null for one page.
-- `SearchInput.test.tsx` — fake timers; typing pushes a debounced `q` and drops `page`.
+- `src/components/SearchInput/SearchInput.test.tsx` — fake timers; typing pushes a debounced `q` and drops `page`; custom `label`.
 - `ArtistCard.test.tsx` — initials; link + pluralized count; initials tile without a photo.
 - `src/lib/initials.test.ts` — first two words, uppercased, whitespace-tolerant.
 - No page-level render tests.

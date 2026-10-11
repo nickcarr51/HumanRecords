@@ -10,9 +10,14 @@ navigation, the player mounted inside `AppShell` persists (see
 [persistent-player.md](persistent-player.md)). Routes in the group: `/feed`, `/albums/[id]`,
 `/dashboard`, `/admin/**` ([[admin-upload]]), and the retired `/artists` ([[artists-read]]).
 
-- `/feed` (`src/app/(app)/feed/page.tsx`) — async server component: `createClient()` →
-  `getFeed(supabase, { page: 1 })` → `<FeedList items={...} />`. Title-only header (search
-  bar deferred). This is the authenticated home.
+- `/feed` (`src/app/(app)/feed/page.tsx`) — async server component. Reads `?q=` (trimmed) and
+  `?page=` (`parsePage` in the plain module `params.ts`: junk, `0`, negatives → 1; `2.5` → 2),
+  then `getFeed(supabase, { page, q })`. A page past the end redirects to the last page, keeping
+  `q` (`pageHref`). Renders `SearchInput` (label `Search artists, tracks, albums`) as the header,
+  a scroll area keyed on `q|page` (new page/search starts at the top) with
+  `<FeedList items source={{ kind: "feed", q, lastPage: page, hasMore }} emptyMessage>` (search
+  with no hits → `No results for "<q>"`), `Pagination` below, and `FollowPlayingPage`. This is the
+  authenticated home.
 - `/albums/[id]` (`src/app/(app)/albums/[id]/page.tsx`) — async server component:
   `getAlbum(supabase, id)`; `notFound()` when null; renders album header + `<AlbumTracks>`
   whose rows play through the persistent player.
@@ -54,15 +59,20 @@ state instead of a 500.
 
 `src/components/Feed/` (all `'use client'`, consume `usePlayer` + `toPlayerTrack`):
 
-- `FeedList` — maps `FeedItem[]` to `AlbumRow`/`SingleTrackRow`; "Nothing here yet." when empty.
-  Builds ONE feed-wide queue (every track, in feed order — singles as one track, albums as
-  their tracks) plus each item's offset into it, so next/prev move from release to release.
-- `SingleTrackRow` — play → `playQueue(feedQueue, itsOffset)`.
+- `FeedList` — maps `FeedItem[]` to `AlbumRow`/`SingleTrackRow`; `emptyMessage` when empty
+  (default "Nothing here yet."). Builds ONE page-wide queue with `feedQueue(items, page)`
+  (every track in feed order, each tagged with its feed `page` and its release `from`) plus each
+  item's offset into it, so next/prev move from release to release. Passes its `source` down.
+- `SingleTrackRow` — play → `playQueue(feedQueue, itsOffset, source)`.
 - `AlbumRow` — collapsed by default; expand reveals `AlbumTracks`; "play album" →
-  `playQueue(feedQueue, albumOffset)`, disabled when the album has no tracks; links to `/albums/{id}`.
+  `playQueue(feedQueue, albumOffset, source)`, disabled when the album has no tracks; links to `/albums/{id}`.
 - `AlbumTracks` — shared by the expanded row and the album page. In the feed it gets the
-  feed queue + album offset (`playQueue(feedQueue, albumOffset + i)`); on the album page those
-  props are omitted and the album is its own queue (`playQueue(albumTracks, i)`).
+  feed queue + album offset + source (`playQueue(feedQueue, albumOffset + i, source)`); on the
+  album page it gets `albumId` instead and the album is its own queue with source
+  `{ kind: "album", albumId }`, so it continues into the feed when the album ends.
+- `FollowPlayingPage` (feed page only) — when the playing track's `page` goes N → N+1 while the
+  viewer is on page N with the same `q`, `router.replace` to N+1; deferred until the tab is
+  visible. Never moves the view otherwise (see [persistent-player.md](persistent-player.md)).
 - `usePlayButton(trackIds, start)` — shared by all three buttons. If the current track is one
   of `trackIds` the button shows ⏸ while playing (or loading) and toggles pause/resume instead
   of restarting; an album button covers all its track ids. Not current → `start()`. Loading →

@@ -68,7 +68,9 @@ feature skill — read that skill before changing them.
 | Folder | Owner skill |
 |---|---|
 | `AppShell/` — nav, Admin link, sign-out, mounts the player | [[timeline-player]] (mount), [[admin-upload]] (Admin link) |
-| `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack` | [[timeline-player]] |
-| `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton` | [[timeline-player]] |
+| `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack`, `queue.ts`, `useMediaSession` | [[timeline-player]] |
+| `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton`, `FollowPlayingPage` | [[timeline-player]] |
 | `Upload/` — `UploadForm`, `TrackWidget`, `ArtistCombobox`, reducer, engine | [[admin-upload]] |
 | `ArtistCard/` — artist list row + re-exported `initials` | [[artists-read]] |
+| `SearchInput/` — debounced URL search box (`initialQuery`, `label?`) | [[artists-read]] (used by `/artists` and `/feed`) |
+| `Pagination/` — prev/next pager (`basePath`, `query`, `page`, `totalPages`) + `pageHref` (plain module, server-safe) | [[artists-read]] (used by `/artists` and `/feed`) |
