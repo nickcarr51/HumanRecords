@@ -58,7 +58,9 @@ Nothing — this is foundational. Feature skills that build on it:
 
 - One theme only (dark). No light mode, no theme switching.
 - `Link` is a styled `<a>`, not `next/link`; in-app navigation uses `styled(Link)` from
-  `next/link` locally (see `AppShell`, `Pagination`). Use the right one — see the catalog.
+  `next/link` locally (see `AppShell`, `Pagination`), or renders `<Link as={NextLink} href=…>`
+  for a themed in-app link (see `ArtistsTable`, `UsersTable`, the album page). A bare
+  `next/link` renders browser-default blue — never ship one unstyled.
 - `Modal` has Escape + overlay-close but no focus trap.
 - Player icons/artwork are placeholders pending a design pass.
 

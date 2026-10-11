@@ -10,6 +10,11 @@ an artist page at `/artists/[id]` showing bio and credited tracks. Built 2026-09
 **Retired from the listener MVP**: the code, tests, and data layer are intact, but signed-in
 users who visit `/artists` or `/artists/*` are redirected to `/feed` and there is no nav link.
 
+**Still live elsewhere:** `/admin/artists` (see [[admin-upload]]) imports `SearchInput` and
+`Pagination` from `src/app/(app)/artists/`. `Pagination`/`pageHref` take an optional
+`basePath` (default `/artists`) for that reuse. Don't delete or move these files without
+updating that page; worktree 2 plans to move them into `src/components/`.
+
 ## The one thing to understand first
 
 **The route is dark only because of one rule in `authRedirectPath`.** Middleware sends

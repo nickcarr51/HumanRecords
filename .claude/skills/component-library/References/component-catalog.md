@@ -71,4 +71,6 @@ feature skill — read that skill before changing them.
 | `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack` | [[timeline-player]] |
 | `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton` | [[timeline-player]] |
 | `Upload/` — `UploadForm`, `TrackWidget`, `ArtistCombobox`, reducer, engine | [[admin-upload]] |
+| `AdminArtists/` — `ArtistsTable`, `ArtistForm`, `UserCombobox` (single-pick user search), `DeleteArtist`, `admin-artists.styles` (`Danger` section) | [[admin-upload]] |
+| `AdminUsers/` — `NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell` (`disabled`), `UserForm`, `ActiveToggle`, `users.styles` (`Table`: stacked cards below `md`; `td[data-label]` shows a label on phones) | [[invites]] |
 | `ArtistCard/` — artist list row + re-exported `initials` | [[artists-read]] |
