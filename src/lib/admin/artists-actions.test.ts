@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentRole = vi.fn();
+const getUser = vi.fn();
 const revalidatePath = vi.fn();
 const redirect = vi.fn((to: string) => {
   throw Object.assign(new Error("NEXT_REDIRECT"), { digest: `NEXT_REDIRECT;${to}` });
@@ -14,7 +15,7 @@ const updateSelect = vi.fn();
 const updateEq = vi.fn(() => ({ select: updateSelect }));
 const update = vi.fn(() => ({ eq: updateEq }));
 const rpc = vi.fn();
-const db = { from: () => ({ insert, update }), rpc };
+const db = { from: () => ({ insert, update }), rpc, auth: { getUser: () => getUser() } };
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => db }));
@@ -34,6 +35,7 @@ const U = "44444444-4444-4444-8444-444444444444";
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
+  getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   insertSingle.mockResolvedValue({ data: { id: A }, error: null });
   updateSelect.mockResolvedValue({ data: [{ id: A }], error: null });
   rpc.mockResolvedValue({ error: null });
@@ -50,6 +52,16 @@ describe("auth gate", () => {
     expect((await searchLinkableUsers("ada")).error).toBe("Only label members can do this.");
     expect(insert).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("banned caller", () => {
+  it("is refused even though the stale token still has the label_member role", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: { code: "user_banned" } });
+    expect((await createArtist({ name: "X", bio: "", userId: null })).error).toBe("Only label members can do this.");
+    expect((await deleteArtist(A)).error).toBe("Only label members can do this.");
+    expect(insert).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 });

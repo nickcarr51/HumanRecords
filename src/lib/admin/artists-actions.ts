@@ -7,8 +7,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentRole } from "@/lib/auth/role";
 import { createClient } from "@/lib/supabase/server";
+import { activeLabelMemberId } from "./caller";
 import { filterLinkableUsers, getCreditCounts, loadLinkTargets } from "./artists";
 import {
   MAX_ARTIST_NAME_LENGTH,
@@ -28,7 +28,7 @@ type Row = { name: string; bio: string | null; user_id: string | null };
 type DbError = { code?: string; message: string };
 
 async function isLabelMember(): Promise<boolean> {
-  return (await getCurrentRole()) === "label_member";
+  return (await activeLabelMemberId()) !== null;
 }
 
 function parseInput(input: ArtistInput): { row: Row } | { error: string } {

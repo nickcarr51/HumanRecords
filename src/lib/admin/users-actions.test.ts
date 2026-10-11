@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentRole = vi.fn();
-const getSessionUser = vi.fn();
+const getUser = vi.fn();
 const createUserApi = vi.fn();
 const rpc = vi.fn();
 const upsertInvite = vi.fn();
 const revalidatePath = vi.fn();
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
-vi.mock("@/lib/auth/session", () => ({ getSessionUser: () => getSessionUser() }));
 const getUserById = vi.fn();
 const updateUserById = vi.fn();
 const usersEq = vi.fn();
@@ -19,7 +18,7 @@ vi.mock("@/lib/supabase/service", () => ({
     from: () => ({ update: usersUpdate }),
   }),
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc }) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc, auth: { getUser: () => getUser() } }) }));
 vi.mock("@/lib/invites/store", () => ({ upsertInvite: (...a: unknown[]) => upsertInvite(...a) }));
 vi.mock("@/lib/invites/token", () => ({ generateInviteToken: () => "T".repeat(43) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
@@ -32,13 +31,28 @@ const OTHER = "22222222-2222-2222-2222-222222222222";
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
-  getSessionUser.mockResolvedValue({ sub: ME });
+  getUser.mockResolvedValue({ data: { user: { id: ME } }, error: null });
   createUserApi.mockResolvedValue({ data: { user: { id: OTHER } }, error: null });
   upsertInvite.mockResolvedValue(undefined);
   rpc.mockResolvedValue({ error: null });
   getUserById.mockResolvedValue({ data: { user: { id: OTHER, email: "old@x.co" } }, error: null });
   updateUserById.mockResolvedValue({ data: { user: {} }, error: null });
   usersEq.mockResolvedValue({ error: null });
+});
+
+describe("banned caller", () => {
+  it("is refused by every action even though the stale token still has the label_member role", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: { code: "user_banned" } });
+    const forbidden = /label members/i;
+    expect((await createUser({ email: "a@b.co", name: "", role: "listener" })).error).toMatch(forbidden);
+    expect((await issueInvite(OTHER)).error).toMatch(forbidden);
+    expect((await setUserRole(OTHER, "artist")).error).toMatch(forbidden);
+    expect((await updateUserProfile(OTHER, { name: "A", email: "a@b.co" })).error).toMatch(forbidden);
+    expect((await setUserActive(OTHER, true)).error).toMatch(forbidden);
+    expect(createUserApi).not.toHaveBeenCalled();
+    expect(updateUserById).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("createUser", () => {
@@ -220,6 +234,8 @@ describe("setUserActive", () => {
 
   it("blocks deactivating yourself", async () => {
     expect((await setUserActive(ME, false)).error).toBe("You can't deactivate yourself.");
+    expect((await setUserActive(ME, true)).error).toBe("You can't reactivate yourself.");
+    expect(updateUserById).not.toHaveBeenCalled();
     expect(updateUserById).not.toHaveBeenCalled();
   });
 

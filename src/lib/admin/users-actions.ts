@@ -5,12 +5,11 @@
 // service role (auth admin API); the invites table is service-role only.
 
 import { revalidatePath } from "next/cache";
-import { getCurrentRole } from "@/lib/auth/role";
-import { getSessionUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { upsertInvite } from "@/lib/invites/store";
 import { generateInviteToken } from "@/lib/invites/token";
+import { activeLabelMemberId } from "./caller";
 import { USER_ROLES, type ActionResult, type UserRole } from "./users-types";
 
 const FORBIDDEN = "Only label members can do this.";
@@ -18,12 +17,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_NAME_LENGTH = 100;
 
-// The caller's user id if they're a label member, else null.
-async function labelMemberId(): Promise<string | null> {
-  if ((await getCurrentRole()) !== "label_member") return null;
-  const claims = await getSessionUser();
-  return typeof claims?.sub === "string" ? claims.sub : null;
-}
+// The caller's user id if they're an active label member, else null.
+const labelMemberId = activeLabelMemberId;
 
 function isRole(value: unknown): value is UserRole {
   return typeof value === "string" && (USER_ROLES as readonly string[]).includes(value);
@@ -161,7 +156,9 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   const caller = await labelMemberId();
   if (!caller) return { error: FORBIDDEN };
   if (typeof userId !== "string" || !UUID_RE.test(userId)) return { error: "Unknown user." };
-  if (!active && userId === caller) return { error: "You can't deactivate yourself." };
+  if (userId === caller) {
+    return { error: active ? "You can't reactivate yourself." : "You can't deactivate yourself." };
+  }
 
   const { error } = await createServiceClient().auth.admin.updateUserById(userId, {
     ban_duration: active ? "none" : DEACTIVATE_BAN,
