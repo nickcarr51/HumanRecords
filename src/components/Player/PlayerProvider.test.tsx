@@ -406,6 +406,27 @@ describe("PlayerProvider paging", () => {
     expect(mockLoad).toHaveBeenCalledTimes(2);
   });
 
+  it("background prefetch stops after 3 consecutive fetches that add nothing", async () => {
+    mockLoad.mockResolvedValue({ tracks: ONE_PAGE1, page: 2, hasMore: true, error: null });
+    renderPlayer({ tracks: ONE_PAGE1, source: feedSource(true) });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockLoad).toHaveBeenCalledTimes(3));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockLoad).toHaveBeenCalledTimes(3);
+  });
+
+  it("next still fetches and plays a new track after the prefetch cap", async () => {
+    mockLoad.mockResolvedValue({ tracks: ONE_PAGE1, page: 2, hasMore: true, error: null });
+    renderPlayer({ tracks: ONE_PAGE1, source: feedSource(true) });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockLoad).toHaveBeenCalledTimes(3));
+    await new Promise((r) => setTimeout(r, 50));
+
+    mockLoad.mockResolvedValue({ tracks: PAGE2, page: 3, hasMore: false, error: null });
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Two"));
+  });
+
   it("an album-page queue continues into the feed after its last track", async () => {
     mockAfterRelease.mockResolvedValue({ tracks: [{ id: "f1", title: "Feed One", artistName: "C", page: 3 }], page: 3, hasMore: false, error: null });
     const { container } = renderPlayer({

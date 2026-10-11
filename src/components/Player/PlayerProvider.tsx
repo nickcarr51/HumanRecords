@@ -87,6 +87,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // A track already started by moveTo (src set + play() called), so the load
   // effect must not load it a second time.
   const startedRef = useRef<string | null>(null);
+  // Background prefetches fired for the current queue length. A page that adds
+  // nothing leaves the length unchanged, so this caps empty-page loops.
+  const prefetchRef = useRef({ length: -1, attempts: 0 });
 
   const currentTrack = queueState.tracks[queueState.index] ?? null;
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
@@ -233,6 +236,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
+      prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
     [commit],
@@ -361,7 +365,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // not when it ends (a locked phone may not get the chance then).
   useEffect(() => {
     const { tracks, index, source } = queueState;
-    if (tracks.length > 0 && index === tracks.length - 1 && canExtend(source)) void extend();
+    const pf = prefetchRef.current;
+    if (pf.length !== tracks.length) prefetchRef.current = { length: tracks.length, attempts: 0 };
+    if (tracks.length > 0 && index === tracks.length - 1 && canExtend(source)) {
+      // Stop after MAX_EXTEND_ATTEMPTS fetches that added nothing; goNext can still fetch.
+      if (prefetchRef.current.attempts >= MAX_EXTEND_ATTEMPTS) return;
+      prefetchRef.current.attempts += 1;
+      void extend();
+    }
   }, [queueState, extend]);
 
   useMediaSession(audioRef, currentTrack, isPlaying, { play, pause, next, prev, seek });

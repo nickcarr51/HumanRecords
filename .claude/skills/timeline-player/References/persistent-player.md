@@ -83,6 +83,7 @@ state and effects in `PlayerProvider`.
   after the *last queued track's* `from`; a track without `from` just ends the queue.
 - **Prefetch**: an effect fires `extend()` as soon as the *last loaded* track starts, not when it ends
   (a locked phone may not get to run anything then). One request in flight (`extendingRef`);
+  The background prefetch stops after 3 consecutive fetches that add nothing (`goNext` can still fetch).
   concurrent callers share it. `extend()` calls `loadFeedPage({ q, page: lastPage + 1 })` or
   `continueAfterRelease(ref)` (finished search: the last track's `from`; album: `{ kind: "album",
   albumId }`) (server actions in `src/lib/feed/actions.ts`, which return
