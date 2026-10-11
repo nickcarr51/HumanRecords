@@ -10,6 +10,11 @@ an artist page at `/artists/[id]` showing bio and credited tracks. Built 2026-09
 **Retired from the listener MVP**: the code, tests, and data layer are intact, but signed-in
 users who visit `/artists` or `/artists/*` are redirected to `/feed` and there is no nav link.
 
+**Still live elsewhere:** `/admin/artists` (see [[admin-upload]]) imports `SearchInput` and
+`Pagination` from `src/app/(app)/artists/`. `Pagination`/`pageHref` take an optional
+`basePath` (default `/artists`) for that reuse. Don't delete or move these files without
+updating that page; worktree 2 plans to move them into `src/components/`.
+
 ## The one thing to understand first
 
 **The route is dark only because of one rule in `authRedirectPath`.** Middleware sends
@@ -26,8 +31,9 @@ of the slice are live elsewhere: `escapeLike` is used by the admin artist search
 | Data: list (search + paging + track counts), detail | `src/lib/supabase/artists.ts` (`getArtists`, `getArtist`) |
 | LIKE-escaping (also used by `searchArtists` in admin) | `src/lib/supabase/artists.ts` (`escapeLike`) |
 | Browse page (server) | `src/app/(app)/artists/page.tsx` + `artists.styles.ts` |
-| Debounced URL search box | `src/app/(app)/artists/SearchInput.tsx` |
-| Prev/next pager + `pageHref` | `src/app/(app)/artists/Pagination.tsx` |
+| Debounced URL search box (takes a `label`; shared with `/feed`) | `src/components/SearchInput/` |
+| Prev/next pager | `src/components/Pagination/` |
+| `pageHref(basePath, query, page)` (plain module, server-safe) | `src/components/Pagination/pageHref.ts` |
 | Detail page (server) | `src/app/(app)/artists/[id]/page.tsx` + `artist-detail.styles.ts` |
 | List row | `src/components/ArtistCard/ArtistCard.tsx` |
 | Initials placeholder (server-safe) | `src/lib/initials.ts` |

@@ -31,6 +31,8 @@ All return `{ error: string | null }` and never surface raw GoTrue text.
 
 **`submitOtp(email, token, next?)`**
 - `verifyOtp({ email, token, type: 'email' })`.
+- Ban check first (`code === "user_banned"` or message matches `/banned/i`) → "This account has
+  been deactivated. Contact Human Records if you think this is a mistake." (no redirect).
 - `/expired|invalid|incorrect|token/i` → "That code is invalid or expired — request a new one."
 - Success calls `redirect()`, which **throws** `NEXT_REDIRECT` — so the client only ever sees a
   return value on failure (`res?.error`).

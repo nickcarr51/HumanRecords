@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import styled from 'styled-components';
-import { usePlayer, type PlayerTrack } from '@/components/Player';
+import { usePlayer, type PlayerTrack, type QueueSource } from '@/components/Player';
 import { PlaybackIcon } from '@/components/Player/PlaybackIcon';
 import type { FeedItem } from '@/lib/supabase/feed';
 import { Row, PlayButton, AlbumLink, Meta, Title, Sub, Kind, RowActions, ExpandArea } from './feed.styles';
@@ -23,11 +23,13 @@ export function AlbumRow({
   item,
   queue,
   queueStart,
+  source,
 }: {
   item: Extract<FeedItem, { kind: 'album' }>;
   // The feed-wide queue and the index of this album's first track in it.
   queue: PlayerTrack[];
   queueStart: number;
+  source?: QueueSource;
 }) {
   const { playQueue } = usePlayer();
   const [expanded, setExpanded] = useState(false);
@@ -36,7 +38,7 @@ export function AlbumRow({
   const artist = albumArtistLabel(item.artistNames);
   const { playing, onClick } = usePlayButton(
     item.tracks.map((t) => t.id),
-    () => playQueue(queue, queueStart),
+    () => playQueue(queue, queueStart, source),
   );
 
   return (
@@ -78,7 +80,7 @@ export function AlbumRow({
       </Row>
       <PixelAccordion open={expanded} id={panelId}>
         <ExpandArea>
-          <AlbumTracks tracks={item.tracks} queue={queue} queueStart={queueStart} />
+          <AlbumTracks tracks={item.tracks} queue={queue} queueStart={queueStart} source={source} />
         </ExpandArea>
       </PixelAccordion>
     </div>

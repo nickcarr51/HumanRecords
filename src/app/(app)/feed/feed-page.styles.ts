@@ -25,3 +25,7 @@ export const Scroll = styled.div`
   min-height: 0;
   overflow-y: auto;
 `;
+
+export const Foot = styled.div`
+  flex-shrink: 0;
+`;

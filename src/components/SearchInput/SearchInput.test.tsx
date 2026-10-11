@@ -25,4 +25,10 @@ describe("SearchInput", () => {
     vi.advanceTimersByTime(250);
     expect(replace).toHaveBeenCalledWith("/artists?q=mara");
   });
+
+  it("uses the given label for the box and placeholder", () => {
+    renderWithTheme(<SearchInput initialQuery="" label="Search artists, tracks, albums" />);
+    const box = screen.getByRole("searchbox", { name: "Search artists, tracks, albums" });
+    expect(box).toHaveAttribute("placeholder", "Search artists, tracks, albums");
+  });
 });

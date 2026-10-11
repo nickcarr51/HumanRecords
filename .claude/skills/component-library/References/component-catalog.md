@@ -68,8 +68,12 @@ feature skill — read that skill before changing them.
 | Folder | Owner skill |
 |---|---|
 | `AppShell/` — nav, Admin link, sign-out, mounts the player | [[timeline-player]] (mount), [[admin-upload]] (Admin link) |
-| `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack` | [[timeline-player]] |
-| `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton` | [[timeline-player]] |
+| `Player/` — `PlayerProvider`, `usePlayer`, `PlayerBar`, `toPlayerTrack`, `queue.ts`, `useMediaSession` | [[timeline-player]] |
+| `Feed/` — `FeedList`, `AlbumRow`, `SingleTrackRow`, `AlbumTracks`, `usePlayButton`, `FollowPlayingPage` | [[timeline-player]] |
 | `Downloads/` — `DownloadsProvider`, `useDownloads` (`isDownloaded`, `markDownloaded`; no-op fallback outside a provider), `DownloadButton` (reuses Feed's `PlayButton` style; `Spinner` while signing, `aria-busy`; `↓` / `✓` once downloaded) | [[timeline-player]], [[media-storage]] |
 | `Upload/` — `UploadForm`, `TrackWidget`, `ArtistCombobox`, reducer, engine | [[admin-upload]] |
+| `AdminArtists/` — `ArtistsTable`, `ArtistForm`, `UserCombobox` (single-pick user search), `DeleteArtist`, `admin-artists.styles` (`Danger` section) | [[admin-upload]] |
+| `AdminUsers/` — `NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell` (`disabled`), `UserForm`, `ActiveToggle`, `users.styles` (`Table`: stacked cards below `md`; `td[data-label]` shows a label on phones) | [[invites]] |
 | `ArtistCard/` — artist list row + re-exported `initials` | [[artists-read]] |
+| `SearchInput/` — debounced URL search box (`initialQuery`, `label?`) | [[artists-read]] (used by `/artists`, `/admin/artists` and `/feed`) |
+| `Pagination/` — prev/next pager (`basePath`, `query`, `page`, `totalPages`) + `pageHref` (plain module, server-safe) | [[artists-read]] (used by `/artists`, `/admin/artists` and `/feed`) |

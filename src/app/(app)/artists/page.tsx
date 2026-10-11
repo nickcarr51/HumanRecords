@@ -1,9 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getArtists } from '@/lib/supabase/artists';
-import { ArtistCard, Heading } from '@/components';
-import { SearchInput } from './SearchInput';
-import { Pagination } from './Pagination';
+import { ArtistCard, Heading, Pagination, SearchInput, pageHref } from '@/components';
 import { Page, Header, SearchSlot, List, Empty, Foot } from './artists.styles';
 
 export default async function ArtistsPage({
@@ -24,11 +22,7 @@ export default async function ArtistsPage({
   // otherwise render an empty "no artists" state with an N-of-M pager where
   // N > M. Send the user to the last real page instead.
   if (total > 0 && page > totalPages) {
-    const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (totalPages > 1) params.set('page', String(totalPages));
-    const qs = params.toString();
-    redirect(qs ? `/artists?${qs}` : '/artists');
+    redirect(pageHref('/artists', query, totalPages));
   }
 
   return (
@@ -59,7 +53,7 @@ export default async function ArtistsPage({
       </List>
 
       <Foot>
-        <Pagination query={query} page={page} totalPages={totalPages} />
+        <Pagination basePath="/artists" query={query} page={page} totalPages={totalPages} />
       </Foot>
     </Page>
   );

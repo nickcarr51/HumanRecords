@@ -101,9 +101,10 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 
 - `getFeed` (`feed.ts`): one `releases` select embedding `track:tracks(...)` and
   `album:albums(... album_artists, track_albums(position, tracks(...)))`, ordered
-  `pinned desc, sort_at desc, id desc` with `archived_at is null`, `.range(from, from + pageSize)` — one extra row decides
-  `hasMore`. `toFeedItem` maps single → `kind:"track"`, album → `kind:"album"`; a release
-  whose embedded target is null is skipped. Public `FeedItem`/`FeedPage` shapes unchanged.
+  `pinned desc, sort_at desc, id desc` with `archived_at is null`, `.range(from, from + pageSize - 1)`
+  with `count: 'exact'` (`total`/`totalPages`, `hasMore = page < totalPages`; optional `q` searches via
+  `search_feed`, see [[timeline-player]]). `toFeedItem` maps single → `kind:"track"`, album → `kind:"album"`; a release
+  whose embedded target is null is skipped.
 - `getAlbum` (`albums.ts`): same embeds from `albums`; tracks ordered by
   `track_albums.position`.
 - `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS — PostgREST can't
