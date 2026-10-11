@@ -26,7 +26,7 @@ never unmount. No global state library, no refresh-resume.
 | Player control bar (UI) | `src/components/Player/PlayerBar.tsx` |
 | Queue model (sources, paging, dedup) | `src/components/Player/queue.ts` |
 | Lock-screen controls | `src/components/Player/useMediaSession.ts` |
-| Next-page server actions | `src/lib/feed/actions.ts` (`loadFeedPage`, `continueAfterAlbum`) |
+| Next-page server actions | `src/lib/feed/actions.ts` (`loadFeedPage`, `continueAfterRelease`) |
 | Follow-the-music on /feed | `src/components/Feed/FollowPlayingPage.tsx` |
 | Feed search box + pager | `src/components/{SearchInput,Pagination}/` (shared with [[artists-read]]); `src/app/(app)/feed/{page.tsx,params.ts}` |
 | Feed data (pinned + `sort_at` order, archived hidden) | `src/lib/supabase/feed.ts` (`getFeed`) |
@@ -43,10 +43,11 @@ never unmount. No global state library, no refresh-resume.
 
 - [persistent-player.md](References/persistent-player.md) — the player context, its state
   machine (load/play/pause/next/prev/seek), signed-URL playback, error/autoplay handling, queue
-  sources and paging, pre-signing, Media Session, and `FollowPlayingPage`.
+  sources and paging (a search queue that runs out continues into the main feed after its last
+  release; the view stays on the search), pre-signing, Media Session, and `FollowPlayingPage`.
 - [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
   or `search_feed` via `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
-  `FEED_PAGE_SIZE`), `getAlbumFeedPage` / `getFeedAfterAlbum`, and `getAlbum` (tracks in `position`
+  `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`, and `getAlbum` (tracks in `position`
   order); position ordering and the "Various Artists" label.
 - [routing-and-auth.md](References/routing-and-auth.md) — the `(app)` route group, `/feed`
   as the authenticated home, `/albums/[id]`, the auth retarget, retired `/artists`, the

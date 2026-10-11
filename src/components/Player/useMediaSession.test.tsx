@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
 vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn() }));
-vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterAlbum: vi.fn() }));
+vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterRelease: vi.fn() }));
 import { getTrackStreamUrl } from "@/lib/storage/actions";
 import { PlayerProvider, usePlayer } from "./PlayerProvider";
 

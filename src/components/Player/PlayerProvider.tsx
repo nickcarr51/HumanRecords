@@ -9,13 +9,14 @@ import {
   useState,
 } from "react";
 import { getTrackStreamUrl, type UrlResult } from "@/lib/storage/actions";
-import { continueAfterAlbum, loadFeedPage, type QueuePage } from "@/lib/feed/actions";
+import { continueAfterRelease, loadFeedPage, type QueuePage } from "@/lib/feed/actions";
 import {
   EMPTY_QUEUE,
   advance,
   appendPage,
   back,
   canExtend,
+  isFinishedSearch,
   startQueue,
   type PlayerTrack,
   type QueueSource,
@@ -136,19 +137,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [commit, startAudio],
   );
 
-  // Fetch the next page (or, for an album-page queue, the feed after the
-  // album) and append it.
+  // Fetch the next page and append it. An album-page queue, or a search queue
+  // with no more pages, continues instead into the main feed after its last
+  // release; from then on the queue's source is the plain feed (q "").
   const extend = useCallback((): Promise<ExtendResult> => {
     if (extendingRef.current) return extendingRef.current;
-    const { source } = queueRef.current;
+    const { source, tracks } = queueRef.current;
     let request: Promise<QueuePage>;
+    // The search the result belongs to; a continuation is always the plain feed.
+    let q: string | undefined;
     if (source.kind === "feed" && source.hasMore) {
-      const { q, lastPage } = source;
+      const { lastPage } = source;
+      q = source.q;
       // Called inside .then so a synchronous throw also becomes a rejection.
-      request = Promise.resolve().then(() => loadFeedPage({ q, page: lastPage + 1 }));
+      request = Promise.resolve().then(() => loadFeedPage({ q: source.q, page: lastPage + 1 }));
+    } else if (isFinishedSearch(source)) {
+      const from = tracks[tracks.length - 1]?.from;
+      if (!from) return Promise.resolve("end");
+      q = "";
+      request = Promise.resolve().then(() => continueAfterRelease(from));
     } else if (source.kind === "album") {
       const { albumId } = source;
-      request = Promise.resolve().then(() => continueAfterAlbum(albumId));
+      q = "";
+      request = Promise.resolve().then(() => continueAfterRelease({ kind: "album", albumId }));
     } else {
       return Promise.resolve("end");
     }
@@ -158,7 +169,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (gen !== genRef.current) return "end";
         if (res.error) return "error";
         const before = queueRef.current.tracks.length;
-        commit(appendPage(queueRef.current, res.tracks, res.page, res.hasMore));
+        commit(appendPage(queueRef.current, res.tracks, res.page, res.hasMore, q));
         return queueRef.current.tracks.length > before ? "added" : "end";
       })
       .catch((): ExtendResult => "error")

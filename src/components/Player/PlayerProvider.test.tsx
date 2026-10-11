@@ -5,14 +5,14 @@ import { renderWithTheme } from "@/test/renderWithTheme";
 
 vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn() }));
 import { getTrackStreamUrl } from "@/lib/storage/actions";
-vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterAlbum: vi.fn() }));
-import { continueAfterAlbum, loadFeedPage } from "@/lib/feed/actions";
+vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterRelease: vi.fn() }));
+import { continueAfterRelease, loadFeedPage } from "@/lib/feed/actions";
 import { PlayerProvider, usePlayer, toPlayerTrack } from "./PlayerProvider";
 import type { PlayerTrack, QueueSource } from "./queue";
 
 const mockGet = vi.mocked(getTrackStreamUrl);
 const mockLoad = vi.mocked(loadFeedPage);
-const mockAfterAlbum = vi.mocked(continueAfterAlbum);
+const mockAfterRelease = vi.mocked(continueAfterRelease);
 
 beforeAll(() => {
   // jsdom does not implement media playback.
@@ -26,7 +26,7 @@ beforeEach(() => {
   mockGet.mockImplementation(async (id: string) => ({ url: `https://signed.example/${id}`, error: null }));
   // clearAllMocks keeps return values; reset so one test's deferred page can't leak into the next.
   mockLoad.mockReset();
-  mockAfterAlbum.mockReset();
+  mockAfterRelease.mockReset();
 });
 
 const TRACKS = [
@@ -42,6 +42,7 @@ function Harness({ tracks = TRACKS, source }: { tracks?: PlayerTrack[]; source?:
       <span data-testid="status">{p.status}</span>
       <span data-testid="count">{p.queue.length}</span>
       <span data-testid="source">{p.source.kind}</span>
+      <span data-testid="source-json">{JSON.stringify(p.source)}</span>
       <button onClick={() => p.playQueue(tracks, 0, source)}>play</button>
       <button onClick={() => p.playQueue(TRACKS, 0)}>play-other</button>
       <button onClick={() => p.next()}>next</button>
@@ -190,7 +191,7 @@ describe("PlayerProvider", () => {
 
   it("does not skip loading a track whose earlier moveTo was superseded before its effect ran", async () => {
     const FOUR = [...TRACKS, { id: "t3", title: "Three", artistName: "Gamma" }, { id: "t4", title: "Four", artistName: "Delta" }];
-    const { container } = renderPlayer({ tracks: FOUR });
+    renderPlayer({ tracks: FOUR });
     await userEvent.click(screen.getByText("play"));
     await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2")); // t2 pre-signed
     await new Promise((r) => setTimeout(r, 0));
@@ -375,16 +376,76 @@ describe("PlayerProvider paging", () => {
   });
 
   it("an album-page queue continues into the feed after its last track", async () => {
-    mockAfterAlbum.mockResolvedValue({ tracks: [{ id: "f1", title: "Feed One", artistName: "C", page: 3 }], page: 3, hasMore: false, error: null });
+    mockAfterRelease.mockResolvedValue({ tracks: [{ id: "f1", title: "Feed One", artistName: "C", page: 3 }], page: 3, hasMore: false, error: null });
     const { container } = renderPlayer({
       tracks: [{ id: "a1", title: "Album One", artistName: "B" }],
       source: { kind: "album", albumId: "al1" },
     });
     await userEvent.click(screen.getByText("play"));
-    await waitFor(() => expect(mockAfterAlbum).toHaveBeenCalledWith("al1"));
+    await waitFor(() => expect(mockAfterRelease).toHaveBeenCalledWith({ kind: "album", albumId: "al1" }));
     await waitFor(() => expect(screen.getByTestId("source")).toHaveTextContent("feed"));
 
     endTrack(container);
     await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Feed One"));
+  });
+
+  const SEARCH_LAST = [{ id: "s1", title: "Search One", artistName: "A", page: 1, from: { kind: "single" as const, trackId: "s1" } }];
+  const searchSource: QueueSource = { kind: "feed", q: "wav", lastPage: 1, hasMore: false };
+  const CONTINUATION = [{ id: "f1", title: "Feed One", artistName: "C", page: 4, from: { kind: "single" as const, trackId: "f1" } }];
+
+  it("a finished search queue continues into the main feed after its last release (next)", async () => {
+    let resolve!: (v: Awaited<ReturnType<typeof continueAfterRelease>>) => void;
+    mockAfterRelease.mockReturnValue(new Promise((r) => (resolve = r)));
+    renderPlayer({ tracks: SEARCH_LAST, source: searchSource });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockAfterRelease).toHaveBeenCalledWith({ kind: "single", trackId: "s1" }));
+
+    // Pressed before the continuation arrives: next waits for it, then plays it.
+    await userEvent.click(screen.getByText("next"));
+    resolve({ tracks: CONTINUATION, page: 4, hasMore: true, error: null });
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Feed One"));
+    expect(mockAfterRelease).toHaveBeenCalledTimes(1);
+    // Later pages come from the main feed, not the search.
+    await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ q: "", page: 5 }));
+  });
+
+  it("prefetches a search queue's continuation and starts it from the pre-signed URL on 'ended'", async () => {
+    mockAfterRelease.mockResolvedValue({ tracks: CONTINUATION, page: 4, hasMore: true, error: null });
+    const { container } = renderPlayer({ tracks: SEARCH_LAST, source: searchSource });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockAfterRelease).toHaveBeenCalledWith({ kind: "single", trackId: "s1" }));
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("2"));
+    // After the continuation the queue's source is the plain feed.
+    expect(JSON.parse(screen.getByTestId("source-json").textContent!)).toEqual({ kind: "feed", q: "", lastPage: 4, hasMore: true });
+
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("f1"));
+    await new Promise((r) => setTimeout(r, 0));
+    mockGet.mockClear();
+
+    const audio = endTrack(container);
+    expect(audio.getAttribute("src")).toBe("https://signed.example/f1");
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Feed One"));
+    expect(mockGet).not.toHaveBeenCalledWith("f1");
+  });
+
+  it("a finished search queue whose last track has no release ref just ends", async () => {
+    const { container } = renderPlayer({ tracks: ONE_PAGE1, source: searchSource });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+    endTrack(container);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByTestId("title")).toHaveTextContent("One");
+    expect(mockAfterRelease).not.toHaveBeenCalled();
+  });
+
+  it("a finished plain-feed queue still stops at the end (no continuation)", async () => {
+    const { container } = renderPlayer({ tracks: SEARCH_LAST, source: feedSource(false) });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("s1"));
+    endTrack(container);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByTestId("title")).toHaveTextContent("Search One");
+    expect(mockAfterRelease).not.toHaveBeenCalled();
+    expect(mockLoad).not.toHaveBeenCalled();
   });
 });

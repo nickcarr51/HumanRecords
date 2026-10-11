@@ -159,20 +159,25 @@ export async function getFeed(
   return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
 }
 
-export type FeedAfterAlbum = { items: FeedItem[]; page: number; hasMore: boolean };
+// A release in the feed: an album by its album id, a single by its track id
+// (the same ids a FeedItem carries).
+export type ReleaseRef = { kind: "album"; albumId: string } | { kind: "single"; trackId: string };
 
-// The feed page an album's release is on, or null if it is archived/missing.
-// Counts the live releases ordered ahead of it using the feed's own order:
-// pinned desc, sort_at desc, id desc.
-export async function getAlbumFeedPage(
+export type FeedAfterRelease = { items: FeedItem[]; page: number; hasMore: boolean };
+
+// The feed page a release is on, or null if it is archived/missing. Counts the
+// live releases ordered ahead of it using the feed's own order: pinned desc,
+// sort_at desc, id desc.
+export async function getReleaseFeedPage(
   supabase: SupabaseClient<Database>,
-  albumId: string,
+  ref: ReleaseRef,
   pageSize: number = feedPageSize(),
 ): Promise<number | null> {
-  const { data: rel, error } = await supabase
-    .from("releases")
-    .select("id, pinned, sort_at")
-    .eq("album_id", albumId)
+  const lookup = supabase.from("releases").select("id, pinned, sort_at");
+  const { data: rel, error } = await (ref.kind === "album"
+    ? lookup.eq("album_id", ref.albumId)
+    : lookup.eq("track_id", ref.trackId)
+  )
     .is("archived_at", null)
     .maybeSingle();
   if (error) throw error;
@@ -194,18 +199,21 @@ export async function getAlbumFeedPage(
   return Math.floor((count ?? 0) / Math.max(1, pageSize)) + 1;
 }
 
-// What plays after an album finishes on the album page: the rest of its feed
-// page, or the next page when the album was the last item on its page.
-export async function getFeedAfterAlbum(
+// What plays after a release when its queue runs out (an album-page queue, or a
+// search queue's last release): the rest of the release's main-feed page, or
+// the next page when the release was the last item on its page.
+export async function getFeedAfterRelease(
   supabase: SupabaseClient<Database>,
-  albumId: string,
+  ref: ReleaseRef,
   pageSize: number = feedPageSize(),
-): Promise<FeedAfterAlbum | null> {
-  const page = await getAlbumFeedPage(supabase, albumId, pageSize);
+): Promise<FeedAfterRelease | null> {
+  const page = await getReleaseFeedPage(supabase, ref, pageSize);
   if (page === null) return null;
 
   const current = await getFeed(supabase, { page, pageSize });
-  const idx = current.items.findIndex((i) => i.kind === "album" && i.id === albumId);
+  const idx = current.items.findIndex((i) =>
+    ref.kind === "album" ? i.kind === "album" && i.id === ref.albumId : i.kind !== "album" && i.id === ref.trackId,
+  );
   if (idx === -1) return null;
 
   const rest = current.items.slice(idx + 1);

@@ -41,6 +41,22 @@ describe("feedQueue", () => {
     expect(tracks.every((x) => x.page === 3)).toBe(true);
     expect(offsets).toEqual([0, 1, 3]);
   });
+
+  it("tags each track with the release it came from", () => {
+    const items: FeedItem[] = [
+      { kind: "track", id: "s1", title: "S1", trackArtUrl: null, artistNames: [], createdAt: "" },
+      {
+        kind: "album", id: "al", title: "AL", albumArtUrl: null, artistNames: [], createdAt: "",
+        tracks: [{ id: "a1", title: "A1", artistNames: [] }, { id: "a2", title: "A2", artistNames: [] }],
+      },
+    ];
+    const { tracks } = feedQueue(items, 1);
+    expect(tracks.map((x) => x.from)).toEqual([
+      { kind: "single", trackId: "s1" },
+      { kind: "album", albumId: "al" },
+      { kind: "album", albumId: "al" },
+    ]);
+  });
 });
 
 describe("queue", () => {
@@ -60,6 +76,16 @@ describe("queue", () => {
     expect(advance(startQueue([t("a")], 0, { kind: "album", albumId: "al" })).kind).toBe("needsMore");
     expect(advance(startQueue([t("a")], 0, feed(false))).kind).toBe("end");
     expect(advance(startQueue([t("a")], 0, { kind: "none" })).kind).toBe("end");
+  });
+
+  it("advance at the end of a finished search asks for more (it continues into the feed)", () => {
+    expect(advance(startQueue([t("a")], 0, feed(false, 1, "wav"))).kind).toBe("needsMore");
+  });
+
+  it("appendPage with a plain-feed continuation switches a search source to q ''", () => {
+    const s = appendPage(startQueue([t("a", 1)], 0, feed(false, 1, "wav")), [t("b", 4)], 4, true, "");
+    expect(s.tracks.map((x) => x.id)).toEqual(["a", "b"]);
+    expect(s.source).toEqual({ kind: "feed", q: "", lastPage: 4, hasMore: true });
   });
 
   it("appendPage adds tracks, records the page and keeps q", () => {
@@ -95,6 +121,8 @@ describe("queue", () => {
   it("canExtend", () => {
     expect(canExtend(feed(true))).toBe(true);
     expect(canExtend(feed(false))).toBe(false);
+    expect(canExtend(feed(false, 1, "wav"))).toBe(true);
+    expect(canExtend(feed(false, 1, "   "))).toBe(false);
     expect(canExtend({ kind: "album", albumId: "x" })).toBe(true);
     expect(canExtend({ kind: "none" })).toBe(false);
   });

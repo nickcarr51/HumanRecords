@@ -54,18 +54,22 @@ and the plain feed can never disagree on order.
 integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging
 (`src/lib/supabase/feed-page-size.test.ts`).
 
-## `getAlbumFeedPage` / `getFeedAfterAlbum`
+## `getReleaseFeedPage` / `getFeedAfterRelease`
 
-- `getAlbumFeedPage(supabase, albumId, pageSize?)` → the feed page (1-based) an album's release is
-  on, or `null` if archived/missing. Counts live releases ordered ahead of it with `or()`:
+- `ReleaseRef` = `{ kind: "album", albumId } | { kind: "single", trackId }` (the same ids a
+  `FeedItem` carries: an album item's `id` is the album id, a single's is its track id).
+- `getReleaseFeedPage(supabase, ref, pageSize?)` → the main-feed page (1-based) a release is
+  on (looked up by `album_id` or `track_id`), or `null` if archived/missing. Counts live releases ordered ahead of it with `or()`:
   pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is wrapped in double
   quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
   `floor(ahead / pageSize) + 1`.
-- `getFeedAfterAlbum(supabase, albumId, pageSize?)` → `{ items, page, hasMore } | null`: the items
-  after the album on its page, or the whole next page when it was the last item. Used by
-  `continueAfterAlbum` for the album-page queue.
-- Tests: `feed-query.data.test.ts` (search through `getFeed`), `feed-after-album.data.test.ts`
-  (album position and continuation). For local paging, set `FEED_PAGE_SIZE=2`.
+- `getFeedAfterRelease(supabase, ref, pageSize?)` → `FeedAfterRelease` (`{ items, page, hasMore }`)
+  `| null`: the items after the release on its main-feed page (never the search), or the whole next
+  page when it was the last item. Used by `continueAfterRelease` for the album-page queue and for a
+  search queue that ran out (a search queue continues into the main feed after its last release;
+  the view stays on the search).
+- Tests: `feed-query.data.test.ts` (search through `getFeed`), `feed-after-release.data.test.ts`
+  (album and single position and continuation, archived → null). For local paging, set `FEED_PAGE_SIZE=2`.
 
 ## `getAlbum(supabase, id)` → `AlbumDetail | null`
 

@@ -72,19 +72,27 @@ Pure model in `queue.ts` (no `'use client'`, so server actions build `PlayerTrac
 state and effects in `PlayerProvider`.
 
 - **`QueueSource`** says where the queue came from and so what follows its last track:
-  `{ kind: "feed", q, lastPage, hasMore }` (next page of the same search), `{ kind: "album", albumId }`
+  `{ kind: "feed", q, lastPage, hasMore }` (next page of the same search; a search with non-empty `q`
+  and no more pages continues into the main feed after its last release), `{ kind: "album", albumId }`
   (album page: continues into the feed after that album), `{ kind: "none" }` (ends). `playQueue`
-  takes it as the third arg; `canExtend(source)` is true for a feed with `hasMore` and for an album.
+  takes it as the third arg; `canExtend(source)` is true for a feed with `hasMore`, for a finished
+  search (`isFinishedSearch`) and for an album. A plain feed (`q: ""`) with no more pages ends.
   `advance(state)` returns `moved | needsMore | end`.
+- **`PlayerTrack.from`**: `feedQueue` tags every track with its release (`ReleaseRef`: album tracks
+  `{ kind: "album", albumId }`, singles `{ kind: "single", trackId }`). A finished search continues
+  after the *last queued track's* `from`; a track without `from` just ends the queue.
 - **Prefetch**: an effect fires `extend()` as soon as the *last loaded* track starts, not when it ends
   (a locked phone may not get to run anything then). One request in flight (`extendingRef`);
   concurrent callers share it. `extend()` calls `loadFeedPage({ q, page: lastPage + 1 })` or
-  `continueAfterAlbum(albumId)` (server actions in `src/lib/feed/actions.ts`, which return
+  `continueAfterRelease(ref)` (finished search: the last track's `from`; album: `{ kind: "album",
+  albumId }`) (server actions in `src/lib/feed/actions.ts`, which return
   `{ tracks, page, hasMore, error }` and never throw).
 - **`genRef`**: bumped by every `playQueue`. Any async result (extend, pre-sign, `startAudio`) from an
   older generation is dropped, so a slow page can't land in a newer queue.
 - **`appendPage`** skips tracks already queued (a release published or moved mid-session shifts the
-  pages, so a track can reappear) and records `lastPage`/`hasMore`. If a page adds nothing,
+  pages, so a track can reappear) and records `lastPage`/`hasMore`. Its optional `q` arg says which
+  search the page came from; `extend()` passes `""` for a continuation, so afterwards the source is
+  the plain feed and later pages come from the main feed. If a page adds nothing,
   `goNext` fetches again, up to `MAX_EXTEND_ATTEMPTS` (3), then stops.
 - **Pre-sign**: an effect signs the *next* track's URL (`presignedRef`, `{ trackId, url, at }`).
   It is kept only if that track is still next when the result arrives. A pre-signed URL older than
@@ -93,9 +101,12 @@ state and effects in `PlayerProvider`.
   right there, inside the `ended` (or click) handler, and marks `startedRef` so the load effect does
   not load it twice. Reason: on a locked iPhone, playback started after an awaited network call
   outside the handler can be blocked; starting synchronously in `ended` keeps it alive.
-- **Album to feed handoff**: the album page passes `{ kind: "album", albumId }`; when its last
-  track ends, `continueAfterAlbum` (`getFeedAfterAlbum`) returns the rest of the album's feed page,
-  or the next page if it was last, and the source becomes a feed source.
+- **Album / search to feed handoff**: the album page passes `{ kind: "album", albumId }`; a search
+  queue that runs out uses its last track's `from`. `continueAfterRelease` (`getFeedAfterRelease`)
+  returns the rest of that release's main-feed page, or the next page if it was last; tracks already
+  queued are skipped, and the source becomes `{ kind: "feed", q: "" }`. An archived/missing release
+  returns nothing, so the queue stops. The search view does not move (`FollowPlayingPage` compares
+  the viewed `q` with the source `q`).
 - **Media Session** (`useMediaSession`): metadata (title, artist, fixed artwork
   `/human_records_main_logo.png` for every track), `playbackState`, handlers for play, pause,
   previoustrack, nexttrack and seekto (registered once, reading the latest callbacks through a ref;
