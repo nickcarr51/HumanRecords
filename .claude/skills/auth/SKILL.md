@@ -1,6 +1,6 @@
 ---
 name: auth
-description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, or a new route needs protecting.
+description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, a new route needs protecting, or a public asset (icon, `og.png`, manifest) redirects to `/login` when logged out.
 ---
 
 # Auth: Invite-only Passwordless Sign-in
@@ -19,7 +19,10 @@ middleware on every request. Signed-in users land on `/feed`.
 2. **Server components** re-check: the `(app)` layout calls `getSessionUser()` and redirects
    to `/login`; admin pages call `requireLabelMember()`.
 3. **Server actions and the database** re-check on every call (`getSessionUser()` in each
-   action; RLS + definer functions in Postgres).
+   action; RLS + definer functions in Postgres). Admin artist/user actions use
+   `activeLabelMemberId()` (`src/lib/admin/caller.ts`): role check plus `auth.getUser()`, which
+   refuses a deactivated (banned) caller whose access token is still valid. `getClaims()` /
+   `getCurrentRole()` alone accept that stale token for up to `jwt_expiry` (1h).
 Invite-only is enforced by Supabase, not app code: `shouldCreateUser: false` on OTP request
 plus `enable_signup = false`.
 

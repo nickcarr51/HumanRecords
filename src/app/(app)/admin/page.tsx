@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { Heading, Text } from '@/components';
 import { requireLabelMember } from '@/lib/auth/role';
 import { ActionCard, Back, Page } from './admin.styles';
+
+export const metadata: Metadata = { title: 'Admin' };
 
 export default async function AdminPage() {
   // Layouts don't re-run on client navigation; the page must gate itself.
@@ -16,6 +19,10 @@ export default async function AdminPage() {
       <ActionCard href="/admin/users">
         <Heading $level={3}>Users</Heading>
         <Text $variant="muted">Invite people and manage roles.</Text>
+      </ActionCard>
+      <ActionCard href="/admin/artists">
+        <Heading $level={3}>Artists</Heading>
+        <Text $variant="muted">Add and edit artists, link them to accounts.</Text>
       </ActionCard>
     </Page>
   );

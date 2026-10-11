@@ -64,6 +64,14 @@ describe("redeemInvite", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
+  it("restores the token and explains a deactivated account when verifyOtp says banned", async () => {
+    verifyOtp.mockResolvedValue({ error: { code: "user_banned", message: "User is banned" } });
+    const res = await redeemInvite(TOKEN);
+    expect(res.error).toBe("This account has been deactivated. Contact Human Records if you think this is a mistake.");
+    expect(restoreInvite).toHaveBeenCalledWith(expect.anything(), CLAIM, TOKEN);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
   it("restores the token when generateLink fails", async () => {
     generateLink.mockResolvedValue({ data: null, error: { message: "boom" } });
     const res = await redeemInvite(TOKEN);

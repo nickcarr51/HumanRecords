@@ -19,6 +19,11 @@ vi.mock('@/components/Player', async () => {
     usePlayer: () => ({ playQueue, toggle, ...player }),
   };
 });
+vi.mock('@/components/Downloads', () => ({
+  DownloadButton: ({ title }: { title: string }) => (
+    <button type="button" aria-label={`Download ${title}`} />
+  ),
+}));
 vi.mock('next/link', () => ({
   default: ({ children, ...rest }: { children: React.ReactNode; href: string }) => <a {...rest}>{children}</a>,
 }));
@@ -53,6 +58,18 @@ beforeEach(() => {
   playQueue.mockClear();
   toggle.mockClear();
   player = { currentTrack: null, isPlaying: false, status: 'idle' };
+});
+
+describe('FeedList download buttons', () => {
+  it('every single and every expanded album track has a download button', () => {
+    renderWithTheme(<FeedList items={items} />);
+    expect(screen.getByRole('button', { name: 'Download Newest Single' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download Older Single' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download FIRST LIGHT' })).toBeNull(); // collapsed
+    fireEvent.click(screen.getByRole('button', { name: 'Expand tracks' }));
+    expect(screen.getByRole('button', { name: 'Download FIRST LIGHT' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download NIGHT SHIFT' })).toBeInTheDocument();
+  });
 });
 
 describe('FeedList playback queue', () => {

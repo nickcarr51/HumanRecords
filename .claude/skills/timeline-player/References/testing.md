@@ -44,6 +44,18 @@ loading, errored track retries via `playQueue`. Also asserts rows pass their `so
 same `q`; deferred while hidden). `Pagination`/`SearchInput` tests live with the components in
 `src/components/` ([[artists-read]]).
 
+**Downloads** (feature/downloads) — `src/components/Downloads/DownloadsProvider.test.tsx` (seeded ids,
+mark flips every consumer, new `initialIds` on rerender unioned with local marks, no-provider fallback);
+`DownloadButton.test.tsx` (↓/✓ labels, spinner + double-tap ignored, success marks + navigates via mocked
+`navigate.ts`, `{ error }` and thrown action → toast, state unchanged);
+`src/components/Feed/AlbumTracks.downloads.test.tsx` (real button in real rows: seeded ✓, and no
+ToastProvider/DownloadsProvider → renders and survives a failed download); `FeedList.test.tsx` (every single
+and expanded album track has a download button, Downloads mocked); `src/lib/supabase/downloads.test.ts`
+(`feedTrackIds`, empty → no query, chunks of 100, error → `[]`) and `downloads.data.test.ts` (RLS: only the
+caller's rows; repeat upsert keeps one row); page tests `src/app/(app)/feed/page.test.tsx` and
+`albums/[id]/page.test.tsx` (ids passed to `getMyDownloadedTrackIds`, `Feed` title, album `generateMetadata`).
+Filename/signing tests live with [[media-storage]].
+
 ## What is deliberately NOT tested (agreed scope)
 
 Pure presentational render tests for `SingleTrackRow`/`AlbumRow` layout and `AppShell`'s

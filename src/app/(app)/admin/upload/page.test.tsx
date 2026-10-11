@@ -8,7 +8,7 @@ vi.mock("@/lib/admin/actions", () => ({
   publishRelease: vi.fn(),
 }));
 
-import AdminUploadPage from "./page";
+import AdminUploadPage, { metadata } from "./page";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -27,3 +27,5 @@ describe("AdminUploadPage", () => {
     expect(requireLabelMember).toHaveBeenCalledTimes(1);
   });
 });
+
+it("sets the tab title", () => expect(metadata.title).toBe("Admin · Upload"));

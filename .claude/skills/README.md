@@ -32,6 +32,8 @@ Platform:
   model, session/role helpers, email templates, inviting users.
 - **media-storage** — private R2 bucket, presigned stream/download/image/upload URLs,
   session-gated storage actions, object keys, download recording.
+- **head-tags** — page titles (`<Page> · Human Services`), root Open Graph/Twitter tags,
+  `metadataBase`/`SITE_URL`, icons + OG image (sizes), manifest, logged-out reachability.
 
 Features:
 

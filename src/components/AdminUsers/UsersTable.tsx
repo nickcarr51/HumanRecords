@@ -1,6 +1,9 @@
 'use client';
 
+import NextLink from 'next/link';
+import { Link } from '@/components/Link';
 import { Mono } from '@/components/Mono';
+import { Tag } from '@/components/Tag';
 import { Text } from '@/components/Text';
 import type { AdminUserRow } from '@/lib/admin/users-types';
 import { InviteCell } from './InviteCell';
@@ -27,7 +30,7 @@ export function UsersTable({ users, selfId }: UsersTableProps) {
         {users.map((u) => {
           const isSelf = u.id === selfId;
           return (
-            <tr key={u.id}>
+            <tr key={u.id} data-deactivated={u.deactivated ? 'true' : undefined}>
               <td>
                 <Cell>
                   <strong>
@@ -35,18 +38,20 @@ export function UsersTable({ users, selfId }: UsersTableProps) {
                     {isSelf ? ' (you)' : ''}
                   </strong>
                   <Mono>{u.email}</Mono>
+                  {u.deactivated ? <Tag $tone="warning">Deactivated</Tag> : null}
+                  <Link as={NextLink} href={`/admin/users/${u.id}`}>Edit</Link>
                 </Cell>
               </td>
               <td>
                 <RoleSelect
                   userId={u.id}
                   role={u.role}
-                  disabled={isSelf}
+                  disabled={isSelf || u.deactivated}
                   label={`Role for ${u.email}`}
                 />
               </td>
               <td>
-                <InviteCell user={u} />
+                <InviteCell user={u} disabled={u.deactivated} />
               </td>
             </tr>
           );
