@@ -11,7 +11,7 @@ navigation, the player mounted inside `AppShell` persists (see
 `/dashboard`, `/admin/**` ([[admin-upload]]), and the retired `/artists` ([[artists-read]]).
 
 - `/feed` (`src/app/(app)/feed/page.tsx`) — async server component. Reads `?q=` (trimmed) and
-  `?page=` (`parsePage` in the plain module `params.ts`: junk, `0`, negatives → 1; `2.5` → 2),
+  `?page=` (`parsePage` in the plain module `params.ts`: junk, `0`, negatives, non-finite or above `MAX_PAGE` (100 000) → 1; `2.5` → 2; `q` is also capped at `MAX_QUERY_LENGTH` (200) and a repeated `?q=a&q=b` / `?page=` is ignored),
   then `getFeed(supabase, { page, q })`. A page past the end redirects to the last page, keeping
   `q` (`pageHref`). Renders `SearchInput` (label `Search artists, tracks, albums`) as the header,
   a scroll area keyed on `q|page` (new page/search starts at the top) with

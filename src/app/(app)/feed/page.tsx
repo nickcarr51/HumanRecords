@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getFeed } from '@/lib/supabase/feed';
+import { getFeed, MAX_QUERY_LENGTH } from '@/lib/supabase/feed';
 import { FeedList, FollowPlayingPage, Pagination, SearchInput } from '@/components';
 import { pageHref } from '@/components/Pagination/pageHref';
 import { parsePage } from './params';
@@ -9,11 +9,11 @@ import { Page, Header, Scroll, Foot } from './feed-page.styles';
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  const q = (sp.q ?? '').trim();
-  const page = parsePage(sp.page);
+  const q = typeof sp.q === 'string' ? sp.q.trim().slice(0, MAX_QUERY_LENGTH) : '';
+  const page = parsePage(typeof sp.page === 'string' ? sp.page : undefined);
 
   const supabase = await createClient();
   const feed = await getFeed(supabase, { page, q });

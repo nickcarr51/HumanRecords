@@ -5,7 +5,11 @@ const redirect = vi.fn((url: string) => {
   throw new Error(`REDIRECT ${url}`);
 });
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => ({})) }));
-vi.mock('@/lib/supabase/feed', () => ({ getFeed: (...a: unknown[]) => getFeed(...a) }));
+vi.mock('@/lib/supabase/feed', () => ({
+  getFeed: (...a: unknown[]) => getFeed(...a),
+  MAX_PAGE: 100_000,
+  MAX_QUERY_LENGTH: 200,
+}));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => redirect(url),
   useRouter: vi.fn(),
@@ -41,5 +45,19 @@ describe('FeedPage', () => {
     getFeed.mockResolvedValue(result(0, 1));
     await expect(FeedPage({ searchParams: Promise.resolve({ q: 'zzz' }) })).resolves.toBeTruthy();
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it('ignores repeated q and page params instead of throwing', async () => {
+    getFeed.mockResolvedValue(result(0, 1));
+    await expect(
+      FeedPage({ searchParams: Promise.resolve({ q: ['a', 'b'], page: ['2', '3'] }) }),
+    ).resolves.toBeTruthy();
+    expect(getFeed).toHaveBeenCalledWith({}, { page: 1, q: '' });
+  });
+
+  it('caps the search text at 200 characters', async () => {
+    getFeed.mockResolvedValue(result(0, 1));
+    await FeedPage({ searchParams: Promise.resolve({ q: 'x'.repeat(500) }) });
+    expect(getFeed).toHaveBeenCalledWith({}, { page: 1, q: 'x'.repeat(200) });
   });
 });

@@ -40,6 +40,11 @@ const DEFAULT_PAGE_SIZE = 20;
 
 // FEED_PAGE_SIZE lets local dev use tiny pages (e.g. 3) to exercise paging
 // and auto-advance with a small catalog. Production leaves it unset.
+// Input caps: PostgREST rejects an exponent-notation offset (page 1e22), and a
+// search string has no business being longer than this.
+export const MAX_PAGE = 100_000;
+export const MAX_QUERY_LENGTH = 200;
+
 export function feedPageSize(): number {
   const raw = process.env.FEED_PAGE_SIZE;
   const n = raw ? Number(raw) : NaN;
@@ -128,9 +133,10 @@ export async function getFeed(
   supabase: SupabaseClient<Database>,
   opts: { page?: number; pageSize?: number; q?: string } = {},
 ): Promise<FeedPage> {
-  const page = Math.max(1, opts.page ?? 1);
+  const rawPage = Math.floor(Number(opts.page ?? 1));
+  const page = Number.isFinite(rawPage) && rawPage >= 1 && rawPage <= MAX_PAGE ? rawPage : 1;
   const pageSize = Math.max(1, opts.pageSize ?? feedPageSize());
-  const q = (opts.q ?? "").trim();
+  const q = typeof opts.q === "string" ? opts.q.trim().slice(0, MAX_QUERY_LENGTH) : "";
   const from = (page - 1) * pageSize;
 
   const { data, error, count } = await releaseQuery(supabase, q)

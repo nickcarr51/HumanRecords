@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createAdminClient, createTestUser } from "./test-helpers";
-import { getFeed } from "./feed";
+import { getFeed, MAX_QUERY_LENGTH } from "./feed";
 
 const admin = createAdminClient();
 const trackIds: string[] = [];
@@ -96,6 +96,29 @@ describe("getFeed with q", () => {
     await asListener(async (client) => {
       const { items } = await getFeed(client, { q: `${tag} album`, pageSize: 10 });
       expect(items.map((i) => [i.kind, i.id])).toEqual([["album", albumId]]);
+    });
+  });
+
+  it("treats a non-finite or over-cap page as page 1 and a non-string q as blank", async () => {
+    await asListener(async (client) => {
+      for (const page of [1e22, Infinity, NaN, 100_001]) {
+        const r = await getFeed(client, { page, pageSize: 2 });
+        expect(r.page).toBe(1);
+      }
+      const r = await getFeed(client, { q: ["a", "b"] as unknown as string, pageSize: 2 });
+      expect(r.page).toBe(1);
+    });
+  });
+
+  it("caps q at MAX_QUERY_LENGTH", async () => {
+    const tag = `FSC${Date.now()}`;
+    const title = tag + "a".repeat(MAX_QUERY_LENGTH - tag.length); // exactly the cap
+    const a = await track(title);
+    await single(a, "2101-03-02T00:00:00Z");
+    await asListener(async (client) => {
+      // the 50 extra characters are cut off, so the capped q still matches the title
+      const { items } = await getFeed(client, { q: title + "b".repeat(50), pageSize: 10 });
+      expect(items.map((i) => i.id)).toEqual([a]);
     });
   });
 

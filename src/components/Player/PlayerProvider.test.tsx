@@ -212,6 +212,37 @@ describe("PlayerProvider", () => {
     await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2"));
   });
 
+  it("a superseded track's play() rejection does not flip the status while the next track loads", async () => {
+    const THREE = [...TRACKS, { id: "t3", title: "Three", artistName: "Gamma" }];
+    let resolveC!: (v: Awaited<ReturnType<typeof getTrackStreamUrl>>) => void;
+    mockGet.mockImplementation(async (id: string) => {
+      if (id === "t3") return new Promise((r) => (resolveC = r)); // C is never pre-signed in time
+      return { url: `https://signed.example/${id}`, error: null };
+    });
+    renderPlayer({ tracks: THREE });
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t2")); // B pre-signed
+    await new Promise((r) => setTimeout(r, 0));
+
+    const play = window.HTMLMediaElement.prototype.play as unknown as ReturnType<typeof vi.fn>;
+    let rejectB!: (e: Error) => void;
+    play.mockImplementationOnce(() => new Promise((_, rej) => (rejectB = rej))); // B's play() stays pending
+
+    await userEvent.click(screen.getByText("next")); // B starts from its pre-signed URL
+    await userEvent.click(screen.getByText("next")); // C: no URL yet
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("Three"));
+    expect(screen.getByTestId("status")).toHaveTextContent("loading");
+
+    await act(async () => {
+      rejectB(new DOMException("interrupted", "AbortError"));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(screen.getByTestId("status")).toHaveTextContent("loading");
+
+    await act(async () => resolveC({ url: "https://signed.example/t3", error: null }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("playing"));
+  });
+
   it("prev() moves to the previous track", async () => {
     renderPlayer();
     await userEvent.click(screen.getByText("play"));

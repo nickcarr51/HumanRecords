@@ -10,4 +10,12 @@ describe("parsePage", () => {
     expect(parsePage("2.5")).toBe(2);
     expect(parsePage("4")).toBe(4);
   });
+
+  it("sends exponent, non-finite and over-cap values to page 1", () => {
+    expect(parsePage("1e22")).toBe(1);
+    expect(parsePage("100001")).toBe(1);
+    expect(parsePage("100000")).toBe(100000);
+    expect(parsePage("NaN")).toBe(1);
+    expect(parsePage("Infinity")).toBe(1);
+  });
 });

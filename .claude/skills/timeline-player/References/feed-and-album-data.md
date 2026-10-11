@@ -54,6 +54,11 @@ and the plain feed can never disagree on order.
 integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging
 (`src/lib/supabase/feed-page-size.test.ts`).
 
+Input hardening in `getFeed` (the server action calls it with user input): `page` is floored and
+falls back to 1 unless it is finite and within `MAX_PAGE` (100 000; PostgREST rejects an
+exponent-notation offset like `1e22`); `q` is trimmed then capped at `MAX_QUERY_LENGTH` (200);
+a non-string `q` is treated as blank.
+
 ## `getReleaseFeedPage` / `getFeedAfterRelease`
 
 - `ReleaseRef` = `{ kind: "album", albumId } | { kind: "single", trackId }` (the same ids a

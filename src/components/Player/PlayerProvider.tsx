@@ -130,7 +130,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setCurrentTime(0);
         setDuration(0);
         const gen = genRef.current;
-        startAudio(url, () => gen === genRef.current);
+        startAudio(
+          url,
+          () => gen === genRef.current && queueRef.current.tracks[queueRef.current.index]?.id === track.id,
+        );
       }
       commit(s);
     },
