@@ -125,7 +125,7 @@ Pure presentational render tests for `SingleTrackRow`/`AlbumRow` layout and `App
 player mount are intentionally skipped — the player state machine, the feed queue logic, and
 the data layer carry the meaningful coverage. `AppShell.test.tsx` covers only the
 label-member Admin nav link ([[admin-upload]]). The Web Audio graph, the particle look, and
-iOS lock-screen behaviour with Web Audio connected are browser/device checks, not unit tests.
+iOS lock-screen behaviour (never worked; cause unknown) are browser/device checks, not unit tests.
 If you add feature logic to these components, add tests for the logic (not just render).
 
 ## Running

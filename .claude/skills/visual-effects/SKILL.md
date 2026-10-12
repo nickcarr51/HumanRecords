@@ -157,7 +157,9 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
   shows only the canvas part; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
   may not animate (icon snaps or stays unfilled). Both degrade silently; no workaround shipped.
 - **No audio-reactive effects on phones/tablets** (by design, 2026-10-11): Web Audio
-  silenced iOS background playback, so touch devices skip the analyser. Waveform shows idle
+  silenced iOS background playback when switching apps, so touch devices skip the analyser.
+  (iOS lock-screen playback is a separate, older gap that has never worked; not caused by
+  Web Audio — see [[timeline-player]].) Waveform shows idle
   dots, play buttons have no particles. Planned fix: precompute the waveform at upload time
   and drive visuals from `currentTime` (see [[timeline-player]]).
 - **`GlitchArt` is hover-only** — no touch/focus equivalent, so phones never see the tears.

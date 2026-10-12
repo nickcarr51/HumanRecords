@@ -152,8 +152,11 @@ can't run. Line numbers are as of 2026-10-11 on `feat/playback-vector-icons`.
   R2 buckets allow `GET`/`HEAD` from each site origin (`infra/r2/README.md`): a CORS-mode
   media request the bucket hasn't allowed is refused by the browser, so playback itself
   fails, not only the meter.
-- Once connected, the element's output goes through the `AudioContext`; a suspended
-  context (iOS background/lock) can mean silence — untested, listed as a known gap.
+- Once connected, the element's output goes through the `AudioContext`, and iOS suspends
+  that context when Safari goes to the background → silence while the element still reports
+  playing. This is why touch devices never connect (see `isTouchDevice`). Separately, iOS
+  lock-screen playback has never worked on this app even without Web Audio; see
+  [[timeline-player]] Known deferrals.
 
 ## Sweep hovers — `--hover-progress`, `SweepIcon`, `hoverStyles.ts`
 

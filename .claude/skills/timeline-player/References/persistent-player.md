@@ -156,9 +156,12 @@ enabled (play started outside a gesture path that calls `enableMeter`, or `Audio
 unsupported) or the context is suspended; check `crossOrigin` is still `"anonymous"` and
 that the bucket's CORS rule includes `GET`. **Nothing plays at all** → CORS, see above.
 
-Known gap: **iOS lock-screen playback with Web Audio connected is untested / known not to
-work** per the owner (routing the element through an `AudioContext` changes iOS background
-behaviour). Tests can't cover it — jsdom has no `AudioContext`.
+Known gap: **iOS lock-screen playback has never worked** — the audio stops when the phone
+locks and no lock-screen controls appear, on every version of the app (owner-confirmed
+2026-10-11). It predates Web Audio and is unrelated to it (touch devices never connect an
+`AudioContext`). Cause unknown; see the Known deferrals list in SKILL.md for the
+investigation plan. Switching apps *does* keep playing. Tests can't cover any of this —
+jsdom has no `AudioContext` and no lock state.
 
 ## PlayerBar
 

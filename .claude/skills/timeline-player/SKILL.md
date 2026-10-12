@@ -120,11 +120,16 @@ playhead, which needs no analysis on any platform.
   (`album_art_url` holds an unsigned R2 key). `Art` / `ArtPlaceholder` in
   `album-page.styles.ts` are kept; to restore, put the `Head` grid back to `96px 1fr` and
   render `<Art>` as its first child (see routing-and-auth.md).
-- Feed rows show no artwork; lock screen uses the fixed logo.
+- Feed rows show no artwork; `useMediaSession` sets the fixed logo as artwork.
+- **Lock-screen playback has never worked on iPhone (any version of the app, before and
+  after Web Audio).** Locking the phone stops the audio and no controls appear, even though
+  `useMediaSession` is wired. Cause unknown; not caused by Web Audio (desktop-only now) and
+  not a regression of any branch. Open investigation: test on hosted dev over https (LAN
+  http is a variable), Safari tab vs Home Screen app, and whether `play()` on the first
+  track vs auto-advance differs. Background playback when *switching apps* does work.
 - **No audio-reactive visuals on phones/tablets.** Web Audio is desktop-only because a
-  `MediaElementAudioSourceNode` stops iOS background playback (and the user needs playback
-  to continue when switching apps). A lock-screen *player* beyond Media Session controls isn't
-  possible from the web. Waveform-at-upload-time is the planned fix for mobile visuals.
+  `MediaElementAudioSourceNode` silenced iOS background playback when switching apps.
+  Waveform-at-upload-time is the planned fix for mobile visuals.
 
 ## Gotchas (quick list; details in the references)
 
