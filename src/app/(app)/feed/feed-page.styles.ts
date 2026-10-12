@@ -14,7 +14,9 @@ export const Page = styled.div`
   flex-direction: column;
   box-sizing: border-box;
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    padding: ${({ theme }) => theme.space.md};
+    /* No bottom padding: the list scrolls right up to the PlayerBar's top
+       border instead of stopping above a blank strip. */
+    padding: ${({ theme }) => theme.space.md} ${({ theme }) => theme.space.md} 0;
   }
 `;
 
@@ -27,6 +29,9 @@ export const Scroll = styled.div`
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Rubber-banding stays inside the list instead of chaining to the shell,
+     which reads as a stutter on iOS. */
+  overscroll-behavior-y: contain;
 `;
 
 export const Foot = styled.div`

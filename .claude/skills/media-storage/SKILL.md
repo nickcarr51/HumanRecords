@@ -35,7 +35,9 @@ Verified byte-identical (SHA-256) on 2026-10-10 through `signUploadUrl` then `si
 ## Audio goes R2 → browser directly, in CORS mode
 
 The signed stream URL is set straight on the app's single `<audio>` element
-(`PlayerProvider.tsx`), which has `crossOrigin="anonymous"`. That attribute is what lets Web
+(`PlayerProvider.tsx`), which has `crossOrigin="anonymous"` **on desktop only** (touch devices
+skip it so a plain element keeps playing in the background on iOS; see [[timeline-player]]
+"Desktop only"). That attribute is what lets Web
 Audio (`audioMeter.ts`: one `AudioContext` + `AnalyserNode` on a `MediaElementAudioSourceNode`)
 read the signal for the player waveform (`PixelWaveform`) and the button particles
 (`PlaybackButton`). Without it the media is "tainted" and the analyser reads silence.
@@ -91,7 +93,7 @@ intended fix; the R2 free egress is the reason the architecture is presigned URL
 | Plays on desktop `localhost`, not on a phone at `http://192.168.x.x:3000` | Different origin; the local bucket allows only `localhost`/`127.0.0.1`. Add the LAN origin to the local bucket's CORS policy in the dashboard (don't commit it). |
 | Media error / nothing plays after a CORS edit (status `error` right after load; the signed URL opens fine in a new tab) | The bucket's CORS policy no longer allows `GET` (and `HEAD`) from the site origin, or the origin is wrong (scheme, host, or port must match exactly — no trailing slash). The `<audio>` element requests in CORS mode, so a missing `Access-Control-Allow-Origin` is fatal. Compare the live policy with `infra/r2/cors.<env>.json`, re-paste, hard-reload (`MaxAgeSeconds: 3600` caches the preflight). |
 | Track plays locally but not on develop/prod after a deploy | Same check, for that environment's bucket: Cloudflare → R2 → `humanrecords-media-dev`/`-prod` → Settings → CORS Policy must match `cors.dev.json`/`cors.prod.json` (the dev policy allows only `https://humanservices-dev.vercel.app`). Then confirm that deployment's `R2_BUCKET_NAME` points at that bucket. |
-| Waveform flat / particles still, but audio plays | Web Audio isn't reading the signal: `crossOrigin="anonymous"` missing from the `<audio>` element (`enable()` in `audioMeter.ts` bails if it isn't exactly `"anonymous"`), or the `AudioContext` is still `suspended` because `enable()` wasn't called from a user gesture (`playQueue`/`play` call it; `readLevel`/`readWaveform` return 0/`null` unless `context.state === "running"`). |
+| Waveform flat / particles still, but audio plays | On a phone or tablet this is by design (no Web Audio on touch devices). On desktop, Web Audio isn't reading the signal: `crossOrigin="anonymous"` missing from the `<audio>` element (`enable()` in `audioMeter.ts` bails if it isn't exactly `"anonymous"`), or the `AudioContext` is still `suspended` because `enable()` wasn't called from a user gesture (`playQueue`/`play` call it; `readLevel`/`readWaveform` return 0/`null` unless `context.state === "running"`). |
 | 403 `SignatureDoesNotMatch` | For uploads: the browser sent a different `Content-Type` than the one signed (see signing.md). For GETs: the URL was altered after signing (any query param is covered), the `R2_*` key pair doesn't match the bucket, or the clock is far off. Re-mint; never hand-edit a signed URL. |
 | 403 with `Request has expired` / playback dies mid-track | Stream TTL is 2 h and the player re-signs anything older than 1 h; a page left open longer plays until the next track load. Downloads expire in 5 min — never pre-fetch them. |
 | 404 from the signed URL | Signing never checks the object exists. The key isn't in `R2_BUCKET_NAME` (local seed objects live only in `-local`; run `yarn r2:seed-local`). |

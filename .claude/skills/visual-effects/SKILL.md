@@ -81,8 +81,8 @@ Apply all of it before merge; each line is something an existing effect already 
 
 ## Reading the audio signal
 
-`PlayerProvider` owns the app's one `<audio crossOrigin="anonymous">` and calls
-`useAudioMeterSource(audioRef)` once. Its `enable()` runs inside `playQueue` and `play`
+`PlayerProvider` owns the app's one `<audio>` element (`crossOrigin="anonymous"` set in an
+effect, **desktop only** — see below) and calls `useAudioMeterSource(audioRef)` once. Its `enable()` runs inside `playQueue` and `play`
 (user gestures) and lazily creates a single `AudioContext` + `AnalyserNode`
 (`fftSize 256`) via `createMediaElementSource`, wired source → analyser → destination,
 then `context.resume()`s. Two contexts are provided to the tree:
@@ -93,8 +93,11 @@ then `context.resume()`s. Two contexts are provided to the tree:
 - `useAudioWaveform()` → `readWaveform(): Uint8Array | null` (time-domain bytes, 128 = silence).
   The array is the analyser's shared buffer; read it, don't keep it.
 
-Both hooks return `null` outside `PlayerProvider`. The context closes when the provider
-unmounts. **Because the element is `crossOrigin="anonymous"`, every R2 bucket must allow
+Both hooks return `null` outside `PlayerProvider` **and on touch devices** (`isTouchDevice()`
+in `audioMeter.ts`): routing the element through an `AudioContext` stops iOS background
+playback, so phones/tablets get no analyser, no `crossOrigin`, and effects must treat a `null`
+reader as "draw the idle state once, don't loop" (`PixelWaveform`) or "don't mount a loop"
+(`PlaybackButton`). The context closes when the provider unmounts. **Because the element is `crossOrigin="anonymous"`, every R2 bucket must allow
 `GET`/`HEAD` from its site origin (`infra/r2/cors.*.json`, see [[media-storage]]); without
 that rule playback fails entirely, not just the meter.**
 
@@ -153,10 +156,10 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
 - **Safari**: `backdrop-filter: url(#filter)` is unsupported, so the CRT tracking band
   shows only the canvas part; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
   may not animate (icon snaps or stays unfilled). Both degrade silently; no workaround shipped.
-- **iOS lock screen with Web Audio connected is untested / known broken**: once
-  `createMediaElementSource` routes the element through the `AudioContext`, a suspended
-  context on a locked phone can mean silence or a stalled `ended` handoff. Needs a device
-  test on dev before relying on background playback (see [[timeline-player]] Media Session notes).
+- **No audio-reactive effects on phones/tablets** (by design, 2026-10-11): Web Audio
+  silenced iOS background playback, so touch devices skip the analyser. Waveform shows idle
+  dots, play buttons have no particles. Planned fix: precompute the waveform at upload time
+  and drive visuals from `currentTime` (see [[timeline-player]]).
 - **`GlitchArt` is hover-only** — no touch/focus equivalent, so phones never see the tears.
 - **`GlitchArt` is not rendered on the album page**: `album_art_url` holds an unsigned R2
   key, so `<Art>` would be a blank square. `Art`/`ArtPlaceholder` in

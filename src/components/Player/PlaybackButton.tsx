@@ -89,10 +89,20 @@ export function PlaybackButton({ active, children, ...props }: ButtonHTMLAttribu
         ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
       }
       ctx.globalAlpha = 1;
-      frame = requestAnimationFrame(draw);
+      if (!document.hidden) frame = requestAnimationFrame(draw);
     }
+    const onVisibility = () => {
+      cancelAnimationFrame(frame);
+      last = performance.now();
+      if (!document.hidden) frame = requestAnimationFrame(draw);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     frame = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(frame); ctx.clearRect(0, 0, 130, 130); };
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      cancelAnimationFrame(frame);
+      ctx.clearRect(0, 0, 130, 130);
+    };
   }, [active, readLevel, particleColor]);
   return (
     <Shell $active={active}>

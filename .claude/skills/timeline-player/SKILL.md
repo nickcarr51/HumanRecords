@@ -20,14 +20,27 @@ App Router keeps that layout mounted while the user moves between routes inside 
 (`/feed` ↔ `/albums/[id]` ↔ `/dashboard`), so the `<audio>` element and all player state
 never unmount. No global state library, no refresh-resume.
 
-**2. The browser plays the presigned R2 URL directly, in CORS mode.** The path is
+**2. The browser plays the presigned R2 URL directly; on desktop, in CORS mode.** The path is
 browser → `getTrackStreamUrl(trackId)` server action → presigned R2 URL →
-`<audio crossOrigin="anonymous" src={url}>`. There is no proxy/stream route and no
-feature flag. `crossOrigin="anonymous"` is what lets Web Audio read the signal for the
-waveform and button particles, and it makes the media request a CORS request — so **every
-R2 media bucket must allow `GET`/`HEAD` from its site origin, or nothing plays at all**
+`<audio src={url}>`, with `crossOrigin="anonymous"` set in an effect on desktop only (touch
+devices skip it so iOS keeps playing in the background — see "Desktop only" below). There is
+no proxy/stream route and no feature flag. `crossOrigin="anonymous"` is what lets Web Audio
+read the signal for the waveform and button particles, and it makes the media request a CORS
+request — so **every R2 media bucket must allow `GET`/`HEAD` from its site origin, or nothing
+plays on desktop**
 (the element fires `error`, the player shows `status: "error"` / "Couldn't play this
-track."). The rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
+track.").
+
+**Desktop only.** Web Audio analysis (and therefore `crossOrigin`) is skipped on touch
+devices — `isTouchDevice()` in `audioMeter.ts` (`(pointer: coarse)` or an iOS user agent).
+Routing the element through an `AudioContext` makes iOS silence playback the moment Safari
+is backgrounded, and Android is inconsistent; a plain `<audio>` keeps playing when the user
+switches apps or locks the phone, which the site relies on. On phones `useAudioMeter()` /
+`useAudioWaveform()` return `null`, the waveform draws its idle dots once, play buttons have
+no particles, and the media request is not a CORS request (bucket CORS is still required for
+desktop). Long-term plan: compute the waveform at upload time and drive the dots from the
+playhead, which needs no analysis on any platform.
+ The rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 (see [[media-storage]]).
 
 ## Pieces
@@ -108,9 +121,10 @@ track."). The rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README
   `album-page.styles.ts` are kept; to restore, put the `Head` grid back to `96px 1fr` and
   render `<Art>` as its first child (see routing-and-auth.md).
 - Feed rows show no artwork; lock screen uses the fixed logo.
-- **iOS lock-screen playback with Web Audio connected is untested / known not to work**
-  per the owner. The meter is created lazily inside a user gesture (`playQueue` / play), so
-  this concerns real devices only; nothing in the tests covers it.
+- **No audio-reactive visuals on phones/tablets.** Web Audio is desktop-only because a
+  `MediaElementAudioSourceNode` stops iOS background playback (and the user needs playback
+  to continue when switching apps). A lock-screen *player* beyond Media Session controls isn't
+  possible from the web. Waveform-at-upload-time is the planned fix for mobile visuals.
 
 ## Gotchas (quick list; details in the references)
 

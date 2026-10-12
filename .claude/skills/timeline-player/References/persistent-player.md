@@ -116,6 +116,11 @@ A separate `useEffect` (dep `[goNext]`) attaches/detaches listeners with 1:1 sym
 (`fftSize 256`) + `createMediaElementSource(audio)` for the app's single element, wired
 `source → analyser → destination` (so the audio still comes out of the speakers).
 
+- **Desktop only.** `useAudioMeterSource` decides once at mount (`isTouchDevice()`:
+  `(pointer: coarse)` or iOS UA). On touch devices `supported` is false, `readLevel` /
+  `readWaveform` are provided as `null`, and `PlayerProvider` leaves `crossOrigin` off the
+  element so iOS keeps playing when Safari is backgrounded. The test "skips CORS mode on
+  touch devices" covers it by stubbing `matchMedia`.
 - **Created only inside a user gesture.** `enable()` is called from `playQueue` and `play`
   (both run in click handlers); browsers refuse an `AudioContext` created elsewhere. It is
   idempotent (reuses the node graph, calls `context.resume()`), bails out when

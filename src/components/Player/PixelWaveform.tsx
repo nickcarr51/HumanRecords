@@ -64,15 +64,29 @@ export function PixelWaveform({ playing, status }: { playing: boolean; status: s
         }
         ctx.globalAlpha = 1;
       }
-      if (playing && !reduced) frame = requestAnimationFrame(draw);
+      if (playing && !reduced && readWaveform && !document.hidden) frame = requestAnimationFrame(draw);
     }
+    // Animate only when there is a signal to read; without a meter (touch
+    // devices) the idle dots are drawn once. Pause while the tab is hidden so a
+    // return from the background doesn't start with a burst of frames.
+    const animating = () => playing && !reduced && !!readWaveform && !document.hidden;
     draw(performance.now());
+    const onVisibility = () => {
+      cancelAnimationFrame(frame);
+      if (animating()) frame = requestAnimationFrame(draw);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => {
       resize();
-      if (!playing || reduced) draw(performance.now());
+      if (!animating()) draw(performance.now());
     }) : null;
     observer?.observe(layer);
-    return () => { observer?.disconnect(); cancelAnimationFrame(frame); ctx.clearRect(0, 0, width, 24); };
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      ctx.clearRect(0, 0, width, 24);
+    };
   }, [playing, readWaveform, theme.colors.accent, theme.colors.faint]);
   return <Signal><span>{label}</span><canvas ref={canvas} aria-hidden="true" /></Signal>;
 }

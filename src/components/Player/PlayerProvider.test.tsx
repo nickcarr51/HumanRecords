@@ -82,6 +82,18 @@ describe("PlayerProvider", () => {
     // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
     expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
   });
+
+  it("skips CORS mode on touch devices so a plain <audio> keeps playing in the background", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", addEventListener() {}, removeEventListener() {} }));
+    try {
+      const { container } = renderPlayer();
+      await userEvent.click(screen.getByText("play"));
+      await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+      expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("playQueue sets the current track and requests its signed URL", async () => {
     renderPlayer();
     await userEvent.click(screen.getByText("play"));

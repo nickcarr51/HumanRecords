@@ -42,6 +42,8 @@ export function CRTTexture() {
     const ctx = layer.getContext('2d');
     if (!ctx) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Phones composite a full-screen canvas much less happily than desktops.
+    const idleFps = window.matchMedia('(pointer: coarse)').matches ? 12 : 24;
     const ink = rgbTriplet(inkHex);
     let width = 0;
     let height = 0;
@@ -131,7 +133,7 @@ export function CRTTexture() {
     const tick = (now: number) => {
       // Scanlines drift slowly, so idle at 24 fps; run 60 fps only while a
       // tracking band is crossing so the sweep stays smooth.
-      const fps = sweep ? 60 : 24;
+      const fps = sweep ? 60 : idleFps;
       if (now - last >= 1000 / fps - 1) { paint(now); last = now; }
       frame = requestAnimationFrame(tick);
     };
@@ -159,14 +161,27 @@ export function CRTTexture() {
       resume();
     };
 
+    // iOS fires resize in bursts (toolbar collapse, return from background).
+    // Coalesce to one per frame and skip when the viewport didn't change, so
+    // the full-screen canvas isn't re-allocated and repainted over and over.
+    let resizeFrame = 0;
+    const onResize = () => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        if (window.innerWidth === width && window.innerHeight === height) return;
+        resize();
+      });
+    };
+
     resize();
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', resume);
     reduced.addEventListener('change', resume);
     return () => {
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(resizeFrame);
       if (bandElement) bandElement.style.visibility = 'hidden';
-      window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', resume);
       reduced.removeEventListener('change', resume);
     };

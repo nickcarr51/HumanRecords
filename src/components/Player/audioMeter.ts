@@ -1,4 +1,19 @@
-import { createContext, useContext, useEffect, useRef, useCallback, type RefObject } from 'react';
+import { createContext, useContext, useEffect, useRef, useCallback, useState, type RefObject } from 'react';
+
+/**
+ * Web Audio analysis is desktop-only. Routing the <audio> element through an
+ * AudioContext (createMediaElementSource) makes iOS stop the sound as soon as
+ * Safari is backgrounded, and Android is inconsistent and burns battery. A plain
+ * media element keeps playing in the background, so phones/tablets skip the
+ * analyser (and `crossOrigin`) entirely; the waveform shows its idle dots.
+ */
+export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const ua = navigator.userAgent;
+  const iOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return coarse || iOS;
+}
 
 export const AudioMeterContext = createContext<(() => number) | null>(null);
 export const useAudioMeter = () => useContext(AudioMeterContext);
@@ -10,10 +25,13 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
   const meter = useRef<{ context: AudioContext; analyser: AnalyserNode; source: MediaElementAudioSourceNode; bytes: Uint8Array<ArrayBuffer> } | null>(null);
   const level = useRef(0);
   const lastRead = useRef(-Infinity);
+  // Server: false. Client: decided once at mount; only feeds context values,
+  // never markup, so there is no hydration mismatch.
+  const [supported] = useState(() => !isTouchDevice());
 
   const enable = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || audio.crossOrigin !== 'anonymous' || typeof AudioContext === 'undefined') return;
+    if (!supported || !audio || audio.crossOrigin !== 'anonymous' || typeof AudioContext === 'undefined') return;
     try {
       if (!meter.current) {
         const context = new AudioContext();
@@ -26,7 +44,7 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
       }
       void meter.current.context.resume().catch(() => {});
     } catch { /* Unsupported audio analysis must not crash the controls. */ }
-  }, [audioRef]);
+  }, [audioRef, supported]);
 
   const readLevel = useCallback(() => {
     const m = meter.current;
@@ -60,5 +78,11 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
     }
   }, []);
 
-  return { enable, readLevel, readWaveform };
+  return {
+    supported,
+    enable,
+    // null on touch devices so consumers skip their draw loops entirely.
+    readLevel: supported ? readLevel : null,
+    readWaveform: supported ? readWaveform : null,
+  };
 }

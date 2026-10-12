@@ -82,7 +82,15 @@ export function usePlayerTime(): PlayerTimeValue {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const { enable: enableMeter, readLevel, readWaveform } = useAudioMeterSource(audioRef);
+  const { supported: meterSupported, enable: enableMeter, readLevel, readWaveform } = useAudioMeterSource(audioRef);
+  // CORS-mode media is only needed for Web Audio analysis (desktop). Phones
+  // load the element plainly so iOS keeps playing in the background.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (meterSupported) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
+  }, [meterSupported]);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -420,9 +428,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         </AudioMeterContext.Provider>
       </PlayerTimeContext.Provider>
       {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
-      {/* crossOrigin lets Web Audio read the signal for the waveform/particles;
-          the R2 buckets allow GET/HEAD from each site origin (infra/r2/). */}
-      <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+      {/* crossOrigin is set in an effect, desktop only (see useAudioMeterSource):
+          it lets Web Audio read the signal for the waveform/particles, and the R2
+          buckets allow GET/HEAD from each site origin (infra/r2/) for that. */}
+      <audio ref={audioRef} preload="metadata" />
     </PlayerContext.Provider>
   );
 }
