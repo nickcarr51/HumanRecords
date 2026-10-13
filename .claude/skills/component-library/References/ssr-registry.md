@@ -100,4 +100,4 @@ styled bits into a client module.
 - The registry is a client component, but its `children` can still be server components
   (they're passed through as already-rendered RSC payload).
 - `CRTTexture` is a sibling *after* `{children}` inside the registry, so it paints above
-  page content; its canvas ignores pointer events, so nothing underneath is blocked.
+  page content; its layers ignore pointer events, so nothing underneath is blocked.

@@ -55,6 +55,12 @@ Use `renderWithTheme` for anything that reads `useTheme()` (all canvas effects d
   first `draw` samples once and draws more than 32 dots; rerendering `playing={false}`
   draws exactly 32 flat dots and never samples. (rAF is stubbed to a no-op `() => 1`, so
   only the synchronous first paint runs.)
+- **`CRTTexture.test.tsx`** — no canvas: stubs `matchMedia` (a getter for `matches`) and
+  `Element.prototype.animate` (returns `{ cancel, onfinish }`), fake `setTimeout`. Asserts a
+  sweep is animated after the 2–5 s delay with `translateY` keyframes and ≥ 5.5 s duration,
+  `onfinish` hides the band and a second sweep follows; none under reduced motion; none while
+  `document.hidden` (redefined with a configurable getter) and a restart on
+  `visibilitychange`; hiding mid-sweep calls `cancel`; unmount cancels and stops the timer.
 - **`PlayerBar.test.tsx`** — doesn't care about effects:
   `vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)` in
   `beforeEach` makes `PlaybackButton`/`PixelWaveform` bail silently and keeps jsdom's

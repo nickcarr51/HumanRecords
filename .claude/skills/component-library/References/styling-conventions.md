@@ -192,7 +192,7 @@ Use `renderWithTheme(ui)` from `@/test/renderWithTheme` — it wraps in the real
 matchers (`vitest.setup.ts`). Test behavior (clicks, disabled state, ARIA), not CSS values.
 
 **jsdom has no canvas, rAF is real-ish, and `matchMedia` is missing.** Components that draw
-(`PlaybackButton`, `PixelWaveform`, `PixelAccordion`, `CRTTexture`, `GlitchArt`) bail out
+(`PlaybackButton`, `PixelWaveform`, `PixelAccordion`, `GlitchArt`) bail out
 when `getContext` returns `null` or `window.matchMedia` is undefined, so the recipe is:
 
 ```ts
@@ -219,7 +219,7 @@ vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), r
 
 Include `addEventListener`/`removeEventListener` on the `matchMedia` stub when the component
 subscribes to the query (`CRTTexture`, `SignInGlitch`). Timer-driven effects
-(`SignInGlitch`) use `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })` and
+(`SignInGlitch`, `CRTTexture`) use `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })` and
 `vi.getTimerCount()` to prove cleanup. Web Audio readers are injected through
 `AudioMeterContext` / `AudioWaveformContext` providers in tests rather than a real
 `AudioContext`. The provider-level recipes (cookie, `renderToString`, `startViewTransition`)

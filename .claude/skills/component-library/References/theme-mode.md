@@ -134,7 +134,7 @@ forces `animation: none !important`.
   `${({ theme }) => theme.mode === 'light' && css`…`}`. Both branches still read tokens.
 - Effects pick their inks from `theme.effects.*`, never from `colors`.
 - In a component body, `useTheme()` from styled-components gives the current theme object
-  (`PixelAccordion`, `CRTTexture`, `PlaybackButton`, `SweepIcon` do this to feed canvas /
+  (`PixelAccordion`, `PlaybackButton`, `SweepIcon` do this to feed canvas /
   inline-style colors).
 
 ## Testing

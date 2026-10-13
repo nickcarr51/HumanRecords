@@ -1,192 +1,160 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
-import styled, { useTheme } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { rgbTriplet, withAlpha } from '@/lib/theme/color';
 
-const Layer = styled.canvas`
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: ${({ theme }) => theme.zIndex.toast + 1};
+/**
+ * The CRT layer is two fixed elements and no render loop:
+ *
+ * - `Scanlines`: the base wash, 1 px scanlines every 4 px, and the radial vignette, all
+ *   CSS gradients the browser paints once and caches. The slow brightness pulse is an
+ *   `opacity` animation, which the compositor blends without repainting (desktop only;
+ *   phones keep the layer static so the display can idle).
+ * - `Band`: the occasional tracking sweep. One `element.animate()` moves it across the
+ *   viewport on the compositor (transform + opacity); the glow and the dashed "tracking
+ *   noise" line are static backgrounds that travel with it. Between sweeps it is
+ *   `visibility: hidden`, so its backdrop filter costs nothing.
+ *
+ * The only JavaScript that runs is a timer between sweeps. The earlier canvas version
+ * repainted the full viewport 24 times a second (60 during a sweep) to bend each scanline
+ * by under a pixel; that drift and the wobble lines are the only things this drops.
+ */
+
+const pulse = keyframes`
+  from { opacity: 0.7; }
+  to { opacity: 1; }
 `;
 
-const DistortionBand = styled.div`
+const Scanlines = styled.div`
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: ${({ theme }) => theme.zIndex.toast + 1};
+  background-color: ${({ theme }) => withAlpha(theme.effects.ink, 0.02)};
+  background-image:
+    radial-gradient(
+      farthest-corner at 50% 50%,
+      ${({ theme }) => withAlpha(theme.effects.vignette, 0)} 35%,
+      ${({ theme }) => withAlpha(theme.effects.vignette, 0.055)} 100%
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      ${({ theme }) => withAlpha(theme.effects.ink, theme.mode === 'dark' ? 0.06 : 0.029)} 0 1px,
+      transparent 1px 4px
+    );
+  animation: ${pulse} 3.9s ease-in-out infinite alternate;
+  &[data-paused='true'] {
+    animation-play-state: paused;
+  }
+  @media (hover: none), (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const Band = styled.div`
   position: fixed;
   left: 0;
   top: 0;
   width: 100%;
   pointer-events: none;
   visibility: hidden;
+  opacity: 0;
+  will-change: transform, opacity;
   z-index: ${({ theme }) => theme.zIndex.toast + 1};
+  --sweep-strength: 0.03;
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgba(${({ theme }) => rgbTriplet(theme.effects.ink)}, var(--sweep-strength)) 50%,
+      transparent
+    ),
+    repeating-linear-gradient(
+      to right,
+      ${({ theme }) => withAlpha(theme.effects.ink, 0.035)} 0 12px,
+      transparent 12px 48px
+    );
+  background-size: 100% 100%, 100% 1px;
+  background-position: 0 0, 0 calc(50% + 12px);
+  background-repeat: no-repeat;
   mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
 `;
 
-/** Canvas tracking texture and a narrow backdrop filter move together. */
+const SWEEP_MARGIN = 80;
+const firstDelay = () => 2000 + Math.random() * 3000;
+const restDelay = () => 4000 + Math.random() * 7000;
+
+/** Static CSS scanlines/vignette plus a compositor-driven tracking sweep. */
 export function CRTTexture() {
-  const theme = useTheme();
-  const dark = theme.mode === 'dark';
-  const inkHex = theme.effects.ink;
-  const vignetteHex = theme.effects.vignette;
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const distortion = useRef<HTMLDivElement>(null);
-  const displacement = useRef<SVGFEDisplacementMapElement>(null);
+  const layer = useRef<HTMLDivElement>(null);
+  const band = useRef<HTMLDivElement>(null);
   const filterId = `crt-${useId().replace(/:/g, '')}`;
 
   useEffect(() => {
-    const layer = canvas.current;
-    const bandElement = distortion.current;
-    if (!layer || !window.matchMedia) return;
-    const ctx = layer.getContext('2d');
-    if (!ctx) return;
+    const scanlines = layer.current;
+    const element = band.current;
+    if (!scanlines || !element || !window.matchMedia) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    // Phones composite a full-screen canvas much less happily than desktops.
-    const idleFps = window.matchMedia('(pointer: coarse)').matches ? 12 : 24;
-    const ink = rgbTriplet(inkHex);
-    let width = 0;
-    let height = 0;
-    let frame = 0;
-    let last = -Infinity;
-    let vignette: CanvasGradient;
-    type Sweep = { start: number; duration: number; origin: number; travel: number; thickness: number; strength: number; offset: number };
-    let sweep: Sweep | null = null;
-    let nextSweep = performance.now() + 2000 + Math.random() * 3000;
+    let timer = 0;
+    let running: Animation | null = null;
 
-    const paint = (now: number) => {
-      const time = reduced.matches ? 0 : now / 1000;
-      if (bandElement) bandElement.style.visibility = 'hidden';
-      ctx.clearRect(0, 0, width, height);
-      const pulse = 0.5 + 0.5 * Math.sin(time * 0.8);
-      ctx.fillStyle = `rgba(${ink}, ${0.014 + pulse * 0.012})`;
-      ctx.fillRect(0, 0, width, height);
-
-      // Sparse, bent scanlines suggest analog drift without flashing or RGB noise.
-      ctx.strokeStyle = `rgba(${ink}, ${(dark ? 0.055 : 0.024) + pulse * 0.01})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let y = 0; y < height; y += 4) {
-        ctx.moveTo(0, y);
-        for (let x = 0; x <= width + 32; x += 32) {
-          const bend = Math.sin(x / 180 + time * 0.35 + y / 240) * 0.7;
-          ctx.lineTo(x, y + bend);
-        }
-      }
-      ctx.stroke();
-
-      // Each tracking pass starts off-screen and crosses the entire viewport.
-      if (!reduced.matches && now >= nextSweep) {
-        const downward = Math.random() > 0.5;
-        const margin = 80;
-        sweep = {
-          start: now,
-          duration: 5500 + Math.random() * 2500,
-          origin: downward ? -margin : height + margin,
-          travel: (downward ? 1 : -1) * (height + margin * 2),
-          thickness: 8 + Math.random() * 20,
-          strength: 0.02 + Math.random() * 0.015,
-          offset: Math.random() * 100,
-        };
-        nextSweep = now + sweep.duration + 4000 + Math.random() * 7000;
-      }
-      if (sweep && !reduced.matches) {
-        const progress = (now - sweep.start) / sweep.duration;
-        if (progress >= 1) sweep = null;
-        else {
-          const envelope = Math.sin(Math.PI * progress);
-          const y = sweep.origin + progress * sweep.travel;
-          if (bandElement) {
-            bandElement.style.visibility = 'visible';
-            bandElement.style.transform = `translateY(${y - sweep.thickness * 2}px)`;
-            bandElement.style.height = `${sweep.thickness * 4}px`;
-          }
-          displacement.current?.setAttribute('scale', String(envelope * 1.2));
-          const tracking = ctx.createLinearGradient(0, y - sweep.thickness, 0, y + sweep.thickness);
-          tracking.addColorStop(0, `rgba(${ink},0)`);
-          tracking.addColorStop(0.5, `rgba(${ink},${sweep.strength * envelope})`);
-          tracking.addColorStop(1, `rgba(${ink},0)`);
-          ctx.fillStyle = tracking;
-          ctx.fillRect(0, y - sweep.thickness, width, sweep.thickness * 2);
-          ctx.strokeStyle = `rgba(${ink},${envelope * 0.045})`;
-          ctx.beginPath();
-          for (let line = 0; line < 3; line++) {
-            const lineY = y + line * 3;
-            ctx.moveTo(0, lineY);
-            for (let x = 0; x <= width + 24; x += 24) {
-              const wobble = Math.sin(x / 120 + time * 0.8 + sweep.offset + line) * envelope * 0.6;
-              ctx.lineTo(x, lineY + wobble);
-            }
-          }
-          ctx.stroke();
-          // A short broken gray line lends a little old-display tracking noise.
-          ctx.fillStyle = `rgba(${ink},${envelope * 0.035})`;
-          for (let x = 0; x < width; x += 48) {
-            if (Math.sin(x * 0.7 + sweep.offset) > 0) ctx.fillRect(x, Math.round(y + 12), 12, 1);
-          }
-        }
-      }
-      ctx.fillStyle = vignette;
-      ctx.fillRect(0, 0, width, height);
+    const stop = () => {
+      window.clearTimeout(timer);
+      timer = 0;
+      running?.cancel();
+      running = null;
+      element.style.visibility = 'hidden';
     };
 
-    const tick = (now: number) => {
-      // Scanlines drift slowly, so idle at 24 fps; run 60 fps only while a
-      // tracking band is crossing so the sweep stays smooth.
-      const fps = sweep ? 60 : idleFps;
-      if (now - last >= 1000 / fps - 1) { paint(now); last = now; }
-      frame = requestAnimationFrame(tick);
-    };
-    const resume = () => {
-      cancelAnimationFrame(frame);
-      if (bandElement) bandElement.style.visibility = 'hidden';
-      if (document.hidden) return;
-      last = -Infinity;
-      sweep = null;
-      nextSweep = performance.now() + 2000 + Math.random() * 3000;
-      paint(performance.now());
-      if (!reduced.matches) frame = requestAnimationFrame(tick);
-    };
-    const resize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      layer.width = Math.ceil(width * ratio);
-      layer.height = Math.ceil(height * ratio);
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      const radius = Math.hypot(width, height) / 2;
-      vignette = ctx.createRadialGradient(width / 2, height / 2, radius * 0.35, width / 2, height / 2, radius);
-      vignette.addColorStop(0, withAlpha(vignetteHex, 0));
-      vignette.addColorStop(1, withAlpha(vignetteHex, 0.055));
-      resume();
+    const sweep = () => {
+      timer = 0;
+      // jsdom has no Web Animations; the sweep is decoration, so skip quietly.
+      if (document.hidden || reduced.matches || typeof element.animate !== 'function') return;
+      const viewport = window.innerHeight;
+      const thickness = 8 + Math.random() * 20;
+      const height = thickness * 4;
+      const downward = Math.random() > 0.5;
+      const from = downward ? -SWEEP_MARGIN - height : viewport + SWEEP_MARGIN;
+      const to = downward ? viewport + SWEEP_MARGIN : -SWEEP_MARGIN - height;
+      element.style.height = `${height}px`;
+      element.style.setProperty('--sweep-strength', (0.02 + Math.random() * 0.015).toFixed(3));
+      element.style.visibility = 'visible';
+      running = element.animate(
+        [
+          { transform: `translateY(${from}px)`, opacity: 0, easing: 'ease-in' },
+          { opacity: 1, offset: 0.5, easing: 'ease-out' },
+          { transform: `translateY(${to}px)`, opacity: 0 },
+        ],
+        { duration: 5500 + Math.random() * 2500, fill: 'none' },
+      );
+      running.onfinish = () => {
+        running = null;
+        element.style.visibility = 'hidden';
+        timer = window.setTimeout(sweep, restDelay());
+      };
     };
 
-    // iOS fires resize in bursts (toolbar collapse, return from background).
-    // Coalesce to one per frame and skip when the viewport didn't change, so
-    // the full-screen canvas isn't re-allocated and repainted over and over.
-    let resizeFrame = 0;
-    const onResize = () => {
-      cancelAnimationFrame(resizeFrame);
-      resizeFrame = requestAnimationFrame(() => {
-        if (window.innerWidth === width && window.innerHeight === height) return;
-        resize();
-      });
+    // Called on mount, on visibility change, and when reduced motion toggles:
+    // nothing runs while the page is hidden or motion is reduced.
+    const restart = () => {
+      stop();
+      scanlines.dataset.paused = document.hidden ? 'true' : 'false';
+      if (document.hidden || reduced.matches) return;
+      timer = window.setTimeout(sweep, firstDelay());
     };
 
-    resize();
-    window.addEventListener('resize', onResize);
-    document.addEventListener('visibilitychange', resume);
-    reduced.addEventListener('change', resume);
+    restart();
+    document.addEventListener('visibilitychange', restart);
+    reduced.addEventListener('change', restart);
     return () => {
-      cancelAnimationFrame(frame);
-      cancelAnimationFrame(resizeFrame);
-      if (bandElement) bandElement.style.visibility = 'hidden';
-      window.removeEventListener('resize', onResize);
-      document.removeEventListener('visibilitychange', resume);
-      reduced.removeEventListener('change', resume);
+      stop();
+      document.removeEventListener('visibilitychange', restart);
+      reduced.removeEventListener('change', restart);
     };
-  }, [dark, inkHex, vignetteHex]);
+  }, []);
 
+  // Chrome/Firefox wobble the page under the band; Safari ignores `backdrop-filter: url()`.
   const filter = `url("#${filterId}") blur(0.1px)`;
   return (
     <>
@@ -194,12 +162,12 @@ export function CRTTexture() {
         <defs>
           <filter id={filterId} x="-5%" y="-20%" width="110%" height="140%" colorInterpolationFilters="sRGB">
             <feTurbulence type="fractalNoise" baseFrequency="0.008 0.08" numOctaves="1" seed="9" result="tracking" />
-            <feDisplacementMap ref={displacement} in="SourceGraphic" in2="tracking" scale="0" xChannelSelector="R" yChannelSelector="G" />
+            <feDisplacementMap in="SourceGraphic" in2="tracking" scale="1" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </defs>
       </svg>
-      <DistortionBand ref={distortion} aria-hidden="true" style={{ backdropFilter: filter, WebkitBackdropFilter: filter }} />
-      <Layer ref={canvas} aria-hidden="true" />
+      <Scanlines ref={layer} aria-hidden="true" data-testid="crt-scanlines" />
+      <Band ref={band} aria-hidden="true" data-testid="crt-band" style={{ backdropFilter: filter, WebkitBackdropFilter: filter }} />
     </>
   );
 }

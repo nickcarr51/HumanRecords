@@ -5,7 +5,7 @@ description: Use when adding, tuning, or debugging an ambient visual effect in H
 
 # Visual Effects (ambient layer)
 
-The "old display" feel layered over the gray/amber UI: a full-viewport CRT canvas, pixel
+The "old display" feel layered over the gray/amber UI: a full-viewport CRT layer, pixel
 particles that react to the music, horizontal tears on the sign-in screen, and sweep
 hovers on text and icons. Built on `feat/playback-vector-icons` (2026-10-11). Every
 effect is decoration: the app must read, play, and navigate identically with all of it
@@ -24,7 +24,7 @@ value. If an effect re-renders React on every frame it is wrong, whatever it loo
 
 | Concern | Where |
 |---|---|
-| Full-viewport scanlines + pulse + vignette + tracking sweep; mounted once in the root layout inside the styled registry | `src/components/CRTTexture/CRTTexture.tsx`, `src/app/layout.tsx` |
+| Full-viewport scanlines + vignette + pulse (CSS, painted once) and the tracking sweep (one `element.animate()` on a fixed div); no render loop; mounted once in the root layout inside the styled registry | `src/components/CRTTexture/CRTTexture.tsx` (+ `.test.tsx`), `src/app/layout.tsx` |
 | Horizontal image tears on hover (`<img>` + overlay canvas, never reads pixels) | `src/components/GlitchArt/GlitchArt.tsx` |
 | Randomized tear bursts around the logo/heading/form on `/` and `/login` | `src/components/Login/SignInGlitch.tsx` (+ `.test.tsx`), `src/app/page.tsx`, `src/app/login/page.tsx` |
 | Album-row expand/collapse with body-level particle canvas; `inert` + unmount when closed | `src/components/Feed/PixelAccordion.tsx` (+ `.test.tsx`), used by `Feed/AlbumRow.tsx` |
@@ -45,25 +45,29 @@ them from their folder paths (`@/components/Player/PlaybackButton`, etc.).
 Apply all of it before merge; each line is something an existing effect already does.
 
 1. **Reduced motion.** Read `window.matchMedia('(prefers-reduced-motion: reduce)')`. Either
-   paint one static frame (`CRTTexture`, `PixelWaveform`) or bail entirely (`GlitchArt`,
+   paint one static frame (`PixelWaveform`; `CRTTexture` keeps its static CSS layer and
+   schedules no sweeps) or bail entirely (`GlitchArt`,
    `PixelAccordion` particles, `PlaybackButton`, `SignInGlitch`). Long-lived effects
    `addEventListener('change', …)` on the media query and re-check; CSS transitions get
    `@media (prefers-reduced-motion: reduce) { transition: none }`.
 2. **Hidden tab.** Check `document.hidden` (stop the loop, or read `0`/`null` from the
    meter) and listen for `visibilitychange` to resume. Timer-driven effects must not
-   fire while hidden (`SignInGlitch.schedule`).
+   fire while hidden (`SignInGlitch.schedule`, `CRTTexture.restart`). CSS animations get
+   `animation-play-state: paused` via a data attribute while hidden (`CRTTexture`).
 3. **DPR + cleanup.** `Math.min(devicePixelRatio || 1, 1.5)` for full-screen canvases,
    `2` for small ones; size `canvas.width/height` by that ratio and `ctx.scale`/`setTransform`.
    The effect's return cancels the rAF, clears the canvas, removes every listener, and
    `remove()`s any body-level element (`PixelAccordion`).
-4. **Throttle.** Idle loops run low (`CRTTexture` 24 fps, `PixelWaveform` 30 fps,
-   `GlitchArt` ~11 fps); 60 fps only while something is visibly moving (the CRT sweep,
-   particles in flight). Stop requesting frames when nothing is left to draw
+4. **Throttle, or better, don't loop.** Prefer CSS/Web Animations on `transform`/`opacity`
+   (compositor-only, no repaint — `CRTTexture` pulse and sweep) over a canvas loop. Where a
+   loop is unavoidable, idle low (`PixelWaveform` 30 fps, `GlitchArt` ~11 fps) and run 60 fps
+   only while something is visibly moving (particles in flight). Stop requesting frames when nothing is left to draw
    (`PixelAccordion` removes its canvas once `pixels.length === 0`).
 5. **Theme colors only.** `theme.colors.*`, `theme.effects.*`, and `withAlpha(hex, a)` /
-   `rgbTriplet(hex)` for canvas `rgba(...)`. No hex literals in components, no
-   `${hex}22` suffix tricks. Read the theme once via `useTheme()` and put the strings in
-   the effect's dependency array so a day/night toggle re-initialises the loop.
+   `rgbTriplet(hex)` for canvas `rgba(...)` or where the alpha is a CSS variable. No hex
+   literals in components, no `${hex}22` suffix tricks. Canvas effects read the theme once
+   via `useTheme()` and put the strings in the effect's dependency array so a day/night
+   toggle re-initialises the loop; CSS-driven effects just read `theme` in the template.
 6. **One audio graph.** Anything that reacts to sound calls `useAudioMeter()` /
    `useAudioWaveform()` and handles `null` (outside `PlayerProvider`, or before the
    first play gesture). Never `new AudioContext()` or `createMediaElementSource` anywhere
@@ -103,15 +107,18 @@ that rule playback fails entirely, not just the meter.**
 
 ## Performance budget
 
-`CRTTexture` is the only always-on, full-viewport effect, so it sets the floor. Each
-paint clears the viewport, fills the pulse, strokes a scanline every 4 px with a segment
-every 32 px, and fills the vignette — at DPR ≤ 1.5. The first version painted that at a
-flat 60 fps (`1000 / 60`), on every page, forever: roughly 2.5× the idle work of today's
-loop, competing with the feed render, the audio-driven canvases, and the backdrop-filter
-band on the compositor. Scanlines drift at 0.35 rad/s, so 24 fps is indistinguishable;
-the loop now idles at **24 fps** and switches to **60 fps only while `sweep` is non-null**
-(a tracking pass lasting 5.5–8 s every ~10–20 s), because a band crossing at 24 fps
-visibly steps. The same shape applies to any new effect: cheap idle, brief bursts.
+`CRTTexture` is the only always-on, full-viewport effect, so it sets the floor — and the
+floor is now **zero per-frame work**. Its first version painted a full-viewport canvas at
+60 fps; the review cut that to 24 fps idle / 60 fps during sweeps; measured on 2026-10-11
+that still cost Energy Impact 31.0 (+12.1 Graphics and Media) on an *idle* localhost tab
+against 7.7 (+4.5) for develop *streaming audio*. The reason: the scanlines bent by under a
+pixel and the wash pulsed, so every frame repainted ~3 M pixels. On 2026-10-13 it became
+CSS gradients painted once, an `opacity` pulse, and one Web Animation per sweep (all
+compositor-only). The rule for every effect follows from that: **anything that runs at rest
+must be `transform`/`opacity` on the compositor or nothing at all**; canvas loops are for
+things that are visibly moving (particles, the waveform while playing) and stop when they
+aren't. A music site stays open for an hour with audio running — at-rest cost is paid for
+the whole hour.
 
 ## Testing
 
@@ -154,7 +161,7 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
 ## Known gaps (as of 2026-10-11)
 
 - **Safari**: `backdrop-filter: url(#filter)` is unsupported, so the CRT tracking band
-  shows only the canvas part; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
+  shows only its glow and dashed line, no page wobble; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
   may not animate (icon snaps or stays unfilled). Both degrade silently; no workaround shipped.
 - **No audio-reactive effects on phones/tablets** (by design, 2026-10-11): Web Audio
   silenced iOS background playback when switching apps, so touch devices skip the analyser.
@@ -167,6 +174,5 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
   key, so `<Art>` would be a blank square. `Art`/`ArtPlaceholder` in
   `src/app/(app)/albums/[id]/album-page.styles.ts` and the single-column `Head` wait for
   the image-upload pass. It still renders in `ArtistCard` on the retired `/artists` route.
-- `PlaybackButton` and `PixelWaveform` keep their rAF loop while the tab is hidden (they
-  read `0`/`null` instead); browsers throttle background rAF, so it's cheap, but a full
-  pause/resume like `CRTTexture` would be cleaner.
+- The CRT scanlines no longer drift (CSS, painted once) and the three wobble lines beside
+  the sweep are gone — the cost of the 2026-10-13 rewrite; restoring either means a canvas.

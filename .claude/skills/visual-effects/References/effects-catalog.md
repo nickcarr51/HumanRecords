@@ -9,37 +9,55 @@ Files: `src/components/CRTTexture/CRTTexture.tsx`, `src/components/GlitchArt/Gli
 Each entry: what it draws, how it's timed, where it sits, and what it does when it
 can't run. Line numbers are as of 2026-10-11 on `feat/playback-vector-icons`.
 
-## CRTTexture — full-viewport scanlines, pulse, vignette, tracking sweep
+## CRTTexture — CSS scanlines/vignette, compositor tracking sweep (no render loop)
+
+Rewritten 2026-10-13 from a full-viewport canvas (24 fps idle / 60 fps during a sweep;
+measured Energy Impact 31.0 + 12.1 "Graphics and Media" on an idle tab vs 7.7 + 4.5 for
+develop while *streaming*). The look is the same four things; the per-frame work is gone.
 
 - **Mount**: once, in `src/app/layout.tsx` inside `StyledComponentsRegistry` after
   `{children}`, so it has the theme and overlays every route (login included).
-- **Layers**: a `position: fixed; inset: 0; pointer-events: none` canvas at
-  `z-index: theme.zIndex.toast + 1` (1101 — above toasts and modals, deliberately), plus a
-  `DistortionBand` div with the same z-index, hidden by default, with a vertical
-  `mask-image` gradient and `backdrop-filter: url("#crt-<id>") blur(0.1px)`. The filter
-  is an inline `<svg width=0 height=0>` with `feTurbulence` (`fractalNoise`,
-  `baseFrequency 0.008 0.08`) feeding `feDisplacementMap`; the effect sets its `scale`
-  attribute per frame.
-- **Paint** (`paint(now)`): clear; base fill `rgba(ink, 0.014 + pulse·0.012)` where
-  `pulse = 0.5 + 0.5·sin(t·0.8)`; one stroked path of bent scanlines every 4 px, alpha
-  `0.055` (dark) / `0.024` (light) + pulse; then, while a sweep is live, a translucent
-  band gradient, three wobbling lines, a dashed "tracking noise" row, and the band div is
-  shown and translated to the sweep's `y`; finally the vignette gradient
-  (`withAlpha(vignette, 0)` → `0.055`, rebuilt on resize).
-- **Sweep timing**: first pass 2–5 s after mount, lasts 5.5–8 s, next one 4–11 s after it
-  ends; random direction, thickness 8–28 px, strength 0.02–0.035, envelope `sin(π·progress)`.
-- **Frame rate**: `tick` requests every frame but paints only when
-  `now - last >= 1000/fps - 1`, with `fps = sweep ? 60 : 24` (lines 131–137).
-- **DPR**: `Math.min(devicePixelRatio, 1.5)`; `ctx.setTransform(ratio, …)` on resize.
-- **Reduced motion**: `time = 0`, no sweeps are scheduled, and `resume()` paints one
-  frame without starting the loop. Re-checked via `reduced.addEventListener('change', resume)`.
-- **Hidden tab**: `resume()` runs on `visibilitychange`; it cancels the frame, hides the
-  band, and returns early when `document.hidden`, else restarts with a fresh sweep timer.
-- **Cleanup**: cancels rAF, hides band, removes `resize`/`visibilitychange`/`change` listeners.
-- **Deps**: `[dark, inkHex, vignetteHex]` — a theme toggle re-runs the whole effect.
-- **Colors**: `theme.effects.ink` via `rgbTriplet` (canvas supplies its own alpha),
-  `theme.effects.vignette` via `withAlpha`. Light: gray ink `#646464`; dark: amber accent.
-- **Safari**: `backdrop-filter: url()` is ignored, so only the canvas half of the sweep shows.
+- **`Scanlines`** (styled `div`, `position: fixed; inset: 0; pointer-events: none`,
+  `z-index: theme.zIndex.toast + 1`): `background-color` = `withAlpha(ink, 0.02)` (the old
+  pulsing wash's midpoint); `background-image` = a `radial-gradient(farthest-corner …)`
+  vignette (`withAlpha(vignette, 0)` at 35% → `0.055` at the corners) over a
+  `repeating-linear-gradient(to bottom, withAlpha(ink, 0.06 dark / 0.029 light) 0 1px,
+  transparent 1px 4px)`. The browser rasterises this once and caches it; nothing redraws on
+  resize or scroll. **Pulse**: `@keyframes` `opacity 0.7 → 1`, `3.9s ease-in-out infinite
+  alternate` (same 7.85 s period as the old `sin(t·0.8)`); `opacity` animates on the
+  compositor without a repaint. `@media (hover: none), (prefers-reduced-motion: reduce)
+  { animation: none }` — phones stay static so the display can idle. `[data-paused='true']`
+  → `animation-play-state: paused` (set by the effect while `document.hidden`).
+- **`Band`** (styled `div`, fixed, full width, `visibility: hidden; opacity: 0;
+  will-change: transform, opacity`, same z-index): the tracking sweep. Backgrounds are
+  static and travel with it — a vertical glow `linear-gradient(transparent, rgba(ink,
+  var(--sweep-strength)) 50%, transparent)` and the dashed "tracking noise" row
+  (`repeating-linear-gradient(to right, withAlpha(ink, 0.035) 0 12px, transparent 12px
+  48px)`, `background-size: 100% 1px` at `calc(50% + 12px)`); the vertical `mask-image`
+  softens the edges. Inline `backdrop-filter: url("#crt-<id>") blur(0.1px)` → the inline
+  `<svg width=0 height=0>` `feTurbulence` + `feDisplacementMap` at a constant `scale="1"`
+  (Chrome/Firefox wobble the page under the band; Safari ignores `backdrop-filter: url()`).
+  While hidden the band is not painted, so the filter costs nothing between sweeps.
+- **Effect** (`useEffect`, deps `[]`): a scheduler, no `requestAnimationFrame`.
+  `restart()` runs on mount, `visibilitychange`, and the reduced-motion `change` event: it
+  `stop()`s (clear timer, `running?.cancel()`, hide band), writes `data-paused`, and returns
+  early when `document.hidden || reduced.matches`; otherwise `setTimeout(sweep, 2–5 s)`.
+  `sweep()` picks thickness 8–28 px (band height = 4×), direction, strength 0.02–0.035
+  (written to `--sweep-strength`), shows the band, and calls `element.animate([{transform:
+  translateY(from), opacity: 0}, {opacity: 1, offset: 0.5}, {transform: translateY(to),
+  opacity: 0}], { duration: 5.5–8 s })`. `from`/`to` sit 80 px beyond the viewport.
+  `onfinish` hides the band and schedules the next sweep in 4–11 s. If
+  `element.animate` is missing (jsdom) the sweep is skipped silently.
+- **Cleanup**: `stop()` + remove the two listeners.
+- **Dropped vs the canvas version**: the sub-pixel scanline bend that drifted at 0.35 rad/s
+  and the three wobbled lines beside the band. Restoring either needs a canvas again.
+- **Colors**: `theme.effects.ink` (`withAlpha`, and `rgbTriplet` where the alpha is a CSS
+  variable), `theme.effects.vignette`. Light: gray ink `#646464`; dark: amber accent.
+  Stronger scanlines in night via `theme.mode`.
+- **Test**: `CRTTexture.test.tsx` stubs `matchMedia` and `Element.prototype.animate`, uses
+  fake timers, and checks: sweep after the delay and again after `onfinish`; none under
+  reduced motion; none while hidden + restart on `visibilitychange` (hide mid-sweep cancels);
+  unmount cancels.
 
 ## GlitchArt — horizontal tears over an image (kept, not on the album page)
 
