@@ -19,8 +19,8 @@ describe('AlbumTracks on the album page', () => {
       <AlbumTracks
         albumId="al1"
         tracks={[
-          { id: 't1', title: 'First', artistNames: [] },
-          { id: 't2', title: 'Second', artistNames: [] },
+          { catalogNumber: 1, id: 't1', title: 'First', artistNames: [] },
+          { catalogNumber: 2, id: 't2', title: 'Second', artistNames: [] },
         ]}
       />,
     );

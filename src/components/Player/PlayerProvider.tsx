@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useMemo,
 } from "react";
 import { getTrackStreamUrl, type UrlResult } from "@/lib/storage/actions";
 import { continueAfterRelease, loadFeedPage, type QueuePage } from "@/lib/feed/actions";
@@ -23,6 +24,7 @@ import {
   type QueueState,
 } from "./queue";
 import { useMediaSession } from "./useMediaSession";
+import { AudioMeterContext, AudioWaveformContext, useAudioMeterSource } from './audioMeter';
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
 
@@ -50,8 +52,6 @@ type PlayerContextValue = {
   currentTrack: PlayerTrack | null;
   source: QueueSource;
   isPlaying: boolean;
-  currentTime: number;
-  duration: number;
   status: Status;
   playQueue: (tracks: PlayerTrack[], startIndex?: number, source?: QueueSource) => void;
   toggle: () => void;
@@ -68,8 +68,29 @@ export function usePlayer(): PlayerContextValue {
   return ctx;
 }
 
+// Position/duration tick ~4x/s during playback, so they live in their own
+// context: only the scrubber (PlayerBar) re-renders on each tick, not every
+// play button on the page.
+type PlayerTimeValue = { currentTime: number; duration: number };
+const PlayerTimeContext = createContext<PlayerTimeValue | null>(null);
+
+export function usePlayerTime(): PlayerTimeValue {
+  const ctx = useContext(PlayerTimeContext);
+  if (!ctx) throw new Error("usePlayerTime must be used within a PlayerProvider");
+  return ctx;
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const { supported: meterSupported, enable: enableMeter, readLevel, readWaveform } = useAudioMeterSource(audioRef);
+  // CORS-mode media is only needed for Web Audio analysis (desktop). Phones
+  // load the element plainly so iOS keeps playing in the background.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (meterSupported) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
+  }, [meterSupported]);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -233,22 +254,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(
     (tracks: PlayerTrack[], startIndex = 0, source: QueueSource = NO_SOURCE) => {
+      enableMeter();
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
       prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
-    [commit],
+    [commit, enableMeter],
   );
 
   const play = useCallback(() => {
+    enableMeter();
     const audio = audioRef.current;
     // No-op while errored: there is no valid loaded track to play, and the
     // element's src has been cleared, so play must not resume stale audio.
     if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-  }, [currentTrack, status]);
+  }, [currentTrack, status, enableMeter]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -377,26 +400,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useMediaSession(audioRef, currentTrack, isPlaying, { play, pause, next, prev, seek });
 
-  const value: PlayerContextValue = {
-    queue: queueState.tracks,
-    currentIndex: queueState.index,
-    currentTrack,
-    source: queueState.source,
-    isPlaying,
-    currentTime,
-    duration,
-    status,
-    playQueue,
-    toggle,
-    next,
-    prev,
-    seek,
-  };
+  // Memoized so a time tick (which re-renders this provider) doesn't hand
+  // every consumer a new object.
+  const value = useMemo<PlayerContextValue>(
+    () => ({
+      queue: queueState.tracks,
+      currentIndex: queueState.index,
+      currentTrack,
+      source: queueState.source,
+      isPlaying,
+      status,
+      playQueue,
+      toggle,
+      next,
+      prev,
+      seek,
+    }),
+    [queueState, currentTrack, isPlaying, status, playQueue, toggle, next, prev, seek],
+  );
+  const time = useMemo<PlayerTimeValue>(() => ({ currentTime, duration }), [currentTime, duration]);
 
   return (
     <PlayerContext.Provider value={value}>
-      {children}
+      <PlayerTimeContext.Provider value={time}>
+        <AudioMeterContext.Provider value={readLevel}>
+          <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
+        </AudioMeterContext.Provider>
+      </PlayerTimeContext.Provider>
       {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
+      {/* crossOrigin is set in an effect, desktop only (see useAudioMeterSource):
+          it lets Web Audio read the signal for the waveform/particles, and the R2
+          buckets allow GET/HEAD from each site origin (infra/r2/) for that. */}
       <audio ref={audioRef} preload="metadata" />
     </PlayerContext.Provider>
   );

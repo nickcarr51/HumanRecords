@@ -30,14 +30,14 @@ function setup(initialIds: string[] = []) {
 beforeEach(() => vi.clearAllMocks());
 
 describe('DownloadButton', () => {
-  it('shows ↓ and the download label when not downloaded', () => {
+  it('shows a decorative vector and the download label when not downloaded', () => {
     setup();
-    expect(screen.getByRole('button', { name: IDLE })).toHaveTextContent('↓');
+    expect(screen.getByRole('button', { name: IDLE }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('shows ✓ and the re-download label when already downloaded', () => {
+  it('shows a decorative vector and the re-download label when already downloaded', () => {
     setup(['t1']);
-    expect(screen.getByRole('button', { name: DONE })).toHaveTextContent('✓');
+    expect(screen.getByRole('button', { name: DONE }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('on success navigates to the signed URL and flips to downloaded', async () => {

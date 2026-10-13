@@ -49,3 +49,23 @@ migration. Handy aliases: `Database['public']['Enums']['user_role']` (see `UserR
 
 Note: `test-helpers.ts` clients are untyped `SupabaseClient` (no `<Database>`), so tests can
 insert fixtures freely.
+
+### Identity columns in the generated types
+
+For a `generated always as identity` column (`albums.catalog_number`, `tracks.catalog_number`),
+`supabase gen types` emits:
+
+```ts
+Row:    { catalog_number: number; … }
+Insert: { catalog_number?: never; … }
+Update: { catalog_number?: never; … }
+```
+
+So a typed client can read the number but any attempt to insert or update it is a compile error —
+mirroring Postgres, which rejects the write at runtime (`428C9`; and the `keep_catalog_number`
+trigger, see [functions.md](functions.md)). The app view types follow the Row shape:
+`catalogNumber: number` is **required** on `FeedItem`/`FeedTrack` (`feed.ts`) and `AlbumDetail`
+(`albums.ts`), and `RELEASE_SELECT` / `getAlbum` select `catalog_number` explicitly. That is
+why a database without the migration breaks those pages with `42703 column tracks_1.catalog_number
+does not exist` — see [local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###`
+happens only in `src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.

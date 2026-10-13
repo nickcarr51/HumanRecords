@@ -11,7 +11,7 @@ export const Heading = styled.h2<{ $level?: Level }>`
   font-weight: ${({ theme }) => theme.fontWeights.bold};
   color: ${({ theme }) => theme.colors.text};
   font-size: ${({ theme, $level = 2 }) => theme.fontSizes[levelSize[$level]]};
-  letter-spacing: -0.01em;
+  letter-spacing: -0.045em;
   line-height: 1.1;
   margin: 0;
 `;

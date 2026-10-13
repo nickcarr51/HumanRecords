@@ -2,30 +2,49 @@
 
 Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/albums.ts`,
 `src/lib/supabase/artist-names.ts`. Tests: `feed.data.test.ts`, `albums.data.test.ts`,
-`artist-names.test.ts`.
+`artist-names.test.ts`, `catalog-numbers.data.test.ts`.
 
 Both functions follow the project convention: they take a `SupabaseClient<Database>` as the
 **first argument** (dependency injection), never calling the cookie-based `createClient()`
 themselves. That makes them unit-testable against local Supabase and reusable by server
-components. See [[catalog-schema]] for the underlying tables and RLS, and [[admin-upload]]
+components. See [[catalog-schema]] for the underlying tables and RLS (including
+`catalog_number` and its `keep_catalog_number` trigger), and [[admin-upload]]
 for the `releases` table and `position` columns this reads.
+
+## Shapes (all carry a required `catalogNumber`)
+
+```ts
+FeedTrack  = { id; catalogNumber: number; title; artistNames: string[] }
+FeedItem   = { kind: "album"; catalogNumber: number; id; title; albumArtUrl; artistNames; createdAt; tracks: FeedTrack[] }
+           | { kind: "track"; catalogNumber: number; id; title; trackArtUrl; artistNames; createdAt }
+FeedPage   = { items; page; pageSize; hasMore; total; totalPages }
+AlbumDetail = { id; catalogNumber: number; title; albumArtUrl; artistNames; tracks: FeedTrack[] }
+```
+
+`catalogNumber` is **required** (not optional) on `FeedTrack`, both `FeedItem` branches and
+`AlbumDetail`: `tracks.catalog_number` / `albums.catalog_number` are assigned by the database
+on insert and never null, so there is nothing to default. The UI renders it as `HS###`
+(album) / `HSS###` (track) through `CatalogId` (`src/components/CatalogId/CatalogId.tsx`,
+which renders nothing for a missing/invalid number) and `CatalogLine` (the row line: id,
+`ISSUED yyyy.mm.dd` from `createdAt` in **UTC**, `TRACK nn / NN` or `TRACKS NN`; everything
+after the id is hidden at `<= theme.breakpoints.sm`). Any test fixture building a `FeedItem`
+or `FeedTrack` must include `catalogNumber` or TypeScript rejects it. `toPlayerTrack` copies
+it onto `PlayerTrack.catalogNumber?` for the player bar.
+
+`createdAt` is the **release's** `created_at` (the real upload date, which never changes; position in the feed comes from `sort_at`).
 
 ## `getFeed(supabase, { page?, pageSize?, q? })` → `FeedPage`
 
-Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as a discriminated union on `kind`:
-
-- `{ kind: "album", id, title, albumArtUrl, artistNames[], createdAt, tracks: FeedTrack[] }`
-- `{ kind: "track", id, title, trackArtUrl, artistNames[], createdAt }`
-
-`FeedTrack = { id, title, artistNames[] }`. `FeedPage = { items, page, pageSize, hasMore, total, totalPages }`.
-`createdAt` is the **release's** `created_at` (the real upload date, which never changes; position in the feed comes from `sort_at`).
+Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as the `FeedItem`
+discriminated union above.
 
 How it works:
 
 1. **One query on `releases`** (`RELEASE_SELECT`), embedding the target via its foreign key:
-   `track:tracks(id, title, track_art_url, archived_at, track_artists(position, artists(name)))` for a
-   single, and `album:albums(id, title, album_art_url, album_artists(position,
-   artists(name)), track_albums(position, tracks(id, title, archived_at, track_artists(position,
+   `id, kind, created_at, pinned, sort_at,
+   track:tracks(id, catalog_number, title, track_art_url, archived_at, track_artists(position, artists(name)))` for a
+   single, and `album:albums(id, catalog_number, title, album_art_url, album_artists(position,
+   artists(name)), track_albums(position, tracks(id, catalog_number, title, archived_at, track_artists(position,
    artists(name)))))` for an album. Only things with a `releases` row appear — an album's
    tracks are never their own feed row because they have no release of their own. A single whose track is archived is dropped in `toFeedItem`, and so is an album with zero live tracks (all archived, or none); the feed never returns an empty album.
 2. `.is("archived_at", null)` (label members can read archived rows via RLS, so the filter is
@@ -37,7 +56,7 @@ How it works:
    PostgREST fail with `PGRST103`; `getFeed` then runs a count-only query on the same source and
    returns `items: []` with the real `total`/`totalPages` so the page can redirect to the last page.
 4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
-   item. A release whose embedded target is null (hidden/removed) is skipped (so a page can
+   item, copying `catalog_number` → `catalogNumber` at every level. A release whose embedded target is null (hidden/removed) is skipped (so a page can
    have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped. Dropping an item (empty album, archived single) makes that page come back short, so admin actions must keep data consistent: archiving an album's last live track must archive the release too.
 5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list
    is in credit order via `namesFrom`.
@@ -80,11 +99,13 @@ a non-string `q` is treated as blank.
 
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
-- `.maybeSingle()`; returns `null` for a missing album **and for an archived one** (it embeds
-  `releases(archived_at)`), even for label members. A missing release is also `null` (RLS hides an archived release from listeners, so the embed comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
+- Selects `id, catalog_number, title, album_art_url, releases(archived_at), album_artists(position, artists(name)),
+  track_albums(position, tracks(id, catalog_number, title, archived_at, track_artists(position, artists(name))))`
+  with `.maybeSingle()`; returns `null` for a missing album **and for an archived one**, even for label members. A missing release is also `null` (RLS hides an archived release from listeners, so the embed comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
 - Same embeds as the feed's album branch; tracks sorted by `track_albums.position`, so the
   album page and the feed's expanded album row always agree.
-- `AlbumDetail = { id, title, albumArtUrl, artistNames[], tracks: FeedTrack[] }`.
+- `albumArtUrl` is returned but **not rendered** by the album page yet (it is an unsigned R2
+  key; see routing-and-auth.md).
 
 ## Downloaded state (`src/lib/supabase/downloads.ts`)
 
@@ -93,7 +114,7 @@ Both pages show which tracks the user already downloaded:
 - Feed: `getMyDownloadedTrackIds(supabase, feedTrackIds(items))`; album page: the album's track ids.
   `feedTrackIds` flattens singles and album tracks in feed order.
 - Uses the **user (cookie) client**: `downloads` RLS is owner-only, so no `user_id` filter. Queries in
-  chunks of 100 ids (PostgREST URL length) and **fails soft** to `[]` (logs; buttons just show the plain arrow).
+  chunks of 100 ids (PostgREST URL length) and **fails soft** to `[]` (logs; buttons just show the plain download glyph).
 - The page wraps its list in `<DownloadsProvider initialIds={...}>`; rows render `DownloadButton`. The provider
   unions the server ids with local marks, so new `initialIds` (e.g. `?page=2`, which doesn't remount) apply without losing clicks.
 - Album page also exports `generateMetadata` and uses `cache(loadAlbum)`, so the title and the page share one

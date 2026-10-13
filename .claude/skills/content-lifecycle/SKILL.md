@@ -35,6 +35,7 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 | `archive_track`, `restore_track` | `…20261010140100_archive_restore_track.sql` |
 | `add_album_track`, `replace_track_audio` | `…20261010140200_add_track_replace_audio.sql` |
 | `update_release` | `…20261010140300_update_release.sql` |
+| `catalog_number` identity + `keep_catalog_number` (archive/restore/delete never reuse or change a number) | `…20261011170000_catalog_numbers.sql` ([[catalog-schema]]) |
 | Feed order + archived filter, `feedPageSize()` | `src/lib/supabase/feed.ts` (`getFeed`) |
 | `null` for archived albums, archived tracks skipped | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Stream/download refuse archived tracks | `src/lib/storage/actions.ts` |

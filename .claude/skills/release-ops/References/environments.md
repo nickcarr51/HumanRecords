@@ -37,6 +37,9 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 
 The prod R2 token lives only in Vercel Production. The backup token lives only in GitHub.
 
+Not an env var: night mode. The root layout (`src/app/layout.tsx`) reads the `hs-theme` cookie
+(`src/lib/theme/mode-cookie.ts`) on every request; no Vercel config is involved.
+
 ## Hosted Auth settings (both Supabase projects; match `config.toml`)
 
 - Sign-up OFF (Authentication → "Allow new users to sign up").

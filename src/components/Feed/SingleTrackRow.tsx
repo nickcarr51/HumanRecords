@@ -1,10 +1,13 @@
 'use client';
 
 import { usePlayer, toPlayerTrack, type PlayerTrack, type QueueSource } from '@/components/Player';
+import { PlaybackButton } from '@/components/Player/PlaybackButton';
+import { PlaybackIcon } from '@/components/Player/PlaybackIcon';
 import { DownloadButton } from '@/components/Downloads';
 import type { FeedItem } from '@/lib/supabase/feed';
-import { Row, PlayButton, Meta, Title, Sub, Kind, RowActions } from './feed.styles';
+import { Row, Meta, Title, Sub, Kind, RowActions } from './feed.styles';
 import { usePlayButton } from './usePlayButton';
+import { CatalogLine } from '@/components/CatalogId/CatalogLine';
 
 export function SingleTrackRow({
   item,
@@ -20,23 +23,24 @@ export function SingleTrackRow({
 }) {
   const { playQueue } = usePlayer();
   const track = toPlayerTrack({ id: item.id, title: item.title, artistNames: item.artistNames });
-  const { playing, onClick } = usePlayButton([item.id], () => playQueue(queue, queueIndex, source));
+  const { playing, activePlaying, onClick } = usePlayButton([item.id], () => playQueue(queue, queueIndex, source));
 
   return (
     <Row>
-      <PlayButton
+      <PlaybackButton active={activePlaying}
         type="button"
         aria-label={`${playing ? 'Pause' : 'Play'} ${item.title}`}
         onClick={onClick}
       >
-        {playing ? '⏸' : '▶'}
-      </PlayButton>
+        <PlaybackIcon playing={playing} />
+      </PlaybackButton>
       <Meta>
+        <CatalogLine kind="track" number={item.catalogNumber} issuedAt={item.createdAt} />
         <Title>{item.title}</Title>
         <Sub>{track.artistName}</Sub>
       </Meta>
       <RowActions>
-        <Kind>Track</Kind>
+        <Kind>Single</Kind>
         <DownloadButton trackId={item.id} title={item.title} />
       </RowActions>
     </Row>

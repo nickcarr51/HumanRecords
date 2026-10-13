@@ -5,15 +5,16 @@ import type { FeedItem, ReleaseRef } from "@/lib/supabase/feed";
 // `page` is the feed page the track came from (absent on the album page).
 // `from` is the release it belongs to (set by feedQueue), so a search queue
 // that runs out can continue in the main feed after its last release.
-export type PlayerTrack = { id: string; title: string; artistName: string; page?: number; from?: ReleaseRef };
+export type PlayerTrack = { id: string; catalogNumber?: number; title: string; artistName: string; page?: number; from?: ReleaseRef };
 
 export function toPlayerTrack(
-  t: { id: string; title: string; artistNames: string[] },
+  t: { id: string; catalogNumber?: number; title: string; artistNames: string[] },
   page?: number,
   from?: ReleaseRef,
 ): PlayerTrack {
   return {
     id: t.id,
+    ...(t.catalogNumber !== undefined ? { catalogNumber: t.catalogNumber } : {}),
     title: t.title,
     artistName: t.artistNames.length ? t.artistNames.join(", ") : "Unknown Artist",
     ...(page !== undefined ? { page } : {}),

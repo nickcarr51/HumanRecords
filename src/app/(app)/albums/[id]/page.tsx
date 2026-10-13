@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getAlbum } from '@/lib/supabase/albums';
 import { getMyDownloadedTrackIds } from '@/lib/supabase/downloads';
 import { AlbumTracks, DownloadsProvider } from '@/components';
-import { Page, Back, Head, Art, ArtPlaceholder, Title, Artists } from './album-page.styles';
+import { Page, Back, Head, Title, Artists } from './album-page.styles';
 import { albumArtistLabel } from '@/lib/supabase/artist-names';
+import { CatalogId } from '@/components/CatalogId/CatalogId';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -38,12 +39,12 @@ export default async function AlbumPage({ params }: Props) {
         ‹ timeline
       </Back>
       <Head>
-        {album.albumArtUrl ? (
-          <Art src={album.albumArtUrl} alt="" />
-        ) : (
-          <ArtPlaceholder aria-hidden />
-        )}
+        {/* Artwork is hidden until image upload ships: `album_art_url` holds an
+            R2 key that isn't signed yet, so <Art> would render a blank square.
+            `Art` (GlitchArt) and `ArtPlaceholder` in album-page.styles stay
+            ready for that pass. */}
         <div>
+          <CatalogId kind="album" number={album.catalogNumber} />
           <Title>{album.title}</Title>
           <Artists>{artist}</Artists>
         </div>

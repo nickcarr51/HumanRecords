@@ -4,6 +4,7 @@ import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
 
 export type FeedTrack = {
   id: string;
+  catalogNumber: number;
   title: string;
   artistNames: string[];
 };
@@ -11,6 +12,7 @@ export type FeedTrack = {
 export type FeedItem =
   | {
       kind: "album";
+      catalogNumber: number;
       id: string;
       title: string;
       albumArtUrl: string | null;
@@ -20,6 +22,7 @@ export type FeedItem =
     }
   | {
       kind: "track";
+      catalogNumber: number;
       id: string;
       title: string;
       trackArtUrl: string | null;
@@ -55,21 +58,22 @@ export function feedPageSize(): number {
 // orders an RPC result (search_feed, chained later) only by projected columns.
 const RELEASE_SELECT = `
   id, kind, created_at, pinned, sort_at,
-  track:tracks ( id, title, track_art_url, archived_at, track_artists ( position, artists ( name ) ) ),
+  track:tracks ( id, catalog_number, title, track_art_url, archived_at, track_artists ( position, artists ( name ) ) ),
   album:albums (
-    id, title, album_art_url,
+    id, catalog_number, title, album_art_url,
     album_artists ( position, artists ( name ) ),
-    track_albums ( position, tracks ( id, title, archived_at, track_artists ( position, artists ( name ) ) ) )
+    track_albums ( position, tracks ( id, catalog_number, title, archived_at, track_artists ( position, artists ( name ) ) ) )
   )
 `;
 
-type TrackRel = { id: string; title: string; track_art_url?: string | null; archived_at?: string | null; track_artists: ArtistNameRel };
+type TrackRel = { id: string; catalog_number: number; title: string; track_art_url?: string | null; archived_at?: string | null; track_artists: ArtistNameRel };
 type ReleaseRow = {
   kind: "single" | "album";
   created_at: string;
   track: TrackRel | null;
   album: {
     id: string;
+    catalog_number: number;
     title: string;
     album_art_url: string | null;
     album_artists: ArtistNameRel;
@@ -83,6 +87,7 @@ function toFeedItem(row: ReleaseRow): FeedItem | null {
     return {
       kind: "track",
       id: row.track.id,
+      catalogNumber: row.track.catalog_number,
       title: row.track.title,
       trackArtUrl: row.track.track_art_url ?? null,
       artistNames: namesFrom(row.track.track_artists),
@@ -93,11 +98,12 @@ function toFeedItem(row: ReleaseRow): FeedItem | null {
     const tracks: FeedTrack[] = byPosition(row.album.track_albums ?? [])
       .map((r) => r.tracks)
       .filter((t): t is TrackRel => t !== null && !t.archived_at)
-      .map((t) => ({ id: t.id, title: t.title, artistNames: namesFrom(t.track_artists) }));
+      .map((t) => ({ id: t.id, catalogNumber: t.catalog_number, title: t.title, artistNames: namesFrom(t.track_artists) }));
     if (tracks.length === 0) return null; // never show an empty album
     return {
       kind: "album",
       id: row.album.id,
+      catalogNumber: row.album.catalog_number,
       title: row.album.title,
       albumArtUrl: row.album.album_art_url,
       artistNames: namesFrom(row.album.album_artists),

@@ -32,7 +32,7 @@ export default function StyleGuidePage() {
         <S.Header>
           <S.Kicker>Human Services · Style Guide</S.Kicker>
           <Heading as="h1" $level={1}>Component Library</Heading>
-          <Text $variant="muted">Every element. Dark theme. Assemble pages from these.</Text>
+          <Text $variant="muted">Every element, in the current day/night theme. Assemble pages from these.</Text>
         </S.Header>
 
         <S.Block>
@@ -54,7 +54,7 @@ export default function StyleGuidePage() {
             <Heading $level={2}>Heading level 2</Heading>
             <Heading $level={3}>Heading level 3</Heading>
             <Heading $level={4}>Heading level 4</Heading>
-            <Text>Body text in Dico Mono — headings above use Dico Mono too.</Text>
+            <Text>Body text in Dico Mono — display headings above use Arial/Helvetica.</Text>
             <Text $variant="muted">Muted body text for secondary copy.</Text>
             <Text $variant="small">Small body text.</Text>
             <Mono>MONO_LABEL · 001 · the old-internet terminal voice</Mono>

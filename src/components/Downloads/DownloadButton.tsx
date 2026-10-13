@@ -7,6 +7,7 @@ import { Spinner } from '@/components/Spinner';
 import { useOptionalToast } from '@/components/Toast';
 import { useDownloads } from './DownloadsProvider';
 import { navigateTo } from './navigate';
+import { SweepIcon } from '@/components/Player/SweepIcon';
 
 export function DownloadButton({ trackId, title }: { trackId: string; title: string }) {
   const { isDownloaded, markDownloaded } = useDownloads();
@@ -40,7 +41,15 @@ export function DownloadButton({ trackId, title }: { trackId: string; title: str
       aria-busy={signing}
       onClick={onClick}
     >
-      {signing ? <Spinner $size="1rem" aria-hidden /> : downloaded ? '✓' : '↓'}
+      {signing ? <Spinner $size="1rem" aria-hidden /> : (
+        <SweepIcon fill="currentColor">
+          {downloaded ? (
+            <path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" strokeLinejoin="miter" />
+          ) : (
+            <path d="M4 7h16l-8 14Z" />
+          )}
+        </SweepIcon>
+      )}
     </PlayButton>
   );
 }

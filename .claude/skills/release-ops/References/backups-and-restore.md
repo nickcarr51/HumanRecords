@@ -22,7 +22,11 @@ local `supabase/migrations` and checks out main's exact set (so stray migrations
 ref cannot leak in; the schema must match prod). It then downloads the newest `data.sql.gz`, starts a throwaway local Supabase, runs
 `db reset --no-seed`, loads the data with `session_replication_role = replica`, then
 `scripts/restore-check.mts` asserts accounts > 0 and `public.users` = `auth.users`. Failure emails
-the owner.
+the owner. The `catalog_number` identity columns and the `keep_catalog_number` trigger
+(`20261011170000`, before-update only) are compatible with this load: COPY writes the dumped
+numbers as-is and no update fires (ordinary triggers are skipped under `replica` anyway); the
+dump's `setval` lines for the two `*_catalog_number_seq` sequences must load too, or the next
+publish fails with a unique violation.
 
 Known causes of a red drill:
 - Before the first prod release: `main` has no migrations yet (the fail-fast message above), or

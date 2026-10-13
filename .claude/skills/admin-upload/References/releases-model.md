@@ -48,6 +48,10 @@ tests, future scripts) without a `releases` row does not appear on `/feed`.
   Stream/download signing checks only `tracks.archived_at`, so archiving an album release alone
   leaves its live tracks signable by id (known gap, now closed by `archive_release`, which
   archives the album's live tracks with the same timestamp). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
+- `catalog_number` (`20261011170000`): new rows in `albums` and `tracks` receive it automatically
+  from a `generated always as identity` column (permanent, never reused; `keep_catalog_number`
+  raises on any change). `publish_release`, `add_album_track` and the upload/publish code pass
+  nothing for it and must never try to. Details: [[catalog-schema]].
 
 ## `publish_release(payload jsonb) returns uuid` (`…120100_publish_release.sql`)
 

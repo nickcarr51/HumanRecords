@@ -13,7 +13,7 @@ export function feedTrackIds(items: FeedItem[]): string[] {
 // user (cookie) client: the downloads RLS policy is owner-only, so no user_id
 // filter is needed. If a label-member read policy is ever added to downloads,
 // add `.eq("user_id", <caller>)` here (pass-2 stats use a definer function instead).
-// Fails soft: on error the page still renders, buttons just show "↓".
+// Fails soft: on error the page still renders, buttons show the download icon.
 export async function getMyDownloadedTrackIds(
   supabase: SupabaseClient<Database>,
   trackIds: string[],
