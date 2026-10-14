@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentRole = vi.fn();
 const single = vi.fn();
-const eq = vi.fn((_c: string, _v: unknown) => ({ single }));
+const eq = vi.fn<(c: string, v: unknown) => { single: typeof single }>(() => ({ single }));
 const inFn = vi.fn();
-const select = vi.fn((_cols: string) => ({ eq, in: inFn }));
-const from = vi.fn((_t: string) => ({ select }));
+const select = vi.fn<(cols: string) => { eq: typeof eq; in: typeof inFn }>(() => ({ eq, in: inFn }));
+const from = vi.fn<(t: string) => { select: typeof select }>(() => ({ select }));
 const headObject = vi.fn();
 const signStreamUrl = vi.fn(async (key: string) => `https://get/${key}`);
-const signUploadUrl = vi.fn(async (key: string, _ct: string) => `https://put/${key}`);
+const signUploadUrl = vi.fn<(key: string, ct: string) => Promise<string>>(async (key) => `https://put/${key}`);
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from })) }));
@@ -68,6 +68,7 @@ describe("getPeaksJob", () => {
       peaksUrl: `https://put/peaks/${A}.bin`,
       error: null,
     });
+    expect(eq).toHaveBeenCalledWith("id", A);
     expect(signUploadUrl).toHaveBeenCalledWith(`peaks/${A}.bin`, "application/octet-stream");
   });
 
