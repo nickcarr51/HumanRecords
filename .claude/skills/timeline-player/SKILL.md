@@ -1,6 +1,6 @@
 ---
 name: timeline-player
-description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), the stored-peaks waveform (`peaks.ts`: `usePeaks` / `usePeakReaders`; `audioMeter.ts`, `PixelWaveform`, `PlaybackButton` particles), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, the waveform is not moving (the track has no `peaks/<id>.bin`; `getTrackPeaksUrl`), or album art is missing from the album page. Covers playback of presigned R2 URLs on a plain `<audio>` (never CORS mode), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
+description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), the waveform (desktop live meter `useAudioMeterSource` / `isTouchDevice` in `audioMeter.ts`; stored peaks on touch via `peaks.ts`: `usePeaks` / `usePeakReaders`; `PixelWaveform`, `PlaybackButton` particles), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, the waveform is not moving (on a phone the track has no `peaks/<id>.bin`, see `getTrackPeaksUrl`; on desktop a CORS/`crossOrigin` problem), or album art is missing from the album page. Covers playback of presigned R2 URLs (CORS-mode `<audio>` on desktop for the live meter, plain `<audio>` on touch), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
 ---
 
 # Timeline + Persistent Player
@@ -8,7 +8,7 @@ description: Use when working on the listener timeline (`/feed`), the persistent
 The listener MVP: a single **timeline** at `/feed` (pinned releases first, then newest `sort_at`) (a mix of album and
 single releases) and a **music player** that keeps playing while the user navigates the
 app — SoundCloud-style. Built on branch `feature/media-player-and-refactor` (2026-09-29);
-vector controls, the Web Audio meter (replaced 2026-10 by the stored-peaks waveform), catalog numbers and the "Pack"/"Single" vocabulary
+vector controls, the waveform meter (live Web Audio on desktop, stored peaks on touch since 2026-10), catalog numbers and the "Pack"/"Single" vocabulary
 landed on `feat/playback-vector-icons` (2026-10-11).
 
 ## The two things to understand first
@@ -20,20 +20,23 @@ App Router keeps that layout mounted while the user moves between routes inside 
 (`/feed` ↔ `/albums/[id]` ↔ `/dashboard`), so the `<audio>` element and all player state
 never unmount. No global state library, no refresh-resume.
 
-**2. The browser plays the presigned R2 URL directly, on a plain `<audio>` on every device.**
+**2. The browser plays the presigned R2 URL directly; the `<audio>` differs by device.**
 The path is browser → `getTrackStreamUrl(trackId)` server action → presigned R2 URL →
-`<audio src={url}>`. There is no proxy/stream route and no feature flag. The element never
-sets `crossOrigin` and the app never creates an `AudioContext` or `createMediaElementSource`:
-routing the element through Web Audio makes iOS silence playback the moment Safari is
+`<audio src={url}>`. There is no proxy/stream route and no feature flag. On **desktop**
+`useAudioMeterSource` routes the element through a Web Audio analyser
+(`createMediaElementSource` → `AnalyserNode`) and `PlayerProvider` sets
+`crossOrigin="anonymous"`, so playback is a CORS request (the bucket's existing `GET` rule
+covers it). On **touch devices** (`isTouchDevice()`: coarse pointer or iOS/iPadOS) the element
+stays plain: **never** set `crossOrigin` or create an `AudioContext` /
+`createMediaElementSource` there, because iOS silences playback the moment Safari is
 backgrounded, and a plain `<audio>` keeps playing when the user switches apps or locks the
-phone, which the site relies on. (The old desktop-only Web Audio meter, `isTouchDevice()` and
-`useAudioMeterSource` were removed 2026-10.) Playback is therefore not a CORS request; bucket
-CORS `GET` is still needed, but only for the waveform's peaks `fetch`.
+phone, which the site relies on. Touch playback is therefore not a CORS request; bucket CORS
+`GET` is needed there only for the waveform's peaks `fetch`.
 
-**3. The waveform and button particles are driven by stored peaks, not live analysis.** Each
+**3. The waveform and button particles are driven by a live analyser on desktop and by stored peaks on touch.** Desktop feeds `useAudioMeterSource`'s readers into the contexts and never fetches peaks. On touch, each
 track has `peaks/<id>.bin` in R2 (50 loudness bytes per second, written at upload or by
 **Analyze all** on `/admin/releases/[id]`; see [[admin-upload]] and [[media-storage]]).
-`PlayerProvider` calls `usePeaks(currentTrack?.id)` (fetches via the `getTrackPeaksUrl`
+`PlayerProvider` calls `usePeaks(peakTrackId)` (fetches via the `getTrackPeaksUrl`
 server action, deferred while `document.hidden`, keyed by track) and
 `usePeakReaders(audioRef, peaks)` (`src/components/Player/peaks.ts`), which turns the peaks
 plus `audio.currentTime` into the `readLevel` / `readWaveform` readers that `useAudioMeter()` /
@@ -124,27 +127,29 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
   `album-page.styles.ts` are kept; to restore, put the `Head` grid back to `96px 1fr` and
   render `<Art>` as its first child (see routing-and-auth.md).
 - Feed rows show no artwork; `useMediaSession` sets the fixed logo as artwork.
-- **Lock-screen playback has never worked on iPhone (any version of the app, before and
-  after Web Audio).** Locking the phone stops the audio and no controls appear, even though
-  `useMediaSession` is wired. Cause unknown; not caused by Web Audio (removed entirely 2026-10) and
+- **Lock-screen playback has never worked on iPhone (any version of the app, with or
+  without Web Audio).** Locking the phone stops the audio and no controls appear, even though
+  `useMediaSession` is wired. Cause unknown; not caused by Web Audio (touch devices never use it) and
   not a regression of any branch. Open investigation: test on hosted dev over https (LAN
   http is a variable), Safari tab vs Home Screen app, and whether `play()` on the first
   track vs auto-advance differs. Background playback when *switching apps* does work.
-- **Tracks without stored peaks show idle dots.** Anything uploaded before the stored-peaks
+- **On touch devices, tracks without stored peaks show idle dots.** Anything uploaded before the stored-peaks
   change, or whose peaks upload failed, has no `peaks/<id>.bin` until **Analyze all** runs on
-  its release page ([[admin-upload]]). Phones animate like desktop once peaks exist.
+  its release page ([[admin-upload]]). Phones animate like desktop once peaks exist. Desktop needs no peaks.
 
 ## Gotchas (quick list; details in the references)
 
 - A track won't play on an environment → check signing (`getTrackStreamUrl`) and that the
-  object exists. Playback is not CORS mode, so bucket CORS is not the first suspect; it only
-  affects the peaks `fetch`.
-- Waveform flat while audio plays → the track has no peaks (Analyze all on its release page),
-  or the bucket CORS `GET` rule is missing for the site origin (peaks fetch fails silently).
+  object exists. On desktop playback is CORS mode (`crossOrigin="anonymous"`), so a missing
+  bucket `GET` rule can also block it; on touch it only affects the peaks `fetch`.
+- Waveform flat while audio plays → on a phone, the track has no peaks (Analyze all on its
+  release page) or the bucket CORS `GET` rule is missing (peaks fetch fails silently); on
+  desktop, a CORS / `crossOrigin` problem with the live analyser.
 - Anything that only needs `currentTrack` / `isPlaying` / `status` must call `usePlayer()`,
   **never `usePlayerTime()`** — the time context ticks ~4×/s during playback.
-- There is no `AudioContext` in the app; the meter readers are pure functions of peaks bytes
-  plus `currentTime` and are unit-tested in `peaks.test.tsx`. Canvas pieces need `getContext`/`requestAnimationFrame`/`matchMedia` stubs.
+- The only `AudioContext` is `useAudioMeterSource`'s, desktop only (a no-op in jsdom); the
+  touch meter readers are pure functions of peaks bytes plus `currentTime`, unit-tested in
+  `peaks.test.tsx`. Canvas pieces need `getContext`/`requestAnimationFrame`/`matchMedia` stubs.
 - Collapsed album rows do not render their tracks (`PixelAccordion` unmounts children
   ~450 ms after close), so they do not subscribe to the player.
 

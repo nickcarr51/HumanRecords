@@ -94,9 +94,10 @@ Browser paths that hit the R2 endpoint cross-origin and need the bucket to answe
 - **Peaks and MP3 reads (`GET`/`HEAD`).** The player `fetch`es `peaks/<id>.bin` through a
   presigned URL (`usePeaks`), and the admin Analyze all `fetch`es the MP3 to decode it. If the
   bucket doesn't allow `GET` from the page's origin, those fetches fail: the waveform stays on
-  idle dots / Analyze all fails. **Playback itself is not affected**: the `<audio>` element
-  has no `crossOrigin` (removed 2026-10 with Web Audio), so its media request is not CORS mode
-  and plays even where the same URL would be refused to `fetch`. `HEAD` stays allowed alongside
+  idle dots / Analyze all fails. **Touch playback is not affected**: there the `<audio>` element
+  has no `crossOrigin`, so its media request is not CORS mode and plays even where the same
+  URL would be refused to `fetch`. On desktop the element is `crossOrigin="anonymous"` (live
+  analyser), so the same `GET` rule is required for it to play. `HEAD` stays allowed alongside
   `GET`.
 - **Browser uploads (`PUT`).** `/admin/upload` and the admin edit page PUT MP3s and peaks files with a
   `Content-Type` header → preflight → the bucket must allow `PUT` and the `content-type` header

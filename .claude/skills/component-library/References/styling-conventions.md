@@ -221,6 +221,6 @@ Include `addEventListener`/`removeEventListener` on the `matchMedia` stub when t
 subscribes to the query (`CRTTexture`, `SignInGlitch`). Timer-driven effects
 (`SignInGlitch`, `CRTTexture`) use `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })` and
 `vi.getTimerCount()` to prove cleanup. Audio readers are injected through
-`AudioMeterContext` / `AudioWaveformContext` providers in tests (there is no `AudioContext` in
-the app; the readers come from stored peaks). The provider-level recipes (cookie, `renderToString`, `startViewTransition`)
+`AudioMeterContext` / `AudioWaveformContext` providers in tests (jsdom has no `AudioContext`; on
+desktop the live analyser only exists in a browser, on touch the readers come from stored peaks). The provider-level recipes (cookie, `renderToString`, `startViewTransition`)
 are in [theme-mode.md](theme-mode.md).

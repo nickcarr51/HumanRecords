@@ -43,8 +43,8 @@ signed PUT, the browser must send exactly the signed `Content-Type`.
 
 All GET signers share the private `signObjectUrl(key, { expiresIn, downloadFilename? })`.
 
-Signing says nothing about CORS. A stream URL is consumed by a plain `<audio>` (no
-`crossOrigin`), which needs no CORS; a stream-signed `peaks/<id>.bin` URL is consumed by
+Signing says nothing about CORS. A stream URL is consumed by an `<audio>`: plain on touch devices (no
+`crossOrigin`, needs no CORS), `crossOrigin="anonymous"` on desktop (needs the `GET` rule); a stream-signed `peaks/<id>.bin` URL is consumed by
 `fetch`, and the admin MP3 URL by `fetch`, so the **bucket** must answer with
 `Access-Control-Allow-Origin` for the site origin (`GET`/`HEAD` in `infra/r2/cors.<env>.json`);
 a download URL is consumed by navigation and an image URL by `<img>`, neither of which needs

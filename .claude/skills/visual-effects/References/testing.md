@@ -87,8 +87,9 @@ Use `renderWithTheme` for anything that reads `useTheme()` (all canvas effects d
   (`draw(performance.now() + 2000)`) or use fake timers; never `await` real delays.
 - **Audio without audio.** Wrap the component in `AudioMeterContext.Provider` /
   `AudioWaveformContext.Provider` from `src/components/Player/audioMeter.ts` with a
-  `vi.fn()` that returns a level or a `Uint8Array`. There is no `AudioContext` anywhere
-  now. To test the readers themselves, pass a `Uint8Array` of peaks to `levelAt` /
+  `vi.fn()` that returns a level or a `Uint8Array`. jsdom has no `AudioContext`, so on desktop
+  the live meter's `enable()` is a no-op in tests (its readers are still non-null); stub
+  `matchMedia` (`(pointer: coarse)`) to run the touch/stored-peaks path. To test the readers themselves, pass a `Uint8Array` of peaks to `levelAt` /
   `shimmer` / `usePeakReaders` (an injected `random` makes `shimmer` deterministic; see
   `src/components/Player/peaks.test.tsx`), and inject the `load` argument of `usePeaks`
   instead of mocking `fetch`.

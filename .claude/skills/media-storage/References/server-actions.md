@@ -26,9 +26,10 @@ Never throws to the client. Error strings are fixed and user-safe:
 
 Caller: `PlayerProvider`'s load-and-play effect ([[timeline-player]]). It sets
 `audio.src = url` on the app's single `<audio preload="metadata">`
-element — the bytes go R2 → browser directly, there is no proxy route in between. The element
-has no `crossOrigin`, so playback is not a CORS request and doesn't depend on the bucket's CORS
-policy (the waveform's peaks `fetch` does; see `getTrackPeaksUrl` below and
+element — the bytes go R2 → browser directly, there is no proxy route in between. On desktop the
+element has `crossOrigin="anonymous"` (live analyser), so playback is a CORS request and needs
+the bucket's `GET` rule; on touch it has none, so playback is not CORS and doesn't depend on
+the policy (the touch waveform's peaks `fetch` does; see `getTrackPeaksUrl` below and
 [object-keys.md](object-keys.md#cors)). On `{ error }` from the action it clears `src` and
 shows the error state. The provider also pre-signs the *next* track (`presignedRef`) and re-signs
 anything older than `PRESIGN_MAX_AGE_MS` (1 h) so a URL can't expire mid-track.

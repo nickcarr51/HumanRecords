@@ -24,7 +24,7 @@ import {
   type QueueState,
 } from "./queue";
 import { useMediaSession } from "./useMediaSession";
-import { AudioMeterContext, AudioWaveformContext } from './audioMeter';
+import { AudioMeterContext, AudioWaveformContext, useAudioMeterSource } from './audioMeter';
 import { usePeakReaders, usePeaks } from './peaks';
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
@@ -83,6 +83,16 @@ export function usePlayerTime(): PlayerTimeValue {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Desktop: live Web Audio analyser, which needs CORS-mode media. Touch
+  // devices load the element plainly so iOS keeps playing in the background,
+  // and draw from stored peaks instead (below).
+  const live = useAudioMeterSource(audioRef);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (live.supported) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
+  }, [live.supported]);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -106,14 +116,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const currentTrack = queueState.tracks[queueState.index] ?? null;
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
-  // Visuals come from the track's stored loudness, not Web Audio: routing the
-  // <audio> element through an AudioContext stops iOS background playback.
-  // The peaks request waits until audio has started for this track: Next runs
-  // client server actions one at a time, so asking earlier would queue it ahead
-  // of getTrackStreamUrl and delay playback by a round trip.
+  // Touch devices draw from the track's stored loudness (desktop never fetches
+  // it). The peaks request waits until audio has started for this track: Next
+  // runs client server actions one at a time, so asking earlier would queue it
+  // ahead of getTrackStreamUrl and delay playback by a round trip.
   const [audioStartedId, setAudioStartedId] = useState<string | null>(null);
-  const peaks = usePeaks(audioStartedId !== null && audioStartedId === currentTrack?.id ? audioStartedId : undefined);
-  const { readLevel, readWaveform } = usePeakReaders(audioRef, peaks);
+  const peakTrackId =
+    !live.supported && audioStartedId !== null && audioStartedId === currentTrack?.id ? audioStartedId : undefined;
+  const peakReaders = usePeakReaders(audioRef, usePeaks(peakTrackId));
+  const readLevel = live.supported ? live.readLevel : peakReaders.readLevel;
+  const readWaveform = live.supported ? live.readWaveform : peakReaders.readWaveform;
+  const enableMeter = live.enable;
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
@@ -256,22 +269,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(
     (tracks: PlayerTrack[], startIndex = 0, source: QueueSource = NO_SOURCE) => {
+      enableMeter();
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
       prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
-    [commit],
+    [commit, enableMeter],
   );
 
   const play = useCallback(() => {
+    enableMeter();
     const audio = audioRef.current;
     // No-op while errored: there is no valid loaded track to play, and the
     // element's src has been cleared, so play must not resume stale audio.
     if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-  }, [currentTrack, status]);
+  }, [currentTrack, status, enableMeter]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -427,8 +442,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
         </AudioMeterContext.Provider>
       </PlayerTimeContext.Provider>
-      {/* Single element for the whole app; hidden — controls live in PlayerBar.
-          Never CORS mode or Web Audio: a plain element keeps playing in the background. */}
+      {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
+      {/* crossOrigin is set in an effect, desktop only (see useAudioMeterSource):
+          it lets Web Audio read the signal for the waveform/particles, and the R2
+          buckets allow GET/HEAD from each site origin (infra/r2/) for that.
+          Touch devices keep a plain element so playback survives backgrounding. */}
       <audio ref={audioRef} preload="metadata" />
     </PlayerContext.Provider>
   );

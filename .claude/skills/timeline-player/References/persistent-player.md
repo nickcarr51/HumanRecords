@@ -15,18 +15,21 @@ click → playQueue(...)            (client)
       → load effect               (PlayerProvider)
       → getTrackStreamUrl(trackId) (server action, src/lib/storage/actions.ts; see [[media-storage]])
       → presigned R2 URL (2 h)    ({ url, error }, never throws to the client)
-      → audio.src = url; play()   (the single <audio preload="metadata">, never CORS mode)
+      → audio.src = url; play()   (the single <audio preload="metadata">; CORS mode on desktop, plain on touch)
 ```
 
 - The browser fetches the presigned URL **directly from R2**. There is no proxy / stream API
   route in this app and no feature flag choosing between modes; if you find a reference to
   `/api/tracks/[id]/stream` or `NEXT_PUBLIC_AUDIO_REACTIVITY`, it is stale.
-- The element **never** has `crossOrigin` (removed 2026-10 with Web Audio), so the media
-  request is a plain no-CORS request and playback does not depend on bucket CORS. Do not
-  add `crossOrigin` or an `AudioContext`: it silences iOS background playback. The rules in
-  `infra/r2/cors.{local,dev,prod}.json` (status table in `infra/r2/README.md`) still matter
-  for one thing here: the peaks `fetch` is a cross-origin `GET`, so a bucket without `GET`
-  for the site origin leaves the waveform on idle dots (playback is unaffected). Downloads
+- On **desktop** an effect in `PlayerProvider` sets `audio.crossOrigin = 'anonymous'` (the
+  live analyser needs it), so the media request is CORS mode and needs the bucket's `GET`
+  rule for the site origin (the existing rule covers it). On **touch devices** the effect
+  removes it: the element is plain, the request is no-CORS, and playback does not depend on
+  bucket CORS. **Never** add `crossOrigin` or an `AudioContext` on touch devices: it silences
+  iOS background playback. The rules in
+  `infra/r2/cors.{local,dev,prod}.json` (status table in `infra/r2/README.md`) also matter
+  for the touch peaks `fetch`, a cross-origin `GET`: a bucket without `GET`
+  for the site origin leaves the touch waveform on idle dots. Downloads
   (navigation) and `<img>` artwork do not need CORS.
 - Debug order when a track won't play on one environment: (1) `getTrackStreamUrl` returning
   `{ error }` (missing object, env vars — [[media-storage]]), (2) autoplay (the player lands in `status: "idle"`, not
@@ -36,10 +39,10 @@ click → playQueue(...)            (client)
 
 `PlayerProvider` is a client component (`'use client'`) that owns:
 
-- one `<audio>` ref (rendered once, hidden, `preload="metadata"`, no `crossOrigin`),
+- one `<audio>` ref (rendered once, hidden, `preload="metadata"`; `crossOrigin="anonymous"` only on desktop, set by an effect),
 - state: `queueState: { tracks: PlayerTrack[]; index; source }`, `isPlaying`, `currentTime`,
   `duration`, `status: "idle" | "loading" | "playing" | "error"`,
-- the stored-peaks meter (`usePeaks(currentTrack?.id)` → `usePeakReaders(audioRef, peaks)` →
+- the stored-peaks meter (`usePeaks(peakTrackId)` → `usePeakReaders(audioRef, peaks)` →
   `readLevel`, `readWaveform`, provided via `AudioMeterContext` / `AudioWaveformContext`).
 
 It exposes **two contexts** — pick the right one:
@@ -106,12 +109,17 @@ A separate `useEffect` (dep `[goNext]`) attaches/detaches listeners with 1:1 sym
   while `status === "error"`** (nothing valid is loaded; src was cleared).
 - `seek(s)` sets `audio.currentTime` and mirrors it into state.
 
-## Stored-peaks meter (`peaks.ts`, `audioMeter.ts`)
+## Meter: live on desktop, stored peaks on touch (`audioMeter.ts`, `peaks.ts`)
 
-There is no Web Audio. (Removed 2026-10: `useAudioMeterSource`, `isTouchDevice`, the
-`AnalyserNode`, and `crossOrigin="anonymous"`; they silenced iOS background playback.)
-`audioMeter.ts` now holds only `AudioMeterContext` / `AudioWaveformContext` and the hooks
-`useAudioMeter` / `useAudioWaveform`. The data comes from `peaks/<id>.bin` in R2: one byte
+The source is split by `isTouchDevice()` (coarse pointer or iOS/iPadOS). **Desktop:**
+`const live = useAudioMeterSource(audioRef)` builds a Web Audio analyser
+(`createMediaElementSource` → `AnalyserNode`, `fftSize` 256); `enableMeter()` (`live.enable`)
+is called in `playQueue` and `play`; `live.readLevel` / `live.readWaveform` go into the
+contexts and peaks are never fetched. **Touch:** no `AudioContext` (it silenced iOS background
+playback); the stored-peaks path below is used, and `usePeaks` is requested only after audio
+has started for the track, so it is never queued ahead of `getTrackStreamUrl`.
+`audioMeter.ts` holds `AudioMeterContext` / `AudioWaveformContext`, the hooks `useAudioMeter` /
+`useAudioWaveform`, `isTouchDevice` and `useAudioMeterSource`. The touch data comes from `peaks/<id>.bin` in R2: one byte
 per 20 ms (`PEAKS_PER_SECOND = 50`, per-slice RMS of the mono mix, 0–255), written at upload
 time or by Analyze all ([[admin-upload]]); key derivation in [[media-storage]].
 
@@ -131,7 +139,7 @@ time or by Analyze all ([[admin-upload]]); key derivation in [[media-storage]].
     call, so the dots move but are not a real waveform.
 - Tuning constants for Erik at the top of `peaks.ts`: `LEVEL_GAIN = 4` (matches the old live
   meter), `WAVE_GAIN = 3`, `WAVE_MIX`.
-- Works on every device, including phones; no user-gesture requirement.
+- Used on touch devices (desktop uses the live analyser); no user-gesture requirement.
 
 Consumers:
 
@@ -158,7 +166,7 @@ the site origin (the peaks `fetch` is cross-origin) and that `getTrackPeaksUrl` 
 
 Known gap: **iOS lock-screen playback has never worked** — the audio stops when the phone
 locks and no lock-screen controls appear, on every version of the app (owner-confirmed
-2026-10-11). It predates Web Audio and is unrelated to it (Web Audio is gone). Cause unknown; see the Known deferrals list in SKILL.md for the
+2026-10-11). It predates Web Audio and is unrelated to it (touch devices never use it). Cause unknown; see the Known deferrals list in SKILL.md for the
 investigation plan. Switching apps *does* keep playing. Tests can't cover any of this —
 jsdom has no lock state.
 
@@ -248,7 +256,7 @@ state and effects in `PlayerProvider`.
   `Uint8Array` and are tested in `peaks.test.tsx` (inject `load` into `usePeaks`);
   `PixelWaveform`/`PlaybackButton` tests inject `AudioWaveformContext`/`AudioMeterContext`
   values and stub `HTMLCanvasElement.prototype.getContext`, `requestAnimationFrame` and `matchMedia`.
-- Never create an `AudioContext` or set `crossOrigin` on the `<audio>` (iOS background
-  playback); read via `useAudioMeter()`/`useAudioWaveform()`.
+- Never create an `AudioContext` or set `crossOrigin` on the `<audio>` on touch devices (iOS
+  background playback); only `useAudioMeterSource` does so, on desktop. Read via `useAudioMeter()`/`useAudioWaveform()`.
 - The player is server-action-adjacent but fully client-side; never import `@/lib/storage/*`
   modules (they read the R2 secret) into it — only call the `getTrackStreamUrl` action.

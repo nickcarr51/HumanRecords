@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
@@ -76,15 +76,35 @@ describe("toPlayerTrack", () => {
   });
 });
 
+// Touch device (iOS/Android): the provider skips Web Audio and draws from stored peaks.
+// jsdom has no matchMedia, so tests run as desktop unless they call this.
+function asTouch() {
+  vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", addEventListener() {}, removeEventListener() {} }));
+}
+
 describe("PlayerProvider", () => {
-  it("plays the signed R2 URL on a plain audio element (no CORS mode, so background playback survives)", async () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("desktop: plays on a CORS-enabled audio element and never fetches peaks", async () => {
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
+    expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
+  });
+
+  it("touch: plays on a plain audio element (no CORS mode, so background playback survives)", async () => {
+    asTouch();
     const { container } = renderPlayer();
     await userEvent.click(screen.getByText("play"));
     await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
     expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
   });
 
-  it("gives effects a level reader once the track's peaks load", async () => {
+  it("touch: gives effects a level reader once the track's peaks load", async () => {
+    asTouch();
     vi.mocked(getTrackPeaksUrl).mockResolvedValue({ url: "https://signed.example/peaks", error: null });
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(10).buffer })));
     function Meter() {
@@ -100,7 +120,8 @@ describe("PlayerProvider", () => {
       vi.unstubAllGlobals();
     }
   });
-  it("requests the stream URL before the peaks URL, and peaks wait for the stream URL to resolve", async () => {
+  it("touch: requests the stream URL before the peaks URL, and peaks wait for the stream URL to resolve", async () => {
+    asTouch();
     let resolveStream: (v: { url: string; error: null }) => void = () => {};
     mockGet.mockImplementation((id: string) =>
       id === "t1" ? new Promise((r) => { resolveStream = r; }) : Promise.resolve({ url: `https://signed.example/${id}`, error: null }),

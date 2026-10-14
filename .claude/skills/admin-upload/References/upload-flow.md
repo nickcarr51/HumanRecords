@@ -111,8 +111,9 @@ upload fails at the PUT step (the preflight is rejected). One rule per bucket, p
 into Cloudflare -> R2 -> bucket -> Settings -> CORS policy. The source of truth is
 `infra/r2/cors.{local,dev,prod}.json` (`GET`, `HEAD`, `PUT` with `content-type`). Uploads (MP3 and
 peaks) need `PUT` with `content-type`; `GET` is needed by Analyze all (it `fetch`es the MP3 in the
-admin browser) and by the player's peaks `fetch` (see [[media-storage]]). The `<audio>` element
-no longer uses `crossOrigin`, so playback needs no CORS. Downloads (navigation) and artwork
+admin browser) and by the player's peaks `fetch` (see [[media-storage]]). The desktop `<audio>`
+element uses `crossOrigin="anonymous"` (live analyser) and so needs the same `GET` rule; the touch
+element is plain and needs no CORS. Downloads (navigation) and artwork
 (`<img>`) don't need CORS — see `infra/r2/README.md`. The stored-peaks work changed no CORS rule.
 
 Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09; `GET`/`HEAD` added to
