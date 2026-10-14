@@ -3,10 +3,11 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
-vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn() }));
-import { getTrackStreamUrl } from "@/lib/storage/actions";
+vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn(), getTrackPeaksUrl: vi.fn() }));
+import { getTrackPeaksUrl, getTrackStreamUrl } from "@/lib/storage/actions";
 vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterRelease: vi.fn() }));
 import { continueAfterRelease, loadFeedPage } from "@/lib/feed/actions";
+import { useAudioMeter } from "./audioMeter";
 import { PlayerProvider, usePlayer, toPlayerTrack } from "./PlayerProvider";
 import type { PlayerTrack, QueueSource } from "./queue";
 
@@ -24,6 +25,7 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGet.mockImplementation(async (id: string) => ({ url: `https://signed.example/${id}`, error: null }));
+  vi.mocked(getTrackPeaksUrl).mockResolvedValue({ url: null, error: null });
   // clearAllMocks keeps return values; reset so one test's deferred page can't leak into the next.
   mockLoad.mockReset();
   mockAfterRelease.mockReset();
@@ -75,21 +77,25 @@ describe("toPlayerTrack", () => {
 });
 
 describe("PlayerProvider", () => {
-  it("plays the signed R2 URL directly on a CORS-enabled audio element", async () => {
+  it("plays the signed R2 URL on a plain audio element (no CORS mode, so background playback survives)", async () => {
     const { container } = renderPlayer();
     await userEvent.click(screen.getByText("play"));
     await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
-    // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
-    expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
+    expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
   });
 
-  it("skips CORS mode on touch devices so a plain <audio> keeps playing in the background", async () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", addEventListener() {}, removeEventListener() {} }));
+  it("gives effects a level reader once the track's peaks load", async () => {
+    vi.mocked(getTrackPeaksUrl).mockResolvedValue({ url: "https://signed.example/peaks", error: null });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(10).buffer })));
+    function Meter() {
+      return <span data-testid="meter">{useAudioMeter() ? "on" : "off"}</span>;
+    }
     try {
-      const { container } = renderPlayer();
+      renderWithTheme(<PlayerProvider><Harness /><Meter /></PlayerProvider>);
+      expect(screen.getByTestId("meter")).toHaveTextContent("off");
       await userEvent.click(screen.getByText("play"));
-      await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
-      expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
+      await waitFor(() => expect(screen.getByTestId("meter")).toHaveTextContent("on"));
+      expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1");
     } finally {
       vi.unstubAllGlobals();
     }

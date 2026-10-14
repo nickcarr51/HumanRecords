@@ -24,7 +24,8 @@ import {
   type QueueState,
 } from "./queue";
 import { useMediaSession } from "./useMediaSession";
-import { AudioMeterContext, AudioWaveformContext, useAudioMeterSource } from './audioMeter';
+import { AudioMeterContext, AudioWaveformContext } from './audioMeter';
+import { usePeakReaders, usePeaks } from './peaks';
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
 
@@ -82,15 +83,6 @@ export function usePlayerTime(): PlayerTimeValue {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const { supported: meterSupported, enable: enableMeter, readLevel, readWaveform } = useAudioMeterSource(audioRef);
-  // CORS-mode media is only needed for Web Audio analysis (desktop). Phones
-  // load the element plainly so iOS keeps playing in the background.
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (meterSupported) audio.crossOrigin = 'anonymous';
-    else audio.removeAttribute('crossorigin');
-  }, [meterSupported]);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -114,6 +106,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const currentTrack = queueState.tracks[queueState.index] ?? null;
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
+  // Visuals come from the track's stored loudness, not Web Audio: routing the
+  // <audio> element through an AudioContext stops iOS background playback.
+  const peaks = usePeaks(currentTrack?.id);
+  const { readLevel, readWaveform } = usePeakReaders(audioRef, peaks);
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
@@ -254,24 +250,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(
     (tracks: PlayerTrack[], startIndex = 0, source: QueueSource = NO_SOURCE) => {
-      enableMeter();
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
       prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
-    [commit, enableMeter],
+    [commit],
   );
 
   const play = useCallback(() => {
-    enableMeter();
     const audio = audioRef.current;
     // No-op while errored: there is no valid loaded track to play, and the
     // element's src has been cleared, so play must not resume stale audio.
     if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-  }, [currentTrack, status, enableMeter]);
+  }, [currentTrack, status]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -427,10 +421,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
         </AudioMeterContext.Provider>
       </PlayerTimeContext.Provider>
-      {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
-      {/* crossOrigin is set in an effect, desktop only (see useAudioMeterSource):
-          it lets Web Audio read the signal for the waveform/particles, and the R2
-          buckets allow GET/HEAD from each site origin (infra/r2/) for that. */}
+      {/* Single element for the whole app; hidden — controls live in PlayerBar.
+          Never CORS mode or Web Audio: a plain element keeps playing in the background. */}
       <audio ref={audioRef} preload="metadata" />
     </PlayerContext.Provider>
   );
