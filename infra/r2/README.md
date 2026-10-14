@@ -5,16 +5,20 @@ into Cloudflare → R2 → <bucket> → Settings → CORS Policy, then update th
 
 Each bucket allows its own environment's site to:
 
-- `PUT` — browser uploads (presigned PUT from `/admin/upload`).
-- `GET`/`HEAD` — the `<audio>` element loads signed track URLs with
-  `crossOrigin="anonymous"` so Web Audio can read the signal for the player
-  waveform and button particles. Without `GET`, playback fails entirely
-  (the browser refuses CORS-mode media the bucket hasn't allowed).
+- `PUT` (with the `content-type` header) — browser uploads: MP3s and their
+  `peaks/<id>.bin` waveform files (presigned PUTs from the admin pages).
+- `GET`/`HEAD` — on **desktop** the `<audio>` element loads signed track URLs with
+  `crossOrigin="anonymous"` so Web Audio can read the signal for the waveform and
+  button particles; without `GET`, desktop playback fails entirely (the browser
+  refuses CORS-mode media the bucket hasn't allowed). On **phones/tablets** the
+  element is plain (not CORS), but the player `fetch`es `peaks/<id>.bin` and the
+  admin "Analyze all" `fetch`es MP3s, which also need `GET`. See the `waveform` skill.
 
 Downloads (navigation) and artwork (`<img>`) don't need CORS.
 
 **Testing on a phone over LAN** (`http://192.168.x.x:3000`): that is a different origin
-from `localhost`, so playback fails until you add it to the local bucket's policy by hand
+from `localhost`, so the phone plays audio but shows idle dots (its peaks `fetch` is
+refused) until you add it to the local bucket's policy by hand
 in the dashboard. Don't commit LAN addresses to `cors.local.json`; they change per network. `*_art_url` columns
 hold R2 object keys, signed via `signImageUrl` (see the `media-storage` skill).
 

@@ -142,5 +142,6 @@ If you add feature logic to these components, add tests for the logic (not just 
   environment, not a regression).
 - Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files,
   so a pre-existing `tsc --noEmit` error in `actions.test.ts` does not break the build).
-- Playback itself (waveform with real peaks, lock screen) needs a browser against a bucket with
-  the CORS `GET` rule applied (for the peaks fetch): `yarn dev` + the local bucket (`infra/r2/README.md`).
+- Playback itself (desktop live meter, touch waveform with real peaks, lock screen) needs a real
+  browser against a bucket with the CORS `GET` rule applied (desktop playback is CORS mode; the
+  touch peaks fetch is cross-origin): `yarn dev` + the local bucket (`infra/r2/README.md`).

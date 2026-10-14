@@ -18,12 +18,16 @@ Files: `src/components/Upload/upload-engine.ts` (browser), `src/lib/admin/action
    file, plus a `peaksUrl` (presigned PUT for `peaks/<same uuid>.bin`, signed with
    `application/octet-stream`) on each target (`UploadTarget`). Client checks the returned targets are exactly the requested `clientId`s.
 6. `runPool(targets, 2, …)`: for each target, `uploadStarted` → `putFile` (XHR PUT with
-   `Content-Type: audio/mpeg`, progress → `uploadProgress`) → `uploadDone(key)`. On a PUT
+   `Content-Type: audio/mpeg`, progress → `uploadProgress`) → `storePeaks` → `uploadDone(key)`. On a PUT
    failure: `uploadFailed("Upload failed.")`, no new uploads start, in-flight ones finish.
    **After a successful MP3 PUT**, `deps.storePeaks(file, target.peaksUrl)` decodes the file in
    the browser (`computePeaks`, `OfflineAudioContext`) and PUTs the 50-bytes-per-second loudness
    file. It is best-effort and never throws: a failure is ignored (`uploadDone` still fires,
-   publish still succeeds) and the track just shows idle dots in the player until Analyze all.
+   publish still succeeds) and the track just shows idle dots on touch devices until Analyze all.
+   Because `uploadDone` waits for it, the bar sits at 100% with no "analyzing…" text while the
+   decode runs, and the lane waits on the page-wide decode queue (deferred, owner 2026-10-14;
+   see [[waveform]] Known gaps). `uploadOne` behaves the same: it returns the key only after
+   `storePeaks`.
 7. `publishRelease(buildPayload(state, keys))`. Server: role check; runtime shape check;
    ≤ 50 tracks; every `audioKey` a string matching `AUDIO_KEY_RE`, no duplicates; `HEAD`
    each key (missing or size ≤ 0 → "didn't finish uploading"; > 50 MB → rejected);
@@ -43,8 +47,12 @@ best-effort, all using the same `storePeaks`:
   live track's peaks key; per track, sequentially, `getPeaksJob(trackId)` returns a signed
   MP3 GET (`audioUrl`) and a signed peaks PUT (`peaksUrl`), minted per track so the 15-minute
   PUT can't expire mid-run. The browser fetches the MP3, `storePeaks` it, and the row flips to
-  "analyzed". Re-running overwrites in place. Late status responses are ignored and the run stops
-  after unmount. Both actions check `label_member` first (server actions are callable directly).
+  "analyzed". Re-running overwrites in place (rows that already have peaks are redone too). Late
+  status responses are ignored and the run stops after unmount. Status is keyed on each track's
+  id + `audioKey` (`AdminTrack.audioKey`, `src/lib/admin/releases.ts`): after Replace MP3 the
+  page refreshes with the same id and a new key, and that row is re-checked. Rows show the
+  title only (no `HSS###`, accepted). Both actions check `label_member` first (server actions
+  are callable directly). End-to-end: [[waveform]].
 
 The peaks key is derived from the audio key, never stored: no DB column, no migration, and
 `publishRelease` does not HEAD or require it. Prod rule: PUT/overwrite only, never delete.
@@ -94,7 +102,7 @@ can make publish slow before it fails.
 | `createUploadUrls` error (role, bad file, signing) | banner with the error | nothing | nothing |
 | `createUploadUrls` / `publishRelease` rejects (network, server crash) | "Couldn't reach the server. Publish again to retry." | nothing | maybe objects |
 | Returned targets don't match | "Couldn't prepare the upload." | nothing | nothing |
-| A peaks PUT or its decode fails | nothing (best-effort); the track shows idle dots in the player; run Analyze all later | nothing | MP3 stays, no peaks file |
+| A peaks PUT or its decode fails | nothing (best-effort); the track shows idle dots on touch devices; run Analyze all later | nothing | MP3 stays, no peaks file |
 | A PUT fails (CORS, signature, offline, 4xx/5xx) | red progress + "Upload failed." on that track; banner "Some files didn't upload. Publish again to retry." | nothing | uploaded siblings stay |
 | Bad/duplicate key, > 50 tracks, malformed payload | "Invalid audio file reference." / "Too many tracks." / "Invalid release." | nothing | objects stay |
 | HEAD missing / zero / too big / throws | see HEAD section | nothing | objects stay |

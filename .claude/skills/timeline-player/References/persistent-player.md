@@ -1,7 +1,7 @@
 # Reference: The persistent player
 
 Files: `src/components/Player/PlayerProvider.tsx`, `src/components/Player/peaks.ts`,
-`src/components/Player/audioMeter.ts` (contexts and hooks only),
+`src/components/Player/audioMeter.ts` (contexts, hooks, `isTouchDevice`, desktop `useAudioMeterSource`),
 `src/components/Player/PlayerBar.tsx`, `src/components/Player/PixelWaveform.tsx`,
 `src/components/Player/PlaybackButton.tsx`, `src/components/Player/{PlaybackIcon,SweepIcon}.tsx`,
 `src/components/Player/queue.ts`, `src/components/Player/useMediaSession.ts`,
@@ -42,8 +42,9 @@ click → playQueue(...)            (client)
 - one `<audio>` ref (rendered once, hidden, `preload="metadata"`; `crossOrigin="anonymous"` only on desktop, set by an effect),
 - state: `queueState: { tracks: PlayerTrack[]; index; source }`, `isPlaying`, `currentTime`,
   `duration`, `status: "idle" | "loading" | "playing" | "error"`,
-- the stored-peaks meter (`usePeaks(peakTrackId)` → `usePeakReaders(audioRef, peaks)` →
-  `readLevel`, `readWaveform`, provided via `AudioMeterContext` / `AudioWaveformContext`).
+- the meter: `readLevel`, `readWaveform`, provided via `AudioMeterContext` /
+  `AudioWaveformContext` — from `useAudioMeterSource` on desktop, from
+  `usePeaks(peakTrackId)` → `usePeakReaders(audioRef, peaks)` on touch.
 
 It exposes **two contexts** — pick the right one:
 
@@ -111,35 +112,22 @@ A separate `useEffect` (dep `[goNext]`) attaches/detaches listeners with 1:1 sym
 
 ## Meter: live on desktop, stored peaks on touch (`audioMeter.ts`, `peaks.ts`)
 
-The source is split by `isTouchDevice()` (coarse pointer or iOS/iPadOS). **Desktop:**
-`const live = useAudioMeterSource(audioRef)` builds a Web Audio analyser
-(`createMediaElementSource` → `AnalyserNode`, `fftSize` 256); `enableMeter()` (`live.enable`)
-is called in `playQueue` and `play`; `live.readLevel` / `live.readWaveform` go into the
-contexts and peaks are never fetched. **Touch:** no `AudioContext` (it silenced iOS background
-playback); the stored-peaks path below is used, and `usePeaks` is requested only after audio
-has started for the track, so it is never queued ahead of `getTrackStreamUrl`.
-`audioMeter.ts` holds `AudioMeterContext` / `AudioWaveformContext`, the hooks `useAudioMeter` /
-`useAudioWaveform`, `isTouchDevice` and `useAudioMeterSource`. The touch data comes from `peaks/<id>.bin` in R2: one byte
-per 20 ms (`PEAKS_PER_SECOND = 50`, per-slice RMS of the mono mix, 0–255), written at upload
-time or by Analyze all ([[admin-upload]]); key derivation in [[media-storage]].
+End-to-end (format, upload, Analyze all, reader math, tuning, CORS, troubleshooting): see
+[[waveform]]. What this provider does:
 
-- `usePeaks(trackId, load = loadPeaks)` → `Uint8Array | null`. `loadPeaks` calls the
-  `getTrackPeaksUrl(trackId)` server action, then `fetch`es the URL with an `AbortSignal`;
-  any failure (no peaks, 404, network) returns `null`. The effect is **deferred while
-  `document.hidden`** (a locked phone advancing tracks fetches on return, via
-  `visibilitychange`) and aborted on track change/unmount. State is keyed by track id, so a
-  new track never shows the previous track's peaks while loading.
-- `usePeakReaders(audioRef, peaks)` → `{ readLevel, readWaveform }`, both `null` without
-  peaks. They read `audio.currentTime` **per frame** (continuous, unlike the ~4 Hz
-  `timeupdate` behind `usePlayerTime`), and return 0 / `null` while paused.
-  - `readLevel()` = `min(1, levelAt(peaks, t) * LEVEL_GAIN)`; `levelAt` is the loudest of
-    the current slice and its two neighbours, / 255, and 0 out of range.
-  - `readWaveform()` = `shimmer(rms * WAVE_GAIN)`: 256 synthetic time-domain bytes centred on
-    128, a sum of three sines (`WAVE_MIX`, weights sum to 1) with fresh random phases per
-    call, so the dots move but are not a real waveform.
-- Tuning constants for Erik at the top of `peaks.ts`: `LEVEL_GAIN = 4` (matches the old live
-  meter), `WAVE_GAIN = 3`, `WAVE_MIX`.
-- Used on touch devices (desktop uses the live analyser); no user-gesture requirement.
+- `const live = useAudioMeterSource(audioRef)`; `live.supported` is `!isTouchDevice()`.
+- An effect sets `audio.crossOrigin = 'anonymous'` on desktop and removes the attribute on
+  touch.
+- `enableMeter()` (`live.enable`) runs at the top of `playQueue` and `play` (desktop only does
+  anything; it bails unless `crossOrigin` is `'anonymous'`).
+- Touch only: `onPlaying` (the `<audio>` **'playing'** event) records the current track id as
+  started; `peakTrackId` is that id while it still equals `currentTrack.id`, so
+  `usePeaks(peakTrackId)` is never queued ahead of `getTrackStreamUrl` and a quick skip leaves
+  no stale request. The load effect resets the started mark on every track change (going back
+  to the last-played track waits for its own 'playing'). Desktop leaves `peakTrackId`
+  `undefined` and never fetches peaks.
+- `readLevel` / `readWaveform` = `live.*` on desktop, `peakReaders.*` on touch. On touch both
+  are `null` until the track's peaks load; on desktop they are non-null inside the provider.
 
 Consumers:
 
@@ -158,11 +146,10 @@ Consumers:
   [[component-library]]). Prev/next in the bar, the chevron, the open-pack arrow and the
   download glyphs all use `SweepIcon`.
 
-Symptoms: **waveform not moving / no particles while audio plays** → the track has no
-`peaks/<id>.bin` (never analyzed, or its peaks upload failed): run **Analyze all** on its
-`/admin/releases/[id]` page. If peaks exist, check the bucket's CORS rule includes `GET` for
-the site origin (the peaks `fetch` is cross-origin) and that `getTrackPeaksUrl` returns a url.
-**Nothing plays at all** → signing/object problem, not CORS (see above).
+Symptoms: **waveform not moving / no particles while audio plays** → see [[waveform]]
+Troubleshooting (desktop: `enable()` bailed / context suspended; touch: no `peaks/<id>.bin` →
+Analyze all, `getTrackPeaksUrl` null, CORS `GET`, or not 'playing' yet). **Nothing plays at
+all** → signing/object problem, or on desktop a bucket without CORS `GET` (see above).
 
 Known gap: **iOS lock-screen playback has never worked** — the audio stops when the phone
 locks and no lock-screen controls appear, on every version of the app (owner-confirmed
@@ -245,9 +232,10 @@ state and effects in `PlayerProvider`.
 
 ## Gotchas
 
-- **A bucket without `GET` CORS only costs the visuals.** Playback is not CORS mode, but the
-  peaks `fetch` is cross-origin, so after any CORS or domain change re-check
-  `infra/r2/README.md` and confirm the waveform moves on that environment. The
+- **A bucket without `GET` CORS breaks desktop playback and the touch visuals.** Desktop
+  playback is CORS mode (`crossOrigin`); touch playback is not, but the touch peaks `fetch` is
+  cross-origin. After any CORS or domain change re-check `infra/r2/README.md` and confirm
+  desktop plays and the touch waveform moves on that environment. The
   `media-storage` skill owns the CORS files; this skill owns the consequence.
 - **Don't call `usePlayerTime()` from anything that isn't the scrubber.** It re-renders on
   every `timeupdate`.

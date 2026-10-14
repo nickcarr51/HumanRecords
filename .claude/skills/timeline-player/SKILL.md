@@ -1,6 +1,6 @@
 ---
 name: timeline-player
-description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), the waveform (desktop live meter `useAudioMeterSource` / `isTouchDevice` in `audioMeter.ts`; stored peaks on touch via `peaks.ts`: `usePeaks` / `usePeakReaders`; `PixelWaveform`, `PlaybackButton` particles), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, the waveform is not moving (on a phone the track has no `peaks/<id>.bin`, see `getTrackPeaksUrl`; on desktop a CORS/`crossOrigin` problem), or album art is missing from the album page. Covers playback of presigned R2 URLs (CORS-mode `<audio>` on desktop for the live meter, plain `<audio>` on touch), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
+description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), where the waveform plugs into the player (`PixelWaveform`, `PlaybackButton` particles, the meter contexts; the waveform end to end is the `waveform` skill), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, or album art is missing from the album page. Covers playback of presigned R2 URLs (CORS-mode `<audio>` on desktop for the live meter, plain `<audio>` on touch), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
 ---
 
 # Timeline + Persistent Player
@@ -33,16 +33,15 @@ backgrounded, and a plain `<audio>` keeps playing when the user switches apps or
 phone, which the site relies on. Touch playback is therefore not a CORS request; bucket CORS
 `GET` is needed there only for the waveform's peaks `fetch`.
 
-**3. The waveform and button particles are driven by a live analyser on desktop and by stored peaks on touch.** Desktop feeds `useAudioMeterSource`'s readers into the contexts and never fetches peaks. On touch, each
-track has `peaks/<id>.bin` in R2 (50 loudness bytes per second, written at upload or by
-**Analyze all** on `/admin/releases/[id]`; see [[admin-upload]] and [[media-storage]]).
-`PlayerProvider` calls `usePeaks(peakTrackId)` (fetches via the `getTrackPeaksUrl`
-server action, deferred while `document.hidden`, keyed by track) and
-`usePeakReaders(audioRef, peaks)` (`src/components/Player/peaks.ts`), which turns the peaks
-plus `audio.currentTime` into the `readLevel` / `readWaveform` readers that `useAudioMeter()` /
-`useAudioWaveform()` hand to `PixelWaveform` and `PlaybackButton`. A track without peaks gets
-`null` readers: idle dots, no particles, playback unaffected. Tuning constants for Erik:
-`LEVEL_GAIN`, `WAVE_GAIN`, `WAVE_MIX` in `peaks.ts`.
+**3. The waveform and button particles read the meter contexts, filled differently by device.**
+`PlayerProvider` provides `readLevel` / `readWaveform` through `AudioMeterContext` /
+`AudioWaveformContext` (`useAudioMeter()` / `useAudioWaveform()`, consumed by `PlaybackButton`
+and `PixelWaveform`). Desktop fills them from `useAudioMeterSource`'s live analyser
+(`enableMeter()` in `playQueue` / `play`) and never fetches peaks. Touch fills them from
+`usePeaks` + `usePeakReaders` over the track's stored `peaks/<id>.bin`, requested only once the
+`<audio>` fires **'playing'** for that track (the started mark resets on every track change).
+A touch track without peaks gets `null` readers: idle dots, playback unaffected.
+End-to-end (upload, Analyze all, readers, tuning, troubleshooting): see [[waveform]].
 The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 (see [[media-storage]]).
 
@@ -52,7 +51,7 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 |---|---|
 | Player state + `<audio>` + actions (`usePlayer`, `usePlayerTime`) | `src/components/Player/PlayerProvider.tsx` |
 | Stored-peaks readers (`levelAt`, `shimmer`, `loadPeaks`, `usePeaks`, `usePeakReaders`; tuning `LEVEL_GAIN`/`WAVE_GAIN`/`WAVE_MIX`) | `src/components/Player/peaks.ts` |
-| Meter contexts + hooks only (`AudioMeterContext`, `AudioWaveformContext`, `useAudioMeter`, `useAudioWaveform`) | `src/components/Player/audioMeter.ts` |
+| Meter contexts + hooks (`AudioMeterContext`, `AudioWaveformContext`, `useAudioMeter`, `useAudioWaveform`), `isTouchDevice`, desktop analyser `useAudioMeterSource` | `src/components/Player/audioMeter.ts` |
 | Player control bar (UI) | `src/components/Player/PlayerBar.tsx` |
 | Waveform canvas in the bar | `src/components/Player/PixelWaveform.tsx` |
 | Play/pause button with glow + particles (every play button in the app) | `src/components/Player/PlaybackButton.tsx` |
@@ -81,9 +80,9 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 ## References
 
 - [persistent-player.md](References/persistent-player.md) — the playback path (presigned R2
-  URL on a plain `<audio>`), the `usePlayer` / `usePlayerTime` split, the state machine
-  (load/play/pause/next/prev/seek), error/autoplay handling, the stored-peaks meter
-  (`audioMeter.ts`, `PixelWaveform`, `PlaybackButton`), queue sources and paging (a search
+  URL on one `<audio>`: CORS mode on desktop, plain on touch), the `usePlayer` / `usePlayerTime` split, the state machine
+  (load/play/pause/next/prev/seek), error/autoplay handling, the meter wiring
+  (`audioMeter.ts`, `peaks.ts`, `PixelWaveform`, `PlaybackButton`), queue sources and paging (a search
   queue that runs out continues into the main feed after its last release; the view stays on
   the search), pre-signing, Media Session, and `FollowPlayingPage`.
 - [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
@@ -103,9 +102,10 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 
 - [[media-storage]] — the player plays presigned R2 URLs via the `getTrackStreamUrl` server
   action; the client only ever passes a `trackId`. `getTrackPeaksUrl` signs
-  the `peaks/<id>.bin` GET the same way. Playback itself is not a CORS request; the buckets'
-  CORS rules (`infra/r2/cors.*.json`) must still allow `GET` from the site origin for the
-  peaks `fetch`, or the waveform stays on idle dots.
+  the `peaks/<id>.bin` GET the same way. Playback is a CORS request on desktop only
+  (`crossOrigin="anonymous"`, so a bucket without `GET` breaks desktop playback); on touch it
+  is not, and `GET` there only serves the peaks `fetch` (else idle dots).
+- [[waveform]] — the meter end to end: stored peaks, the desktop analyser, Analyze all, CORS.
 - [[catalog-schema]] — `getFeed`/`getAlbum` read `releases`/`albums`/`tracks`/
   `track_albums`/`track_artists`/`album_artists` (including `catalog_number`) and rely on the
   "authenticated" RLS policies.
@@ -133,18 +133,15 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
   not a regression of any branch. Open investigation: test on hosted dev over https (LAN
   http is a variable), Safari tab vs Home Screen app, and whether `play()` on the first
   track vs auto-advance differs. Background playback when *switching apps* does work.
-- **On touch devices, tracks without stored peaks show idle dots.** Anything uploaded before the stored-peaks
-  change, or whose peaks upload failed, has no `peaks/<id>.bin` until **Analyze all** runs on
-  its release page ([[admin-upload]]). Phones animate like desktop once peaks exist. Desktop needs no peaks.
+- **On touch devices, tracks without stored peaks show idle dots** until **Analyze all** runs on
+  their release page. Waveform gaps and decisions: [[waveform]].
 
 ## Gotchas (quick list; details in the references)
 
 - A track won't play on an environment → check signing (`getTrackStreamUrl`) and that the
   object exists. On desktop playback is CORS mode (`crossOrigin="anonymous"`), so a missing
   bucket `GET` rule can also block it; on touch it only affects the peaks `fetch`.
-- Waveform flat while audio plays → on a phone, the track has no peaks (Analyze all on its
-  release page) or the bucket CORS `GET` rule is missing (peaks fetch fails silently); on
-  desktop, a CORS / `crossOrigin` problem with the live analyser.
+- Waveform flat while audio plays → [[waveform]] Troubleshooting (split by desktop / touch).
 - Anything that only needs `currentTrack` / `isPlaying` / `status` must call `usePlayer()`,
   **never `usePlayerTime()`** — the time context ticks ~4×/s during playback.
 - The only `AudioContext` is `useAudioMeterSource`'s, desktop only (a no-op in jsdom); the

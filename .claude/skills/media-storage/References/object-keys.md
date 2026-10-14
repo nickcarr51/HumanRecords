@@ -81,8 +81,9 @@ any other key shape. No DB column, no migration.
   `/admin/releases/[id]`, which overwrites in place. A missing file just means idle dots.
 - Replacing a track's MP3 mints a new id, so old peaks never apply to new audio. The old
   `peaks/<oldid>.bin` is orphaned like the old MP3.
-- **Never deleted.** Writes are PUT/overwrite only; the prod token cannot delete, and the
-  cleanup queue does not list peaks files.
+- **Not deleted now.** Writes are PUT/overwrite only; the prod token cannot delete. The
+  cleanup queue does not list peaks files; the future job deletes `peaks/<id>.bin` alongside
+  its MP3 wherever deletion is allowed (never prod; [[content-lifecycle]]).
 - Signing: `getTrackPeaksUrl` (listener GET, `signStreamUrl` TTL), `getPeaksJob` (admin: GET the
   MP3 + PUT the peaks), `createUploadUrls` (returns `peaksUrl` per target); see `signing.md`.
 
@@ -103,8 +104,13 @@ Browser paths that hit the R2 endpoint cross-origin and need the bucket to answe
   `Content-Type` header → preflight → the bucket must allow `PUT` and the `content-type` header
   ([[admin-upload]] `References/upload-flow.md`).
 
-**Not CORS:** `<audio>` playback, downloads (`window.location.assign` to the signed URL, a navigation) and artwork
-via `<img src>`. None of them breaks if the policy is wrong; only the peaks/MP3 fetches and uploads do.
+**`<audio>` playback depends on the device.** Desktop: CORS mode (`crossOrigin="anonymous"` for
+the live analyser), so a bucket without `GET` for the origin breaks playback. Touch: a plain
+element, not CORS; it plays whatever the policy says.
+
+**Not CORS:** downloads (`window.location.assign` to the signed URL, a navigation) and artwork
+via `<img src>`. Neither breaks if the policy is wrong; desktop playback, the peaks/MP3 fetches
+and uploads do.
 
 ### The policy, per bucket
 
@@ -165,8 +171,8 @@ Audio goes R2 → browser directly. Fix the bucket policy, not the transport.
 
 | Symptom | Meaning |
 |---|---|
-| Waveform stays idle after a CORS edit; console shows a CORS error on the `peaks/…` URL; audio still plays | `GET` (or the origin) missing from that bucket's policy. Re-paste from `infra/r2/cors.<env>.json`, hard-reload. |
+| Touch waveform stays idle after a CORS edit; console shows a CORS error on the `peaks/…` URL; audio still plays (desktop audio would not) | `GET` (or the origin) missing from that bucket's policy. Re-paste from `infra/r2/cors.<env>.json`, hard-reload. |
 | Works locally, not on develop/prod | Each environment is its own bucket with its own policy; check the hosted bucket's CORS Policy in the dashboard against `cors.dev.json`/`cors.prod.json`, then that deployment's `R2_BUCKET_NAME`. |
-| Waveform flat, audio audible | No `peaks/<id>.bin` for that track: run Analyze all on its release page. If it exists, see the CORS row above. |
+| Waveform flat, audio audible | On touch: no `peaks/<id>.bin` for that track (run Analyze all on its release page); if it exists, see the CORS row above. On desktop it isn't CORS (that stops playback): see [[waveform]] Troubleshooting. |
 | Upload (or a peaks PUT) fails at the PUT step with a CORS error | `PUT` or `content-type` missing from the policy. A failed peaks PUT does not fail publish; it only leaves idle dots. |
 | 403 `SignatureDoesNotMatch` | Not CORS: see `signing.md` (wrong Content-Type on PUT, altered URL, mismatched key pair). |

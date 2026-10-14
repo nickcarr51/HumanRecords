@@ -151,38 +151,20 @@ develop while *streaming*). The look is the same four things; the per-frame work
   frame exists even when rAF never fires (jsdom, reduced motion).
 - **Where**: `PlayerBar.tsx` line 147.
 
-## audioMeter.ts / peaks.ts — live meter (desktop) and stored-peaks readers (touch)
+## audioMeter.ts / peaks.ts — the signal effects read
 
-The signal source is split by device. **Desktop** uses a live Web Audio analyser
-(`useAudioMeterSource(audioRef)` in `audioMeter.ts`: `createMediaElementSource` →
-`AnalyserNode`, `fftSize` 256, enabled by `enable()` on play). **Touch devices**
-(`isTouchDevice()`: coarse pointer or iOS/iPadOS) skip it and use stored `peaks/<id>.bin`,
-because routing the element through an `AudioContext` silences iOS background playback.
+`PlayerProvider` provides `readLevel` / `readWaveform` through `AudioMeterContext` /
+`AudioWaveformContext`; `useAudioMeter()` / `useAudioWaveform()` return `null` without a
+provider. **Desktop:** a live Web Audio analyser (`useAudioMeterSource`, `fftSize` 256,
+enabled from `playQueue` / `play`, `<audio crossOrigin="anonymous">`). **Touch**
+(`isTouchDevice()`): stored `peaks/<id>.bin` read against `audio.currentTime` via
+`usePeaks` / `usePeakReaders`, with no `crossOrigin` and no `AudioContext` (it silences iOS
+background playback). On touch the hooks are `null` until the track's peaks load (requested on
+the `<audio>` 'playing' event). Readers return `0` / `null` while paused.
 
-- `audioMeter.ts` holds `AudioMeterContext` / `AudioWaveformContext`, the hooks
-  `useAudioMeter` / `useAudioWaveform` (return `null` without a provider), `isTouchDevice()`
-  and `useAudioMeterSource`.
-- `PlayerProvider` calls `useAudioMeterSource(audioRef)`. On desktop it provides
-  `live.readLevel` / `live.readWaveform` through the two contexts and never fetches peaks. On
-  touch it calls `usePeaks(peakTrackId)` then `usePeakReaders(audioRef, peaks)`
-  (`src/components/Player/peaks.ts`) and provides those readers instead.
-- `usePeaks` fetches `peaks/<id>.bin` through `loadPeaks` (`getTrackPeaksUrl` then `fetch`),
-  aborts on track change/unmount, defers while `document.hidden` (a locked phone advancing
-  tracks must not fetch), and is keyed by track so a new track never shows old peaks.
-  `null` when not loaded, never analyzed, or failed.
-- `usePeakReaders` returns `{ readLevel: null, readWaveform: null }` without peaks. With
-  them, both readers return nothing while the element is paused or missing:
-  `readLevel()` = `min(1, levelAt(peaks, audio.currentTime) * LEVEL_GAIN)`;
-  `readWaveform()` = `shimmer(level * WAVE_GAIN)`.
-- `levelAt` indexes `floor(time * PEAKS_PER_SECOND)` and takes the max of that byte and its
-  neighbours / 255; out of range gives 0. `shimmer` returns 256 bytes centred on 128, swing
-  `min(1, level) * 127`, the sum of three sines (`WAVE_MIX`: 3 / 9 / 23 cycles, weights
-  0.45 / 0.35 / 0.2) with fresh random phases per call.
-- Tuning constants (Erik): `LEVEL_GAIN = 4`, `WAVE_GAIN = 3`, `WAVE_MIX`.
-- `<audio ref preload="metadata" />` gets `crossOrigin="anonymous"` on desktop only (an
-  effect in `PlayerProvider`, required by the analyser) and none on touch, where playback does
-  not depend on bucket CORS and `GET` CORS is only needed for the peaks `fetch`. The existing
-  R2 `GET` rule covers desktop CORS-mode playback.
+Reader math (`levelAt`, `shimmer`, the desktop smoothing), tuning constants (`LEVEL_GAIN`,
+`WAVE_GAIN`, `WAVE_MIX`), CORS and troubleshooting: [[waveform]] and its
+`References/internals.md`.
 
 ## Sweep hovers — `--hover-progress`, `SweepIcon`, `hoverStyles.ts`
 
