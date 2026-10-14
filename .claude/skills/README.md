@@ -25,7 +25,7 @@ Foundational (no dependencies):
   styled-components SSR registry, the `src/components` primitives, `*.styles.ts` conventions,
   hover/sweep mixins, `/style-guide`.
 - **visual-effects** — the ambient layer: CRT scanline canvas, glitch art, pixel particles,
-  audio-reactive waveform/button, the Web Audio meter, and the checklist for adding an effect.
+  audio-reactive waveform/button (driven by stored `peaks/<id>.bin`, no Web Audio), and the checklist for adding an effect.
 - **catalog-schema** — Supabase migrations, tables + RLS, SQL functions, seed, the three
   client factories, generated types, local workflow + data tests.
 

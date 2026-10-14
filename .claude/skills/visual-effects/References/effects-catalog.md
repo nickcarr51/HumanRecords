@@ -151,30 +151,30 @@ develop while *streaming*). The look is the same four things; the per-frame work
   frame exists even when rAF never fires (jsdom, reduced motion).
 - **Where**: `PlayerBar.tsx` line 147.
 
-## audioMeter.ts — the single analyser
+## peaks.ts / audioMeter.ts — stored-peaks readers
 
-- `useAudioMeterSource(audioRef)` (called once in `PlayerProvider`, line 85) returns
-  `{ enable, readLevel, readWaveform }`.
-- `enable()` (invoked at the top of `playQueue` and `play`, lines 249 and 260 — both user
-  gestures) does nothing unless `audio.crossOrigin === 'anonymous'` and `AudioContext`
-  exists; otherwise it creates the context + analyser (`fftSize 256`) +
-  `createMediaElementSource` once, wires source → analyser → destination, and
-  `resume()`s. Failures are swallowed so unsupported browsers keep working controls.
-- `readLevel()` returns 0 unless the context is `running` and the element isn't paused;
-  caches for 8 ms; RMS of time-domain bytes × 4, clamped to 1, smoothed by 0.25 per read.
-- `readWaveform()` returns the analyser's own `Uint8Array` (or `null`), refilled on each call.
-- Unmount: disconnect source and analyser, close the context, drop the ref.
-- Provided via `AudioMeterContext` / `AudioWaveformContext` (PlayerProvider lines
-  418–420); the hooks `useAudioMeter` / `useAudioWaveform` return `null` without a provider.
-- `<audio ref preload="metadata" crossOrigin="anonymous" />` (line 425) is the reason the
-  R2 buckets allow `GET`/`HEAD` from each site origin (`infra/r2/README.md`): a CORS-mode
-  media request the bucket hasn't allowed is refused by the browser, so playback itself
-  fails, not only the meter.
-- Once connected, the element's output goes through the `AudioContext`, and iOS suspends
-  that context when Safari goes to the background → silence while the element still reports
-  playing. This is why touch devices never connect (see `isTouchDevice`). Separately, iOS
-  lock-screen playback has never worked on this app even without Web Audio; see
-  [[timeline-player]] Known deferrals.
+(The live analyser, `useAudioMeterSource`, `isTouchDevice` and `crossOrigin="anonymous"` were
+removed 2026-10; routing the element through an `AudioContext` silenced iOS background playback.)
+
+- `audioMeter.ts` holds only `AudioMeterContext` / `AudioWaveformContext` and the hooks
+  `useAudioMeter` / `useAudioWaveform`, which return `null` without a provider.
+- `PlayerProvider` calls `usePeaks(currentTrack?.id)` then `usePeakReaders(audioRef, peaks)`
+  (`src/components/Player/peaks.ts`) and provides the readers through the two contexts.
+- `usePeaks` fetches `peaks/<id>.bin` through `loadPeaks` (`getTrackPeaksUrl` then `fetch`),
+  aborts on track change/unmount, defers while `document.hidden` (a locked phone advancing
+  tracks must not fetch), and is keyed by track so a new track never shows old peaks.
+  `null` when not loaded, never analyzed, or failed.
+- `usePeakReaders` returns `{ readLevel: null, readWaveform: null }` without peaks. With
+  them, both readers return nothing while the element is paused or missing:
+  `readLevel()` = `min(1, levelAt(peaks, audio.currentTime) * LEVEL_GAIN)`;
+  `readWaveform()` = `shimmer(level * WAVE_GAIN)`.
+- `levelAt` indexes `floor(time * PEAKS_PER_SECOND)` and takes the max of that byte and its
+  neighbours / 255; out of range gives 0. `shimmer` returns 256 bytes centred on 128, swing
+  `min(1, level) * 127`, the sum of three sines (`WAVE_MIX`: 3 / 9 / 23 cycles, weights
+  0.45 / 0.35 / 0.2) with fresh random phases per call.
+- Tuning constants (Erik): `LEVEL_GAIN = 4`, `WAVE_GAIN = 3`, `WAVE_MIX`.
+- `<audio ref preload="metadata" />` carries no `crossOrigin`, so playback does not depend
+  on bucket CORS; `GET` CORS is only needed for the peaks `fetch`.
 
 ## Sweep hovers — `--hover-progress`, `SweepIcon`, `hoverStyles.ts`
 

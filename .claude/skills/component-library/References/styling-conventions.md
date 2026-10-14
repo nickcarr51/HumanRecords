@@ -220,7 +220,7 @@ vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), r
 Include `addEventListener`/`removeEventListener` on the `matchMedia` stub when the component
 subscribes to the query (`CRTTexture`, `SignInGlitch`). Timer-driven effects
 (`SignInGlitch`, `CRTTexture`) use `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })` and
-`vi.getTimerCount()` to prove cleanup. Web Audio readers are injected through
-`AudioMeterContext` / `AudioWaveformContext` providers in tests rather than a real
-`AudioContext`. The provider-level recipes (cookie, `renderToString`, `startViewTransition`)
+`vi.getTimerCount()` to prove cleanup. Audio readers are injected through
+`AudioMeterContext` / `AudioWaveformContext` providers in tests (there is no `AudioContext` in
+the app; the readers come from stored peaks). The provider-level recipes (cookie, `renderToString`, `startViewTransition`)
 are in [theme-mode.md](theme-mode.md).

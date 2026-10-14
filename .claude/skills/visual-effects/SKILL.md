@@ -1,6 +1,6 @@
 ---
 name: visual-effects
-description: Use when adding, tuning, or debugging an ambient visual effect in Human Services — the CRT scanline/tracking canvas (`CRTTexture` in the root layout), image tears (`GlitchArt`), the sign-in glitch (`SignInGlitch`), pixel particles on feed accordions (`PixelAccordion`) and play buttons (`PlaybackButton`), the dot waveform (`PixelWaveform`), the audio analyser (`src/components/Player/audioMeter.ts`: `useAudioMeter` / `useAudioWaveform`), hover sweeps (`SweepIcon`, `src/components/field/hoverStyles.ts`, `--hover-progress`), the `theme.effects.*` tokens and `withAlpha` / `rgbTriplet`, or the day/night View Transition roll. Also when a canvas keeps drawing after unmount, a background tab burns CPU, an effect ignores `prefers-reduced-motion`, links vanish in Windows High Contrast, a test logs "getContext not implemented", playback breaks after a `crossOrigin` / Web Audio / R2 CORS change, or a new page wants an effect.
+description: Use when adding, tuning, or debugging an ambient visual effect in Human Services — the CRT scanline/tracking canvas (`CRTTexture` in the root layout), image tears (`GlitchArt`), the sign-in glitch (`SignInGlitch`), pixel particles on feed accordions (`PixelAccordion`) and play buttons (`PlaybackButton`), the dot waveform (`PixelWaveform`), the stored-peaks audio readers (`src/components/Player/peaks.ts`: `usePeaks` / `usePeakReaders` / `levelAt` / `shimmer`, tuning constants `LEVEL_GAIN` / `WAVE_GAIN` / `WAVE_MIX`; `audioMeter.ts`: `useAudioMeter` / `useAudioWaveform`), hover sweeps (`SweepIcon`, `src/components/field/hoverStyles.ts`, `--hover-progress`), the `theme.effects.*` tokens and `withAlpha` / `rgbTriplet`, or the day/night View Transition roll. Also when a canvas keeps drawing after unmount, a background tab burns CPU, an effect ignores `prefers-reduced-motion`, links vanish in Windows High Contrast, a test logs "getContext not implemented", the waveform is flat while audio plays (the track has no `peaks/<id>.bin`; Analyze all on its release page), or a new page wants an effect.
 ---
 
 # Visual Effects (ambient layer)
@@ -68,10 +68,11 @@ Apply all of it before merge; each line is something an existing effect already 
    literals in components, no `${hex}22` suffix tricks. Canvas effects read the theme once
    via `useTheme()` and put the strings in the effect's dependency array so a day/night
    toggle re-initialises the loop; CSS-driven effects just read `theme` in the template.
-6. **One audio graph.** Anything that reacts to sound calls `useAudioMeter()` /
-   `useAudioWaveform()` and handles `null` (outside `PlayerProvider`, or before the
-   first play gesture). Never `new AudioContext()` or `createMediaElementSource` anywhere
-   else; the element only allows one source node.
+6. **No audio graph.** Anything that reacts to sound calls `useAudioMeter()` /
+   `useAudioWaveform()` and handles `null` (outside `PlayerProvider`, or the track has no
+   stored peaks). Never `new AudioContext()`, `createMediaElementSource`, or set
+   `crossOrigin` on the `<audio>` anywhere: Web Audio was removed 2026-10 because routing
+   the element through an `AudioContext` silenced iOS background playback.
 7. **Hidden content is gone.** Collapsed rows are unmounted or `inert` + `aria-hidden`
    (`PixelAccordion`); a hidden row must not stay subscribed to `usePlayer`.
 8. **Degrade silently.** Text tricks (`color: transparent` + `background-clip: text`)
@@ -85,25 +86,30 @@ Apply all of it before merge; each line is something an existing effect already 
 
 ## Reading the audio signal
 
-`PlayerProvider` owns the app's one `<audio>` element (`crossOrigin="anonymous"` set in an
-effect, **desktop only** — see below) and calls `useAudioMeterSource(audioRef)` once. Its `enable()` runs inside `playQueue` and `play`
-(user gestures) and lazily creates a single `AudioContext` + `AnalyserNode`
-(`fftSize 256`) via `createMediaElementSource`, wired source → analyser → destination,
-then `context.resume()`s. Two contexts are provided to the tree:
+There is no live analysis. Each track's loudness is precomputed at upload time into
+`peaks/<id>.bin` in R2 (one byte per 20 ms, `PEAKS_PER_SECOND = 50`; see [[media-storage]]
+and [[admin-upload]]). `PlayerProvider` keeps the `<audio>` a plain element on every device
+(no `crossOrigin`, no `AudioContext`), calls `usePeaks(currentTrack?.id)` to fetch the
+current track's bytes (deferred while `document.hidden`, keyed by track), and builds the
+readers with `usePeakReaders(audioRef, peaks)` (`src/components/Player/peaks.ts`).
+Two contexts are provided to the tree (`audioMeter.ts` now holds only these and their hooks):
 
-- `useAudioMeter()` → `readLevel(): number` (0..1). Returns `0` when the context isn't
-  running or the element is paused; smooths once per frame (8 ms cache) so several
-  buttons reading per frame share one RMS pass.
-- `useAudioWaveform()` → `readWaveform(): Uint8Array | null` (time-domain bytes, 128 = silence).
-  The array is the analyser's shared buffer; read it, don't keep it.
+- `useAudioMeter()` → `readLevel(): number` (0..1). `levelAt(peaks, audio.currentTime)`
+  (loudest of the slice and its neighbours) × `LEVEL_GAIN`, clamped to 1. `0` while paused.
+  `currentTime` is read per frame, so it is continuous (unlike the ~4 Hz `timeupdate`).
+- `useAudioWaveform()` → `readWaveform(): Uint8Array | null` (256 time-domain bytes, 128 =
+  silence). Synthetic: `shimmer(rms * WAVE_GAIN)` sums three sines (`WAVE_MIX`: cycles and
+  weights summing to 1) with fresh random phases per call. `null` while paused.
 
-Both hooks return `null` outside `PlayerProvider` **and on touch devices** (`isTouchDevice()`
-in `audioMeter.ts`): routing the element through an `AudioContext` stops iOS background
-playback, so phones/tablets get no analyser, no `crossOrigin`, and effects must treat a `null`
-reader as "draw the idle state once, don't loop" (`PixelWaveform`) or "don't mount a loop"
-(`PlaybackButton`). The context closes when the provider unmounts. **Because the element is `crossOrigin="anonymous"`, every R2 bucket must allow
-`GET`/`HEAD` from its site origin (`infra/r2/cors.*.json`, see [[media-storage]]); without
-that rule playback fails entirely, not just the meter.**
+Tuning constants for the designer (Erik) live at the top of `peaks.ts`: `LEVEL_GAIN = 4`
+(particle energy; matches the old live meter), `WAVE_GAIN = 3` and `WAVE_MIX` (dot shimmer).
+
+Both hooks return `null` outside `PlayerProvider` **and for a track with no peaks** (never
+analyzed, fetch failed, still loading). Effects treat a `null` reader as "draw the idle state
+once, don't loop" (`PixelWaveform`) or "don't mount a loop" (`PlaybackButton`). Same on every
+device now: phones animate too. Fix a flat waveform by running **Analyze all** on the
+track's `/admin/releases/[id]` page. R2 CORS `GET` is still needed, but only for the peaks
+`fetch`, not for playback.
 
 ## Performance budget
 
@@ -155,20 +161,19 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
   live (`src/components/field/`). The day/night switch itself (`ThemeModeProvider`,
   cookie, `useThemeMode`) is theme-system work; this skill only covers its roll effect.
 - [[timeline-player]] — `PlayerProvider` hosts the `<audio>` element and the meter
-  contexts; `PlaybackButton`/`PixelWaveform` sit in its rows and bar.
-- [[media-storage]] — R2 CORS `GET`/`HEAD` per bucket, required by `crossOrigin="anonymous"`.
+  contexts (fed from stored peaks); `PlaybackButton`/`PixelWaveform` sit in its rows and bar.
+- [[media-storage]] — the `peaks/<id>.bin` key and R2 CORS `GET` per bucket (needed by the peaks `fetch`).
 
 ## Known gaps (as of 2026-10-11)
 
 - **Safari**: `backdrop-filter: url(#filter)` is unsupported, so the CRT tracking band
   shows only its glow and dashed line, no page wobble; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
   may not animate (icon snaps or stays unfilled). Both degrade silently; no workaround shipped.
-- **No audio-reactive effects on phones/tablets** (by design, 2026-10-11): Web Audio
-  silenced iOS background playback when switching apps, so touch devices skip the analyser.
-  (iOS lock-screen playback is a separate, older gap that has never worked; not caused by
-  Web Audio — see [[timeline-player]].) Waveform shows idle
-  dots, play buttons have no particles. Planned fix: precompute the waveform at upload time
-  and drive visuals from `currentTime` (see [[timeline-player]]).
+- **Audio-reactive effects need stored peaks.** Tracks uploaded before the stored-peaks
+  change (2026-10) show idle dots and no particles until **Analyze all** runs on their
+  release page. A failed peaks upload at publish time leaves the same state. Phones and
+  tablets are no longer special-cased (`isTouchDevice` and the Web Audio meter were removed
+  2026-10). iOS lock-screen playback is a separate, older gap; see [[timeline-player]].
 - **`GlitchArt` is hover-only** — no touch/focus equivalent, so phones never see the tears.
 - **`GlitchArt` is not rendered on the album page**: `album_art_url` holds an unsigned R2
   key, so `<Art>` would be a blank square. `Art`/`ArtPlaceholder` in

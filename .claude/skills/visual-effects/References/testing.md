@@ -87,8 +87,11 @@ Use `renderWithTheme` for anything that reads `useTheme()` (all canvas effects d
   (`draw(performance.now() + 2000)`) or use fake timers; never `await` real delays.
 - **Audio without audio.** Wrap the component in `AudioMeterContext.Provider` /
   `AudioWaveformContext.Provider` from `src/components/Player/audioMeter.ts` with a
-  `vi.fn()` that returns a level or a `Uint8Array`; don't try to construct an
-  `AudioContext` (jsdom has none, and `enable()` returns early without one).
+  `vi.fn()` that returns a level or a `Uint8Array`. There is no `AudioContext` anywhere
+  now. To test the readers themselves, pass a `Uint8Array` of peaks to `levelAt` /
+  `shimmer` / `usePeakReaders` (an injected `random` makes `shimmer` deterministic; see
+  `src/components/Player/peaks.test.tsx`), and inject the `load` argument of `usePeaks`
+  instead of mocking `fetch`.
 - **Body-level elements.** Query `document.body.querySelector('canvas')` and assert it is
   gone after `unmount()`.
 - **Reduced motion.** One test per effect with `matchMedia` → `matches: true` proving no

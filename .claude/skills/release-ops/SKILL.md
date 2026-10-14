@@ -18,7 +18,7 @@ migration means no new code goes live. Claude never pushes migrations from a lap
 touches hosted data without explicit permission in the moment (guard hook enforces a prompt).
 
 Deploy checklist addition: if a change alters what the browser requests from R2 (e.g.
-`crossOrigin` media, a new method or header), apply the CORS JSON to that env's bucket
+a `fetch` of an R2 URL from a new origin, a new method or header), apply the CORS JSON to that env's bucket
 **before** the deploy — the owner pastes `infra/r2/cors.<env>.json` into Cloudflare and updates
 the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.md)).
 

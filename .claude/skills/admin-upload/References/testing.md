@@ -84,4 +84,6 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
    `/feed` ↔ `/admin`.
 
 A PUT failing with CORS or `SignatureDoesNotMatch` → check the bucket CORS rule and that
-the request's `Content-Type` is `audio/mpeg`.
+the request's `Content-Type` is `audio/mpeg` (`application/octet-stream` for `peaks/<id>.bin`).
+After publishing, `/admin/releases/[id]` → **Analyze all** shows "✓ has waveform" per track; a
+track on idle dots in the player shows "— missing" there.
