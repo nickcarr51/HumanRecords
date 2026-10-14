@@ -28,4 +28,9 @@ export const fieldStyles = css<{ $invalid?: boolean }>`
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+  /* iOS Safari zooms the page on focus when a field's text is under 16px,
+     and leaves it zoomed. Touch devices get 16px; desktop keeps sm. */
+  @media (pointer: coarse) {
+    font-size: ${({ theme }) => theme.fontSizes.md};
+  }
 `;
