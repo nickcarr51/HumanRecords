@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({ from: serviceFrom }),
 }));
 
-import { getTrackDownloadUrl, getTrackStreamUrl } from "./actions";
+import { getTrackDownloadUrl, getTrackPeaksUrl, getTrackStreamUrl } from "./actions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -170,5 +170,44 @@ describe("archived tracks", () => {
     expect(res).toEqual({ url: null, error: "Track not found." });
     expect(signDownloadUrl).not.toHaveBeenCalled();
     expect(serviceFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTrackPeaksUrl", () => {
+  const KEY = "tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3";
+
+  it("refuses unauthenticated callers without signing", async () => {
+    getSessionUser.mockResolvedValue(null);
+    expect(await getTrackPeaksUrl("t1")).toEqual({ url: null, error: "Not authenticated." });
+    expect(signStreamUrl).not.toHaveBeenCalled();
+  });
+
+  it("signs the peaks key derived from the track's audio key", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: KEY, archived_at: null }, error: null });
+    signStreamUrl.mockResolvedValue("https://signed.example/peaks");
+    expect(await getTrackPeaksUrl("t1")).toEqual({ url: "https://signed.example/peaks", error: null });
+    expect(signStreamUrl).toHaveBeenCalledWith("peaks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.bin");
+  });
+
+  it("treats an archived track as not found", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: KEY, archived_at: "2026-10-01" }, error: null });
+    expect(await getTrackPeaksUrl("t1")).toEqual({ url: null, error: "Track not found." });
+  });
+
+  it("returns no URL (not an error) for a key with no peaks form", async () => {
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: "tracks/legacy/audio.mp3", archived_at: null }, error: null });
+    expect(await getTrackPeaksUrl("t1")).toEqual({ url: null, error: null });
+    expect(signStreamUrl).not.toHaveBeenCalled();
+  });
+
+  it("returns a generic error when signing throws", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getSessionUser.mockResolvedValue({ sub: "user-1" });
+    single.mockResolvedValue({ data: { audio_url: KEY, archived_at: null }, error: null });
+    signStreamUrl.mockRejectedValue(new Error("Missing R2 env vars"));
+    expect(await getTrackPeaksUrl("t1")).toEqual({ url: null, error: "Could not generate link." });
   });
 });
