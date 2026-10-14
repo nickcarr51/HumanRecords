@@ -117,9 +117,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const currentTrack = queueState.tracks[queueState.index] ?? null;
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
   // Touch devices draw from the track's stored loudness (desktop never fetches
-  // it). The peaks request waits until audio has started for this track: Next
-  // runs client server actions one at a time, so asking earlier would queue it
-  // ahead of getTrackStreamUrl and delay playback by a round trip.
+  // it). The peaks request waits until this track is actually playing (the
+  // element's 'playing' event): Next runs client server actions one at a time,
+  // so asking earlier would queue it ahead of getTrackStreamUrl, and a quick
+  // skip would leave a request for a track already gone. The dots read
+  // audio.currentTime every frame, so a late load is never out of sync.
   const [audioStartedId, setAudioStartedId] = useState<string | null>(null);
   const peakTrackId =
     !live.supported && audioStartedId !== null && audioStartedId === currentTrack?.id ? audioStartedId : undefined;
@@ -130,11 +132,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
-  const startAudio = useCallback((url: string, isCurrent: () => boolean, trackId: string) => {
+  const startAudio = useCallback((url: string, isCurrent: () => boolean) => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.src = url;
-    setAudioStartedId(trackId);
     void audio
       .play()
       .then(() => {
@@ -171,7 +172,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         startAudio(
           url,
           () => gen === genRef.current && queueRef.current.tracks[queueRef.current.index]?.id === track.id,
-          track.id,
         );
       }
       commit(s);
@@ -316,6 +316,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(true);
       setStatus("playing");
     };
+    const onPlaying = () => setAudioStartedId(queueRef.current.tracks[queueRef.current.index]?.id ?? null);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
       setIsPlaying(false);
@@ -328,6 +329,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
@@ -335,6 +337,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
@@ -344,6 +347,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Load + play whenever the selected track changes (unless moveTo already did).
   useEffect(() => {
     if (!currentTrack) return;
+    // A different track: its peaks wait for its own 'playing' event (going back
+    // to the last track that played must not reuse that stale "started" mark).
+    setAudioStartedId((id) => (id === currentTrack.id ? id : null));
     // Always consume the marker: if moveTo's track was superseded before this
     // effect ran, a stale marker must not make a later load of it get skipped.
     const alreadyStarted = startedRef.current === currentTrack.id;
@@ -375,7 +381,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setIsPlaying(false);
           return;
         }
-        startAudio(res.url, () => !cancelled, currentTrack.id);
+        startAudio(res.url, () => !cancelled);
       });
     return () => {
       cancelled = true;

@@ -91,6 +91,8 @@ describe("PlayerProvider", () => {
     await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
     // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
     expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("playing"));
+    fireEvent(container.querySelector("audio")!, new Event("playing"));
     await act(async () => { await Promise.resolve(); });
     expect(getTrackPeaksUrl).not.toHaveBeenCalled();
   });
@@ -110,15 +112,43 @@ describe("PlayerProvider", () => {
     function Meter() {
       return <span data-testid="meter">{useAudioMeter() ? "on" : "off"}</span>;
     }
-    try {
-      renderWithTheme(<PlayerProvider><Harness /><Meter /></PlayerProvider>);
-      expect(screen.getByTestId("meter")).toHaveTextContent("off");
-      await userEvent.click(screen.getByText("play"));
-      await waitFor(() => expect(screen.getByTestId("meter")).toHaveTextContent("on"));
-      expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    const { container } = renderWithTheme(<PlayerProvider><Harness /><Meter /></PlayerProvider>);
+    expect(screen.getByTestId("meter")).toHaveTextContent("off");
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    act(() => { fireEvent(container.querySelector("audio")!, new Event("playing")); });
+    await waitFor(() => expect(screen.getByTestId("meter")).toHaveTextContent("on"));
+    expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1");
+  });
+
+  it("touch: waits for 'playing' before requesting peaks, so skipped tracks never request them", async () => {
+    asTouch();
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t2"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
+    act(() => { fireEvent(container.querySelector("audio")!, new Event("playing")); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledWith("t2"));
+    expect(getTrackPeaksUrl).not.toHaveBeenCalledWith("t1");
+  });
+
+  it("touch: going back to the last track that played waits for its 'playing' again", async () => {
+    asTouch();
+    const { container } = renderPlayer();
+    const audio = () => container.querySelector("audio")!;
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(audio().getAttribute("src")).toBe("https://signed.example/t1"));
+    act(() => { fireEvent(audio(), new Event("playing")); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(audio().getAttribute("src")).toBe("https://signed.example/t2"));
+    await userEvent.click(screen.getByText("prev"));
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("One"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).toHaveBeenCalledTimes(1);
   });
   it("touch: requests the stream URL before the peaks URL, and peaks wait for the stream URL to resolve", async () => {
     asTouch();
@@ -132,6 +162,8 @@ describe("PlayerProvider", () => {
     await act(async () => { await Promise.resolve(); });
     expect(getTrackPeaksUrl).not.toHaveBeenCalled();
     await act(async () => { resolveStream({ url: "https://signed.example/t1", error: null }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("playing"));
+    act(() => { fireEvent(document.querySelector("audio")!, new Event("playing")); });
     await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1"));
     expect(mockGet.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(getTrackPeaksUrl).mock.invocationCallOrder[0]);
   });

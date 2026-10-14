@@ -26,8 +26,9 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
   const meter = useRef<{ context: AudioContext; analyser: AnalyserNode; source: MediaElementAudioSourceNode; bytes: Uint8Array<ArrayBuffer> } | null>(null);
   const level = useRef(0);
   const lastRead = useRef(-Infinity);
-  // Server: false. Client: decided once at mount; only feeds context values,
-  // never markup, so there is no hydration mismatch.
+  // Server: true (no window, so not a touch device). Client: decided once at
+  // mount; only feeds context values and an effect, never markup, so there is
+  // no hydration mismatch.
   const [supported] = useState(() => !isTouchDevice());
 
   const enable = useCallback(() => {
