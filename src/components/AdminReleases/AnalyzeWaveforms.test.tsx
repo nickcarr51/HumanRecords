@@ -82,4 +82,30 @@ describe("AnalyzeWaveforms", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't check waveforms.");
     expect(screen.getByRole("button", { name: "Analyze all" })).not.toBeDisabled();
   });
+  it("ignores a late status response once a run has started", async () => {
+    let resolveStatus: (v: { status: Record<string, boolean>; error: null }) => void = () => {};
+    const d = deps({
+      getPeaksStatus: vi.fn(() => new Promise<{ status: Record<string, boolean>; error: null }>((r) => { resolveStatus = r; })),
+    });
+    renderWithTheme(<AnalyzeWaveforms tracks={[TRACKS[0]]} deps={d} />);
+    await userEvent.click(screen.getByRole("button", { name: "Analyze all" }));
+    await waitFor(() => expect(row("Alpha")).toHaveTextContent("analyzed"));
+    resolveStatus({ status: { a: false }, error: null });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(row("Alpha")).toHaveTextContent("analyzed");
+  });
+
+  it("stops starting new tracks after unmount", async () => {
+    let release: () => void = () => {};
+    const d = deps({
+      storePeaks: vi.fn(() => new Promise<boolean>((r) => { release = () => r(true); })),
+    });
+    const { unmount } = renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={d} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Analyze all" }));
+    await waitFor(() => expect(d.storePeaks).toHaveBeenCalledTimes(1));
+    unmount();
+    release();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(d.getPeaksJob).not.toHaveBeenCalledWith("b");
+  });
 });

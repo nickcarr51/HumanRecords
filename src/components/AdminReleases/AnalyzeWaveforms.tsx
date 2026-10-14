@@ -1,7 +1,7 @@
 // src/components/AdminReleases/AnalyzeWaveforms.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { Heading } from '@/components/Heading';
@@ -48,15 +48,19 @@ export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id
   useEffect(() => {
     let live = true;
     const list = ids ? ids.split(',') : [];
+    if (list.length === 0) return;
+    // Only touch rows still 'checking' so a late response can't undo a run.
+    const settle = (next: (id: string) => RowState) =>
+      setRows((r) => Object.fromEntries(Object.entries(r).map(([id, st]) => [id, st === 'checking' ? next(id) : st])));
     deps.getPeaksStatus(list)
       .then((res) => {
         if (!live) return;
         if (res.error !== null) {
           setError(res.error);
-          setRows(Object.fromEntries(list.map((id) => [id, 'unknown'])));
+          settle(() => 'unknown');
           return;
         }
-        setRows(Object.fromEntries(list.map((id) => [id, res.status[id] ? 'has' : 'missing'])));
+        settle((id) => (res.status[id] ? 'has' : 'missing'));
       })
       .catch(() => {
         if (live) setError("Couldn't check waveforms.");
@@ -65,6 +69,14 @@ export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id
       live = false;
     };
   }, [ids, deps]);
+
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const mark = (id: string, state: RowState) => setRows((r) => ({ ...r, [id]: state }));
 
@@ -84,8 +96,11 @@ export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id
     setRunning(true);
     setError(null);
     // One at a time: each decode holds a whole track's samples in memory.
-    for (const t of tracks) await analyzeOne(t.id);
-    setRunning(false);
+    for (const t of tracks) {
+      if (!mounted.current) return;
+      await analyzeOne(t.id);
+    }
+    if (mounted.current) setRunning(false);
   }
 
   if (tracks.length === 0) return null;
