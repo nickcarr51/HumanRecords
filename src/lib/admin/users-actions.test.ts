@@ -186,6 +186,7 @@ describe("updateUserProfile", () => {
     expect(usersEq).toHaveBeenCalledWith("id", OTHER);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
     expect(revalidatePath).toHaveBeenCalledWith(`/admin/users/${OTHER}`);
+    expect(revalidatePath).not.toHaveBeenCalledWith("/", "layout");
   });
 
   it("does not send the email when only the name (or email case) changed", async () => {
@@ -197,6 +198,8 @@ describe("updateUserProfile", () => {
   it("allows editing yourself", async () => {
     getUserById.mockResolvedValue({ data: { user: { id: ME, email: "me@x.co" } }, error: null });
     expect((await updateUserProfile(ME, { name: "Me", email: "me2@x.co" })).error).toBeNull();
+    // The nav name comes from the (app) layout, so editing yourself refreshes it.
+    expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
   it("maps a duplicate email", async () => {
