@@ -23,20 +23,39 @@ export function peaksFromChannels(channels: Float32Array[], sampleRate: number):
   return out;
 }
 
-export async function computePeaks(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
+// Low decode rate: a 50 MB MP3 is ~1.2 GB of float PCM at 44100 Hz. 8000 Hz
+// divides evenly into 50 slices per second (160 samples) and is plenty for loudness.
+const DECODE_RATE = 8000;
+const FALLBACK_RATE = 44100;
+
+function decodeContext(): OfflineAudioContext {
   // decodeAudioData resamples to the context rate; 1 frame is enough, the
   // context is only used for decoding.
-  const context = new OfflineAudioContext(1, 1, 44100);
+  try {
+    return new OfflineAudioContext(1, 1, DECODE_RATE);
+  } catch {
+    return new OfflineAudioContext(1, 1, FALLBACK_RATE);
+  }
+}
+
+export async function computePeaks(blob: Blob): Promise<Uint8Array<ArrayBuffer>> {
+  const context = decodeContext();
   const buffer = await context.decodeAudioData(await blob.arrayBuffer());
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
   return peaksFromChannels(channels, buffer.sampleRate);
 }
 
+// One decode at a time across the page: two overlapping uploads must not hold
+// two decoded tracks in memory. A failure never breaks the chain.
+let decodeChain: Promise<unknown> = Promise.resolve();
+
 // Never throws: a missing loudness file only leaves the track on idle dots,
 // and the release edit page can analyze it again.
 export async function storePeaks(blob: Blob, peaksUrl: string, compute = computePeaks): Promise<boolean> {
   try {
-    const body = await compute(blob);
+    const run = decodeChain.then(() => compute(blob));
+    decodeChain = run.catch(() => undefined);
+    const body = await run;
     const res = await fetch(peaksUrl, {
       method: "PUT",
       body,

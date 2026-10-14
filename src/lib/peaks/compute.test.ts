@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { peaksFromChannels, storePeaks } from "./compute";
+import { computePeaks, peaksFromChannels, storePeaks } from "./compute";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -47,5 +47,73 @@ describe("storePeaks", () => {
     vi.stubGlobal("fetch", fetchMock);
     expect(await storePeaks(blob, "u", async () => { throw new Error("decode"); })).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("storePeaks decode queue", () => {
+  const blob = new Blob([new Uint8Array(4)]);
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("never decodes two files at once; the second starts after the first settles", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true })));
+    let finishFirst: (v: Uint8Array<ArrayBuffer>) => void = () => {};
+    const first = vi.fn(() => new Promise<Uint8Array<ArrayBuffer>>((r) => { finishFirst = r; }));
+    const second = vi.fn(async () => new Uint8Array(1));
+    const a = storePeaks(blob, "u1", first);
+    const b = storePeaks(blob, "u2", second);
+    await flush();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).not.toHaveBeenCalled();
+    finishFirst(new Uint8Array(1));
+    expect(await a).toBe(true);
+    expect(await b).toBe(true);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("still runs the next decode after one fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true })));
+    const a = storePeaks(blob, "u1", async () => { throw new Error("decode"); });
+    const second = vi.fn(async () => new Uint8Array(1));
+    const b = storePeaks(blob, "u2", second);
+    expect(await a).toBe(false);
+    expect(await b).toBe(true);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("computePeaks", () => {
+  // jsdom's Blob has no arrayBuffer().
+  const fakeBlob = { arrayBuffer: async () => new ArrayBuffer(4) } as unknown as Blob;
+
+  it("decodes at 8000 Hz to keep memory small", async () => {
+    const rates: number[] = [];
+    class FakeContext {
+      constructor(_channels: number, _length: number, rate: number) {
+        rates.push(rate);
+      }
+      async decodeAudioData() {
+        return { numberOfChannels: 1, sampleRate: 8000, getChannelData: () => new Float32Array(160) };
+      }
+    }
+    vi.stubGlobal("OfflineAudioContext", FakeContext);
+    const bytes = await computePeaks(fakeBlob);
+    expect(rates).toEqual([8000]);
+    expect(bytes).toHaveLength(1);
+  });
+
+  it("falls back to 44100 Hz if an 8000 Hz context is refused", async () => {
+    const rates: number[] = [];
+    class FakeContext {
+      constructor(_channels: number, _length: number, rate: number) {
+        rates.push(rate);
+        if (rate === 8000) throw new RangeError("unsupported");
+      }
+      async decodeAudioData() {
+        return { numberOfChannels: 1, sampleRate: 44100, getChannelData: () => new Float32Array(882) };
+      }
+    }
+    vi.stubGlobal("OfflineAudioContext", FakeContext);
+    await computePeaks(fakeBlob);
+    expect(rates).toEqual([8000, 44100]);
   });
 });
