@@ -96,6 +96,14 @@ describe("createUploadUrls", () => {
     expect(signUploadUrl).toHaveBeenCalledWith(expect.any(String), "audio/mpeg");
   });
 
+  it("mints a peaks PUT next to each audio PUT", async () => {
+    const res = await createUploadUrls([{ clientId: "c1", name: "a.mp3", size: 10 }]);
+    const t = res.targets![0];
+    const id = t.key.slice("tracks/".length, -".mp3".length);
+    expect(signUploadUrl).toHaveBeenCalledWith(`peaks/${id}.bin`, "application/octet-stream");
+    expect(t.peaksUrl).toBe(`https://signed.example/peaks/${id}.bin`);
+  });
+
   it("rejects invalid files without signing anything", async () => {
     const res = await createUploadUrls([
       { clientId: "c1", name: "ok.mp3", size: 10 },

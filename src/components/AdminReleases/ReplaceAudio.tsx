@@ -7,6 +7,7 @@ import { createUploadUrls } from '@/lib/admin/actions';
 import { replaceTrackAudio } from '@/lib/admin/release-actions';
 import { audioFileError } from '@/lib/admin/rules';
 import { putFile } from '@/components/Upload/upload-engine';
+import { storePeaks } from '@/lib/peaks/compute';
 import { ConfirmModal } from './ConfirmModal';
 import { Status } from './releases.styles';
 import { uploadOne } from './upload-one';
@@ -36,7 +37,7 @@ export function ReplaceAudio({ trackId, title, disabled }: { trackId: string; ti
     if (!file) return;
     const ok = await run(async () => {
       setProgress(0);
-      const up = await uploadOne(file, { createUploadUrls, putFile }, setProgress);
+      const up = await uploadOne(file, { createUploadUrls, putFile, storePeaks }, setProgress);
       if (up.error !== null) return { error: up.error };
       return replaceTrackAudio(trackId, up.key);
     });

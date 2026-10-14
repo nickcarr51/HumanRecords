@@ -6,6 +6,7 @@ import type { UploadRequest, UploadUrlsResult } from '@/lib/admin/types';
 export type UploadOneDeps = {
   createUploadUrls: (files: UploadRequest[]) => Promise<UploadUrlsResult>;
   putFile: (url: string, file: File, onProgress: (fraction: number) => void) => Promise<void>;
+  storePeaks: (file: Blob, peaksUrl: string) => Promise<boolean>;
 };
 export type UploadOneResult = { key: string; error: null } | { key: null; error: string };
 
@@ -28,5 +29,7 @@ export async function uploadOne(file: File, deps: UploadOneDeps, onProgress: (fr
   } catch (err) {
     return { key: null, error: err instanceof Error ? err.message : 'Upload failed.' };
   }
+  // Same rule as runPublish: peaks are best-effort.
+  await deps.storePeaks(file, target.peaksUrl).catch(() => false);
   return { key: target.key, error: null };
 }

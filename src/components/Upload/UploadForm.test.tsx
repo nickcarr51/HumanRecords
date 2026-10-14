@@ -4,6 +4,7 @@ import { renderWithTheme } from "@/test/renderWithTheme";
 
 const push = vi.fn();
 const createUploadUrls = vi.fn();
+vi.mock("@/lib/peaks/compute", () => ({ storePeaks: vi.fn(async () => true) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/admin/actions", () => ({
   searchArtists: vi.fn(async () => ({ artists: [], error: null })),

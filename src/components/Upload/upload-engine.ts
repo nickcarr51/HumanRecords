@@ -52,6 +52,7 @@ export async function runPool<T>(items: T[], limit: number, worker: (item: T) =>
 export type PublishDeps = {
   createUploadUrls: (files: UploadRequest[]) => Promise<UploadUrlsResult>;
   putFile: (url: string, file: File, onProgress: (fraction: number) => void) => Promise<void>;
+  storePeaks: (file: Blob, peaksUrl: string) => Promise<boolean>;
   publishRelease: (payload: ReleasePayload) => Promise<PublishResult | undefined>;
   dispatch: (action: UploadAction) => void;
 };
@@ -110,6 +111,9 @@ export async function runPublish(state: UploadState, deps: PublishDeps): Promise
           deps.dispatch({ type: "uploadFailed", clientId: target.clientId, error: "Upload failed." });
           throw err;
         }
+        // Loudness file for the player's visuals. A failure leaves the track on
+        // idle dots (re-analyze from the release edit page); never fails publish.
+        await deps.storePeaks(files.get(target.clientId)!, target.peaksUrl).catch(() => false);
         keys[target.clientId] = target.key;
         deps.dispatch({ type: "uploadDone", clientId: target.clientId, key: target.key });
       });

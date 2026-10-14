@@ -14,6 +14,7 @@ vi.mock("@/lib/admin/release-actions", () => ({
   restoreTrack: (...a: unknown[]) => restoreTrack(...a), addAlbumTrack: (...a: unknown[]) => addAlbumTrack(...a), replaceTrackAudio: vi.fn(),
 }));
 vi.mock("@/lib/admin/actions", () => ({ createUploadUrls: (...a: unknown[]) => createUploadUrls(...a), searchArtists: vi.fn(async () => ({ artists: [{ id: "a1", name: "Nova" }], error: null })) }));
+vi.mock("@/lib/peaks/compute", () => ({ storePeaks: vi.fn(async () => true) }));
 vi.mock("@/components/Upload/upload-engine", () => ({ putFile: vi.fn() }));
 
 import { EditReleaseForm } from "./EditReleaseForm";
@@ -166,7 +167,7 @@ describe("EditReleaseForm", () => {
   it("disables draft fields while an add-track is in flight, then re-enables them", async () => {
     let resolveAdd!: (v: { error: null }) => void;
     addAlbumTrack.mockReturnValueOnce(new Promise((r) => { resolveAdd = r; }));
-    createUploadUrls.mockResolvedValue({ targets: [{ clientId: "one", key: "tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3", url: "https://put" }], error: null });
+    createUploadUrls.mockResolvedValue({ targets: [{ clientId: "one", key: "tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3", url: "https://put", peaksUrl: "https://peaks" }], error: null });
     renderWithTheme(<EditReleaseForm release={album} />);
     await userEvent.upload(screen.getByLabelText("MP3 file"), new File([new Uint8Array(10)], "New.mp3", { type: "audio/mpeg" }));
     await userEvent.type(within(screen.getByLabelText("Add a track")).getByRole("combobox", { name: "Artists" }), "Nova");

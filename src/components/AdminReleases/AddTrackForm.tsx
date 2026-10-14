@@ -10,6 +10,7 @@ import { Heading } from '@/components/Heading';
 import { Input } from '@/components/Input';
 import { ArtistCombobox } from '@/components/Upload/ArtistCombobox';
 import { putFile } from '@/components/Upload/upload-engine';
+import { storePeaks } from '@/lib/peaks/compute';
 import { TrackCard } from '@/components/Upload/upload.styles';
 import { addChip, moveChip, titleFromFilename, toRef, type ArtistChip } from '@/components/Upload/upload-reducer';
 import { createUploadUrls } from '@/lib/admin/actions';
@@ -49,7 +50,7 @@ export function AddTrackForm({ releaseId, disabled, onBusyChange }: { releaseId:
     }
     const ok = await run(async () => {
       setProgress(0);
-      const up = await uploadOne(file, { createUploadUrls, putFile }, setProgress);
+      const up = await uploadOne(file, { createUploadUrls, putFile, storePeaks }, setProgress);
       if (up.error !== null) return { error: up.error };
       return addAlbumTrack(releaseId, { title: title.trim(), audioKey: up.key, artists: artists.map(toRef) });
     });

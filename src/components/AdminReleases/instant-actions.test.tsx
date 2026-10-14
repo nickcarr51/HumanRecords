@@ -21,6 +21,7 @@ vi.mock("@/lib/admin/actions", () => ({
   createUploadUrls: (...a: unknown[]) => createUploadUrls(...a),
   searchArtists: vi.fn(async () => ({ artists: [{ id: "a1", name: "Nova" }], error: null })),
 }));
+vi.mock("@/lib/peaks/compute", () => ({ storePeaks: vi.fn(async () => true) }));
 vi.mock("@/components/Upload/upload-engine", () => ({ putFile: (...a: unknown[]) => putFile(...a) }));
 
 import { AddTrackForm } from "./AddTrackForm";
@@ -33,7 +34,7 @@ const mp3 = (name = "New_Song.mp3") => new File([new Uint8Array(10)], name, { ty
 beforeEach(() => {
   vi.clearAllMocks();
   for (const fn of [replaceTrackAudio, removeTrack, restoreTrack, addAlbumTrack]) fn.mockResolvedValue({ error: null });
-  createUploadUrls.mockResolvedValue({ targets: [{ clientId: "one", key: KEY, url: "https://put" }], error: null });
+  createUploadUrls.mockResolvedValue({ targets: [{ clientId: "one", key: KEY, url: "https://put", peaksUrl: "https://peaks" }], error: null });
   putFile.mockResolvedValue(undefined);
 });
 
