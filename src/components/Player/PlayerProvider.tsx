@@ -108,15 +108,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
   // Visuals come from the track's stored loudness, not Web Audio: routing the
   // <audio> element through an AudioContext stops iOS background playback.
-  const peaks = usePeaks(currentTrack?.id);
+  // The peaks request waits until audio has started for this track: Next runs
+  // client server actions one at a time, so asking earlier would queue it ahead
+  // of getTrackStreamUrl and delay playback by a round trip.
+  const [audioStartedId, setAudioStartedId] = useState<string | null>(null);
+  const peaks = usePeaks(audioStartedId !== null && audioStartedId === currentTrack?.id ? audioStartedId : undefined);
   const { readLevel, readWaveform } = usePeakReaders(audioRef, peaks);
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
-  const startAudio = useCallback((url: string, isCurrent: () => boolean) => {
+  const startAudio = useCallback((url: string, isCurrent: () => boolean, trackId: string) => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.src = url;
+    setAudioStartedId(trackId);
     void audio
       .play()
       .then(() => {
@@ -153,6 +158,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         startAudio(
           url,
           () => gen === genRef.current && queueRef.current.tracks[queueRef.current.index]?.id === track.id,
+          track.id,
         );
       }
       commit(s);
@@ -354,7 +360,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setIsPlaying(false);
           return;
         }
-        startAudio(res.url, () => !cancelled);
+        startAudio(res.url, () => !cancelled, currentTrack.id);
       });
     return () => {
       cancelled = true;

@@ -100,6 +100,21 @@ describe("PlayerProvider", () => {
       vi.unstubAllGlobals();
     }
   });
+  it("requests the stream URL before the peaks URL, and peaks wait for the stream URL to resolve", async () => {
+    let resolveStream: (v: { url: string; error: null }) => void = () => {};
+    mockGet.mockImplementation((id: string) =>
+      id === "t1" ? new Promise((r) => { resolveStream = r; }) : Promise.resolve({ url: `https://signed.example/${id}`, error: null }),
+    );
+    renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
+    await act(async () => { resolveStream({ url: "https://signed.example/t1", error: null }); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1"));
+    expect(mockGet.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(getTrackPeaksUrl).mock.invocationCallOrder[0]);
+  });
+
   it("playQueue sets the current track and requests its signed URL", async () => {
     renderPlayer();
     await userEvent.click(screen.getByText("play"));
