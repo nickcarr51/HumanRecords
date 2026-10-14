@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Alert } from '@/components/Alert';
-import { EditReleaseForm } from '@/components/AdminReleases';
+import { AnalyzeWaveforms, EditReleaseForm } from '@/components/AdminReleases';
 import { getAdminRelease, type AdminRelease } from '@/lib/admin/releases';
 import { requireLabelMember } from '@/lib/auth/role';
 import { createClient } from '@/lib/supabase/server';
@@ -37,6 +37,7 @@ export default async function EditReleasePage({ params }: { params: Promise<{ id
     <Page>
       <Back href={release.archived ? '/admin/releases?archived=1' : '/admin/releases'}>‹ releases</Back>
       <EditReleaseForm release={release} />
+      <AnalyzeWaveforms tracks={release.tracks.filter((t) => !t.archived).map(({ id, title }) => ({ id, title }))} />
     </Page>
   );
 }
