@@ -116,7 +116,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 Render through `renderWithTheme` (`src/test/renderWithTheme.tsx`; `{ dark: true }` for the amber
 theme) — `PixelWaveform`, `PlaybackButton`, `PixelAccordion` and `SweepIcon` all read the theme.
-`AudioContext` is never stubbed: the meter stays off in tests and the canvas components receive
+There is no `AudioContext` to stub (the meter reads stored peaks): the canvas components receive
 their samplers through `AudioMeterContext` / `AudioWaveformContext` providers instead.
 
 ## What is deliberately NOT tested (agreed scope)

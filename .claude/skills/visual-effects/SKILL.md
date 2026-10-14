@@ -30,7 +30,7 @@ value. If an effect re-renders React on every frame it is wrong, whatever it loo
 | Album-row expand/collapse with body-level particle canvas; `inert` + unmount when closed | `src/components/Feed/PixelAccordion.tsx` (+ `.test.tsx`), used by `Feed/AlbumRow.tsx` |
 | Play/pause button with level-driven particles and accent bloom | `src/components/Player/PlaybackButton.tsx` (feed rows, album tracks, `PlayerBar`) |
 | 30 fps dot waveform next to the Playing/Paused label | `src/components/Player/PixelWaveform.tsx` (+ `.test.tsx`) |
-| Single AudioContext/Analyser; `useAudioMeter()` → level, `useAudioWaveform()` → samples | `src/components/Player/audioMeter.ts`; provided by `PlayerProvider.tsx` |
+| Stored-peaks readers: `usePeaks` / `usePeakReaders` (`peaks.ts`); `useAudioMeter()` → level, `useAudioWaveform()` → samples (contexts in `audioMeter.ts`, provided by `PlayerProvider.tsx`) | `src/components/Player/{peaks,audioMeter}.ts` |
 | Two-layer clip-path icon that fills with accent on parent hover | `src/components/Player/SweepIcon.tsx` (`PlaybackIcon`, `DownloadButton`, `PlayerBar`, `AlbumRow`) |
 | `iconSweepStyles` / `textSweepStyles` / `textHoverState`; `--hover-progress` driver | `src/components/field/hoverStyles.ts`; `@property` in `src/app/globals.css` |
 | Global hover glow (`button svg, a svg` drop-shadow reads `--hover-progress`), `::selection`, View Transition roll keyframes | `GlobalTheme` in `src/lib/theme/ThemeModeProvider.tsx` |
