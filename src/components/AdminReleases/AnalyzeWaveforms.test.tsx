@@ -117,8 +117,9 @@ describe("AnalyzeWaveforms", () => {
   });
 
   it("gives a track added after mount a real status", async () => {
-    const resolvers: ((v: { status: Record<string, boolean>; error: null }) => void)[] = [];
-    const d = deps({ getPeaksStatus: vi.fn(() => new Promise((r) => { resolvers.push(r); })) });
+    type Status = Awaited<ReturnType<AnalyzeDeps["getPeaksStatus"]>>;
+    const resolvers: ((v: Status) => void)[] = [];
+    const d = deps({ getPeaksStatus: vi.fn(() => new Promise<Status>((r) => { resolvers.push(r); })) });
     const { rerender } = renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={d} />);
     rerender(<AnalyzeWaveforms tracks={[...TRACKS, { id: "c", title: "Gamma" }]} deps={d} />);
     await waitFor(() => expect(resolvers).toHaveLength(2));
