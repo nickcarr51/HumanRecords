@@ -39,16 +39,29 @@ const DEFAULT_DEPS: AnalyzeDeps = { getPeaksStatus, getPeaksJob, fetchAudio, sto
 
 // Decodes each MP3 in this browser (Web Audio is fine on admin pages) and
 // stores its loudness file for the player. Re-running overwrites in place.
-export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id: string; title: string }[]; deps?: AnalyzeDeps }) {
+export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id: string; title: string; audioKey: string }[]; deps?: AnalyzeDeps }) {
   const [rows, setRows] = useState<Record<string, RowState>>(() => Object.fromEntries(tracks.map((t) => [t.id, 'checking'])));
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ids = tracks.map((t) => t.id).join(',');
+  // Re-checked when a track is added or its MP3 replaced (same id, new audio
+  // key and so a new peaks file), e.g. after Replace MP3 refreshes the page.
+  const statusKey = JSON.stringify(tracks.map((t) => [t.id, t.audioKey]));
+  const checkedKeys = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let live = true;
-    const list = ids ? ids.split(',') : [];
+    const entries = JSON.parse(statusKey) as [string, string][];
+    const list = entries.map(([id]) => id);
     if (list.length === 0) return;
+    const replaced = entries.filter(([id, key]) => id in checkedKeys.current && checkedKeys.current[id] !== key).map(([id]) => id);
+    checkedKeys.current = Object.fromEntries(entries);
+    if (replaced.length > 0) {
+      setRows((r) => {
+        const out = { ...r };
+        for (const id of replaced) if (out[id] !== 'analyzing') out[id] = 'checking';
+        return out;
+      });
+    }
     // Only touch rows still 'checking' so a late response can't undo a run. A
     // track with no row yet (added after mount) counts as 'checking'.
     const settle = (next: (id: string) => RowState) =>
@@ -76,7 +89,7 @@ export function AnalyzeWaveforms({ tracks, deps = DEFAULT_DEPS }: { tracks: { id
     return () => {
       live = false;
     };
-  }, [ids, deps]);
+  }, [statusKey, deps]);
 
   const mounted = useRef(false);
   useEffect(() => {

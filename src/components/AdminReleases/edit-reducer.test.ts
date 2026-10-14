@@ -6,14 +6,14 @@ const album: AdminRelease = {
   id: "r1", kind: "album", title: "Night", pinned: false, archived: false,
   album: { title: "Night", artists: [{ id: "a1", name: "Nova" }] },
   tracks: [
-    { id: "t1", title: "One", artists: [{ id: "a1", name: "Nova" }], archived: false },
-    { id: "t2", title: "Gone", artists: [{ id: "a1", name: "Nova" }], archived: true },
-    { id: "t3", title: "Three", artists: [{ id: "a2", name: "Kite" }], archived: false },
+    { id: "t1", title: "One", audioKey: "tracks/t1.mp3", artists: [{ id: "a1", name: "Nova" }], archived: false },
+    { id: "t2", title: "Gone", audioKey: "tracks/t2.mp3", artists: [{ id: "a1", name: "Nova" }], archived: true },
+    { id: "t3", title: "Three", audioKey: "tracks/t3.mp3", artists: [{ id: "a2", name: "Kite" }], archived: false },
   ],
 };
 const single: AdminRelease = {
   id: "r2", kind: "single", title: "Solo", pinned: false, archived: false, album: null,
-  tracks: [{ id: "s1", title: "Solo", artists: [{ id: "a1", name: "Nova" }], archived: false }],
+  tracks: [{ id: "s1", title: "Solo", audioKey: "tracks/s1.mp3", artists: [{ id: "a1", name: "Nova" }], archived: false }],
 };
 
 describe("edit reducer", () => {

@@ -23,14 +23,14 @@ const album: AdminRelease = {
   id: "r1", kind: "album", title: "Night", pinned: false, archived: false,
   album: { title: "Night", artists: [{ id: "a1", name: "Nova" }] },
   tracks: [
-    { id: "t1", title: "One", artists: [{ id: "a1", name: "Nova" }], archived: false },
-    { id: "t2", title: "Two", artists: [{ id: "a1", name: "Nova" }], archived: false },
-    { id: "t3", title: "Gone", artists: [{ id: "a1", name: "Nova" }], archived: true },
+    { id: "t1", title: "One", audioKey: "tracks/t1.mp3", artists: [{ id: "a1", name: "Nova" }], archived: false },
+    { id: "t2", title: "Two", audioKey: "tracks/t2.mp3", artists: [{ id: "a1", name: "Nova" }], archived: false },
+    { id: "t3", title: "Gone", audioKey: "tracks/t3.mp3", artists: [{ id: "a1", name: "Nova" }], archived: true },
   ],
 };
 const single: AdminRelease = {
   id: "r2", kind: "single", title: "Solo", pinned: false, archived: false, album: null,
-  tracks: [{ id: "s1", title: "Solo", artists: [{ id: "a1", name: "Nova" }], archived: false }],
+  tracks: [{ id: "s1", title: "Solo", audioKey: "tracks/s1.mp3", artists: [{ id: "a1", name: "Nova" }], archived: false }],
 };
 
 beforeEach(() => {

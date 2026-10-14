@@ -8,7 +8,7 @@ vi.mock("@/lib/peaks/compute", () => ({ storePeaks: vi.fn() }));
 
 import { AnalyzeWaveforms, type AnalyzeDeps } from "./AnalyzeWaveforms";
 
-const TRACKS = [{ id: "a", title: "Alpha" }, { id: "b", title: "Beta" }];
+const TRACKS = [{ id: "a", title: "Alpha", audioKey: "tracks/a.mp3" }, { id: "b", title: "Beta", audioKey: "tracks/b.mp3" }];
 
 function deps(overrides: Partial<AnalyzeDeps> = {}): AnalyzeDeps {
   return {
@@ -23,6 +23,19 @@ function deps(overrides: Partial<AnalyzeDeps> = {}): AnalyzeDeps {
 const row = (title: string) => screen.getByText(title).closest("li")!;
 
 describe("AnalyzeWaveforms", () => {
+  it("re-checks a track whose MP3 was replaced (same id, new audio key)", async () => {
+    const d = deps({
+      getPeaksStatus: vi.fn()
+        .mockResolvedValueOnce({ status: { a: true, b: false }, error: null })
+        .mockResolvedValueOnce({ status: { a: false, b: false }, error: null }),
+    });
+    const view = renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={d} />);
+    await waitFor(() => expect(row("Alpha")).toHaveTextContent("has waveform"));
+    view.rerender(<AnalyzeWaveforms tracks={[{ ...TRACKS[0], audioKey: "tracks/a2.mp3" }, TRACKS[1]]} deps={d} />);
+    await waitFor(() => expect(row("Alpha")).toHaveTextContent("missing"));
+    expect(d.getPeaksStatus).toHaveBeenCalledTimes(2);
+  });
+
   it("shows which tracks have waveforms", async () => {
     renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={deps()} />);
     await waitFor(() => expect(row("Alpha")).toHaveTextContent("has waveform"));
@@ -121,7 +134,7 @@ describe("AnalyzeWaveforms", () => {
     const resolvers: ((v: Status) => void)[] = [];
     const d = deps({ getPeaksStatus: vi.fn(() => new Promise<Status>((r) => { resolvers.push(r); })) });
     const { rerender } = renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={d} />);
-    rerender(<AnalyzeWaveforms tracks={[...TRACKS, { id: "c", title: "Gamma" }]} deps={d} />);
+    rerender(<AnalyzeWaveforms tracks={[...TRACKS, { id: "c", title: "Gamma", audioKey: "tracks/c.mp3" }]} deps={d} />);
     await waitFor(() => expect(resolvers).toHaveLength(2));
     resolvers[1]({ status: { a: true, b: false, c: true }, error: null });
     await waitFor(() => expect(row("Gamma")).toHaveTextContent("has waveform"));

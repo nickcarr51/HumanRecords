@@ -86,7 +86,7 @@ describe("RemovedTracks", () => {
   it("restores a removed track; renders nothing when empty", async () => {
     const { container, rerender } = renderWithTheme(<RemovedTracks tracks={[]} disabled={false} />);
     expect(container).toBeEmptyDOMElement();
-    rerender(<RemovedTracks tracks={[{ id: "t2", title: "Gone", artists: [], archived: true }]} disabled={false} />);
+    rerender(<RemovedTracks tracks={[{ id: "t2", title: "Gone", audioKey: "tracks/t2.mp3", artists: [], archived: true }]} disabled={false} />);
     await userEvent.click(screen.getByRole("button", { name: "Restore Gone" }));
     expect(restoreTrack).toHaveBeenCalledWith("t2");
   });

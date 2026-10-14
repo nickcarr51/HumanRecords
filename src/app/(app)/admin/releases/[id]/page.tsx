@@ -37,7 +37,7 @@ export default async function EditReleasePage({ params }: { params: Promise<{ id
     <Page>
       <Back href={release.archived ? '/admin/releases?archived=1' : '/admin/releases'}>‹ releases</Back>
       <EditReleaseForm release={release} />
-      <AnalyzeWaveforms tracks={release.tracks.filter((t) => !t.archived).map(({ id, title }) => ({ id, title }))} />
+      <AnalyzeWaveforms tracks={release.tracks.filter((t) => !t.archived).map(({ id, title, audioKey }) => ({ id, title, audioKey }))} />
     </Page>
   );
 }

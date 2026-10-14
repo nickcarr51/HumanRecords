@@ -19,7 +19,8 @@ export type AdminReleaseRow = {
   archived: boolean;
   liveTrackCount: number;
 };
-export type AdminTrack = { id: string; title: string; artists: ArtistMatch[]; archived: boolean };
+// audioKey: the track's current MP3 object key (changes when its audio is replaced).
+export type AdminTrack = { id: string; title: string; audioKey: string; artists: ArtistMatch[]; archived: boolean };
 export type AdminRelease = {
   id: string;
   kind: ReleaseKind;
@@ -32,16 +33,16 @@ export type AdminRelease = {
 
 const SELECT = `
   id, kind, created_at, pinned, sort_at, archived_at,
-  track:tracks ( id, title, archived_at, track_artists ( position, artists ( id, name ) ) ),
+  track:tracks ( id, title, audio_url, archived_at, track_artists ( position, artists ( id, name ) ) ),
   album:albums (
     id, title,
     album_artists ( position, artists ( id, name ) ),
-    track_albums ( position, tracks ( id, title, archived_at, track_artists ( position, artists ( id, name ) ) ) )
+    track_albums ( position, tracks ( id, title, audio_url, archived_at, track_artists ( position, artists ( id, name ) ) ) )
   )
 `;
 
 type ArtistRel = Array<{ position?: number | null; artists: ArtistMatch | null }> | null;
-type TrackRel = { id: string; title: string; archived_at: string | null; track_artists: ArtistRel };
+type TrackRel = { id: string; title: string; audio_url: string; archived_at: string | null; track_artists: ArtistRel };
 type Row = {
   id: string;
   kind: ReleaseKind;
@@ -65,7 +66,7 @@ function artistsFrom(rel: ArtistRel): ArtistMatch[] {
 }
 
 function toTrack(t: TrackRel): AdminTrack {
-  return { id: t.id, title: t.title, artists: artistsFrom(t.track_artists), archived: t.archived_at !== null };
+  return { id: t.id, title: t.title, audioKey: t.audio_url, artists: artistsFrom(t.track_artists), archived: t.archived_at !== null };
 }
 
 function toAdminRelease(row: Row): AdminRelease | null {
