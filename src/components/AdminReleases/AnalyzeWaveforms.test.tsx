@@ -108,4 +108,21 @@ describe("AnalyzeWaveforms", () => {
     await new Promise((r) => setTimeout(r, 5));
     expect(d.getPeaksJob).not.toHaveBeenCalledWith("b");
   });
+
+  it("shows the alert and leaves no row on 'checking' when the status call rejects", async () => {
+    renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={deps({ getPeaksStatus: vi.fn(async () => { throw new Error("boom"); }) })} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't check waveforms.");
+    expect(row("Alpha")).not.toHaveTextContent("checking");
+    expect(row("Beta")).not.toHaveTextContent("checking");
+  });
+
+  it("gives a track added after mount a real status", async () => {
+    const resolvers: ((v: { status: Record<string, boolean>; error: null }) => void)[] = [];
+    const d = deps({ getPeaksStatus: vi.fn(() => new Promise((r) => { resolvers.push(r); })) });
+    const { rerender } = renderWithTheme(<AnalyzeWaveforms tracks={TRACKS} deps={d} />);
+    rerender(<AnalyzeWaveforms tracks={[...TRACKS, { id: "c", title: "Gamma" }]} deps={d} />);
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+    resolvers[1]({ status: { a: true, b: false, c: true }, error: null });
+    await waitFor(() => expect(row("Gamma")).toHaveTextContent("has waveform"));
+  });
 });
