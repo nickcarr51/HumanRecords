@@ -5,7 +5,7 @@ describe('theme mode cookie', () => {
   it('only "night" means dark', () => {
     expect(isDarkCookieValue('night')).toBe(true);
     expect(isDarkCookieValue('day')).toBe(false);
-    expect(isDarkCookieValue(undefined)).toBe(false);
+    expect(isDarkCookieValue(undefined)).toBe(true);
   });
   it('reads its own cookie out of a cookie string, null when absent', () => {
     expect(readThemeCookie(`a=1; ${THEME_COOKIE}=night; b=2`)).toBe(true);

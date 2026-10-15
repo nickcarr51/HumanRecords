@@ -18,7 +18,7 @@ function subscribe(callback: () => void) {
 }
 
 // In-memory fallback when cookies are blocked; the cookie is the source of truth.
-let sessionDark = false;
+let sessionDark = true;
 function snapshot() {
   try { return readThemeCookie(document.cookie) ?? sessionDark; }
   catch { return sessionDark; }
@@ -87,7 +87,7 @@ const GlobalTheme = createGlobalStyle`
  * `initialDark` is the cookie value as read by the server (root layout), so the
  * server-rendered HTML and the first client render agree: no theme flash.
  */
-export function ThemeModeProvider({ children, initialDark = false }: { children: ReactNode; initialDark?: boolean }) {
+export function ThemeModeProvider({ children, initialDark = true }: { children: ReactNode; initialDark?: boolean }) {
   const pathname = usePathname();
   const savedDark = useSyncExternalStore(subscribe, snapshot, () => initialDark);
   const entrance = pathname === '/' || pathname === '/login' || pathname?.startsWith('/login/');

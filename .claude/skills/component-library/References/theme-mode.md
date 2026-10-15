@@ -46,6 +46,10 @@ const dark = Boolean(entrance) || savedDark;
   through `readThemeCookie`; if that throws or the cookie is absent it falls back to an
   in-memory `sessionDark` (so a blocked-cookie browser still toggles for the session). The
   server snapshot is the `initialDark` prop.
+- **Night is the default.** No cookie → amber, on the server (`isDarkCookieValue(undefined)`
+  is `true`) and the client (`sessionDark` starts `true`; `initialDark` defaults to `true` in
+  both `ThemeModeProvider` and `StyledComponentsRegistry`). So a first-time user goes from the
+  amber login straight to an amber `/feed`. Only an explicit `hs-theme=day` gives gray.
 - Changes are broadcast with a window event (`humanrecords-theme-change`) that
   `useSyncExternalStore` subscribes to, so every provider instance re-reads the cookie.
 
@@ -54,7 +58,7 @@ const dark = Boolean(entrance) || savedDark;
 | Export | |
 |---|---|
 | `THEME_COOKIE` | `'hs-theme'` |
-| `ThemeCookieValue` | `'night' \| 'day'` — only `'night'` means dark (`isDarkCookieValue`) |
+| `ThemeCookieValue` | `'night' \| 'day'` — only `'day'` means gray; `'night'`, unset or anything else is dark (`isDarkCookieValue`) |
 | `readThemeCookie(cookieString)` | `true` / `false` / `null` (unset) from a `document.cookie`-style string |
 | `themeCookieString(dark)` | `hs-theme=night; path=/; max-age=31536000; samesite=lax` — a year, site-wide, lax |
 

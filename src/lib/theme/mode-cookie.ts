@@ -4,7 +4,7 @@ export const THEME_COOKIE = 'hs-theme';
 export type ThemeCookieValue = 'night' | 'day';
 
 export function isDarkCookieValue(value: string | undefined | null): boolean {
-  return value === 'night';
+  return value !== 'day';
 }
 
 /** Reads the preference from a document.cookie string; null when unset. */
