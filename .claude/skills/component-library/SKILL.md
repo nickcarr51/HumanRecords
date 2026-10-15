@@ -74,9 +74,9 @@ says, because the root layout reads that cookie on the server.
 
 Nothing — this is foundational. Feature skills that build on it:
 [[timeline-player]], [[admin-upload]], [[auth]] (login screen), [[artists-read]].
-The canvas / SVG-filter / Web Audio *mechanics* behind `CRTTexture`, `GlitchArt`,
+The canvas / SVG-filter / stored-peaks audio *mechanics* behind `CRTTexture`, `GlitchArt`,
 `SignInGlitch`, `PixelAccordion`, `PlaybackButton` and `PixelWaveform` (frame budgets,
-visibility + reduced-motion handling, analyser wiring) are the [[visual-effects]] skill;
+visibility + reduced-motion handling, meter readers) are the [[visual-effects]] skill;
 this skill only says what those components are, where they mount, and how they get their
 colors.
 

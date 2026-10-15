@@ -26,10 +26,16 @@ function deps(overrides: Partial<PublishDeps> = {}) {
   const actions: UploadAction[] = [];
   const d: PublishDeps = {
     createUploadUrls: vi.fn(async (files: UploadRequest[]) => ({
-      targets: files.map((f) => ({ clientId: f.clientId, key: `tracks/${f.clientId}.mp3`, url: `https://up/${f.clientId}` })),
+      targets: files.map((f) => ({
+        clientId: f.clientId,
+        key: `tracks/${f.clientId}.mp3`,
+        url: `https://up/${f.clientId}`,
+        peaksUrl: `https://peaks/${f.clientId}`,
+      })),
       error: null,
     })),
     putFile: vi.fn(async (_url, _file, onProgress) => onProgress(1)),
+    storePeaks: vi.fn(async () => true),
     publishRelease: vi.fn(async () => undefined),
     dispatch: (a) => actions.push(a),
     ...overrides,
@@ -167,9 +173,31 @@ describe("runPublish", () => {
     expect(actions.some((a) => a.type === "publishFailed")).toBe(false);
   });
 
+  it("stores each file's peaks after its audio PUT, with that target's peaksUrl", async () => {
+    const order: string[] = [];
+    const { d } = deps({
+      putFile: vi.fn(async (url: string) => { order.push(`put ${url}`); }),
+      storePeaks: vi.fn(async (_f: Blob, url: string) => { order.push(`peaks ${url}`); return true; }),
+    });
+    await runPublish(readyAlbum(), d);
+    for (const id of ["t1", "t2"]) {
+      expect(order.indexOf(`peaks https://peaks/${id}`)).toBeGreaterThan(order.indexOf(`put https://up/${id}`));
+    }
+    expect(d.publishRelease).toHaveBeenCalledOnce();
+  });
+
+  it("still publishes when storing peaks fails or throws", async () => {
+    const { d, actions } = deps({
+      storePeaks: vi.fn().mockResolvedValueOnce(false).mockRejectedValueOnce(new Error("decode")),
+    });
+    await runPublish(readyAlbum(), d);
+    expect(d.publishRelease).toHaveBeenCalledOnce();
+    expect(actions.some((a) => a.type === "publishFailed")).toBe(false);
+  });
+
   it("fails when returned targets don't match the requested files", async () => {
     const { d, actions } = deps({
-      createUploadUrls: vi.fn(async () => ({ targets: [{ clientId: "t1", key: "k", url: "u" }], error: null })),
+      createUploadUrls: vi.fn(async () => ({ targets: [{ clientId: "t1", key: "k", url: "u", peaksUrl: "p" }], error: null })),
     });
     await runPublish(readyAlbum(), d);
     expect(actions.at(-1)).toEqual({ type: "publishFailed", error: "Couldn't prepare the upload." });

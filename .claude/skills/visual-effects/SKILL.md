@@ -1,6 +1,6 @@
 ---
 name: visual-effects
-description: Use when adding, tuning, or debugging an ambient visual effect in Human Services — the CRT scanline/tracking canvas (`CRTTexture` in the root layout), image tears (`GlitchArt`), the sign-in glitch (`SignInGlitch`), pixel particles on feed accordions (`PixelAccordion`) and play buttons (`PlaybackButton`), the dot waveform (`PixelWaveform`), the audio analyser (`src/components/Player/audioMeter.ts`: `useAudioMeter` / `useAudioWaveform`), hover sweeps (`SweepIcon`, `src/components/field/hoverStyles.ts`, `--hover-progress`), the `theme.effects.*` tokens and `withAlpha` / `rgbTriplet`, or the day/night View Transition roll. Also when a canvas keeps drawing after unmount, a background tab burns CPU, an effect ignores `prefers-reduced-motion`, links vanish in Windows High Contrast, a test logs "getContext not implemented", playback breaks after a `crossOrigin` / Web Audio / R2 CORS change, or a new page wants an effect.
+description: Use when adding, tuning, or debugging an ambient visual effect in Human Services — the CRT scanline/tracking canvas (`CRTTexture` in the root layout), image tears (`GlitchArt`), the sign-in glitch (`SignInGlitch`), pixel particles on feed accordions (`PixelAccordion`) and play buttons (`PlaybackButton`), the dot waveform's drawing (`PixelWaveform`), the meter hooks effects read (`useAudioMeter` / `useAudioWaveform` in `audioMeter.ts`; where the signal comes from is the `waveform` skill), hover sweeps (`SweepIcon`, `src/components/field/hoverStyles.ts`, `--hover-progress`), the `theme.effects.*` tokens and `withAlpha` / `rgbTriplet`, or the day/night View Transition roll. Also when a canvas keeps drawing after unmount, a background tab burns CPU, an effect ignores `prefers-reduced-motion`, links vanish in Windows High Contrast, a test logs "getContext not implemented", or a new page wants an effect.
 ---
 
 # Visual Effects (ambient layer)
@@ -30,7 +30,7 @@ value. If an effect re-renders React on every frame it is wrong, whatever it loo
 | Album-row expand/collapse with body-level particle canvas; `inert` + unmount when closed | `src/components/Feed/PixelAccordion.tsx` (+ `.test.tsx`), used by `Feed/AlbumRow.tsx` |
 | Play/pause button with level-driven particles and accent bloom | `src/components/Player/PlaybackButton.tsx` (feed rows, album tracks, `PlayerBar`) |
 | 30 fps dot waveform next to the Playing/Paused label | `src/components/Player/PixelWaveform.tsx` (+ `.test.tsx`) |
-| Single AudioContext/Analyser; `useAudioMeter()` → level, `useAudioWaveform()` → samples | `src/components/Player/audioMeter.ts`; provided by `PlayerProvider.tsx` |
+| Audio signal: `useAudioMeter()` → level, `useAudioWaveform()` → samples (contexts in `audioMeter.ts`, provided by `PlayerProvider.tsx`: live analyser on desktop, stored peaks via `peaks.ts` on touch; see [[waveform]]) | `src/components/Player/{audioMeter,peaks}.ts` |
 | Two-layer clip-path icon that fills with accent on parent hover | `src/components/Player/SweepIcon.tsx` (`PlaybackIcon`, `DownloadButton`, `PlayerBar`, `AlbumRow`) |
 | `iconSweepStyles` / `textSweepStyles` / `textHoverState`; `--hover-progress` driver | `src/components/field/hoverStyles.ts`; `@property` in `src/app/globals.css` |
 | Global hover glow (`button svg, a svg` drop-shadow reads `--hover-progress`), `::selection`, View Transition roll keyframes | `GlobalTheme` in `src/lib/theme/ThemeModeProvider.tsx` |
@@ -68,10 +68,12 @@ Apply all of it before merge; each line is something an existing effect already 
    literals in components, no `${hex}22` suffix tricks. Canvas effects read the theme once
    via `useTheme()` and put the strings in the effect's dependency array so a day/night
    toggle re-initialises the loop; CSS-driven effects just read `theme` in the template.
-6. **One audio graph.** Anything that reacts to sound calls `useAudioMeter()` /
-   `useAudioWaveform()` and handles `null` (outside `PlayerProvider`, or before the
-   first play gesture). Never `new AudioContext()` or `createMediaElementSource` anywhere
-   else; the element only allows one source node.
+6. **One audio graph, desktop only.** Anything that reacts to sound calls `useAudioMeter()` /
+   `useAudioWaveform()` and handles `null` (outside `PlayerProvider`, or a touch device whose
+   track has no stored peaks). Only `useAudioMeterSource` (`audioMeter.ts`) may create an
+   `AudioContext` / `createMediaElementSource` or set `crossOrigin` on the `<audio>`, and
+   only on desktop. **Never on touch devices** (`isTouchDevice()`): routing the element
+   through an `AudioContext` silences iOS background playback.
 7. **Hidden content is gone.** Collapsed rows are unmounted or `inert` + `aria-hidden`
    (`PixelAccordion`); a hidden row must not stay subscribed to `usePlayer`.
 8. **Degrade silently.** Text tricks (`color: transparent` + `background-clip: text`)
@@ -85,25 +87,28 @@ Apply all of it before merge; each line is something an existing effect already 
 
 ## Reading the audio signal
 
-`PlayerProvider` owns the app's one `<audio>` element (`crossOrigin="anonymous"` set in an
-effect, **desktop only** — see below) and calls `useAudioMeterSource(audioRef)` once. Its `enable()` runs inside `playQueue` and `play`
-(user gestures) and lazily creates a single `AudioContext` + `AnalyserNode`
-(`fftSize 256`) via `createMediaElementSource`, wired source → analyser → destination,
-then `context.resume()`s. Two contexts are provided to the tree:
+Effects never touch the `<audio>` element or Web Audio. They pull from two functions that
+`PlayerProvider` puts in context (`audioMeter.ts`):
 
-- `useAudioMeter()` → `readLevel(): number` (0..1). Returns `0` when the context isn't
-  running or the element is paused; smooths once per frame (8 ms cache) so several
-  buttons reading per frame share one RMS pass.
-- `useAudioWaveform()` → `readWaveform(): Uint8Array | null` (time-domain bytes, 128 = silence).
-  The array is the analyser's shared buffer; read it, don't keep it.
+- `useAudioMeter()` → `readLevel(): number` (0..1, drives particle energy).
+- `useAudioWaveform()` → `readWaveform(): Uint8Array | null` (256 time-domain bytes,
+  128 = silence).
 
-Both hooks return `null` outside `PlayerProvider` **and on touch devices** (`isTouchDevice()`
-in `audioMeter.ts`): routing the element through an `AudioContext` stops iOS background
-playback, so phones/tablets get no analyser, no `crossOrigin`, and effects must treat a `null`
-reader as "draw the idle state once, don't loop" (`PixelWaveform`) or "don't mount a loop"
-(`PlaybackButton`). The context closes when the provider unmounts. **Because the element is `crossOrigin="anonymous"`, every R2 bucket must allow
-`GET`/`HEAD` from its site origin (`infra/r2/cors.*.json`, see [[media-storage]]); without
-that rule playback fails entirely, not just the meter.**
+Call them once per frame from your loop; never copy their values into state. The source
+differs by device: **desktop** is a live Web Audio analyser (`useAudioMeterSource`), **touch**
+is the track's stored `peaks/<id>.bin` read against `audio.currentTime` (`usePeaks` /
+`usePeakReaders`), because Web Audio on the `<audio>` stops iOS background playback.
+Contract for an effect:
+
+- The **hook** is `null` outside `PlayerProvider`, and on touch until the current track's
+  peaks load (none stored, fetch failed, or not 'playing' yet). Treat `null` as "draw the idle
+  state once, don't loop" (`PixelWaveform`) or "don't mount a loop" (`PlaybackButton`).
+- A non-null **reader** still returns `0` / `null` while paused (and on desktop before the
+  analyser runs). Handle that per frame.
+
+Signal tuning (`LEVEL_GAIN`, `WAVE_GAIN`, `WAVE_MIX`), the reader math, upload/Analyze all,
+CORS and flat-waveform troubleshooting are all in [[waveform]]. Drawing tuning (columns,
+fps, colors, particle physics) stays here and in [effects-catalog.md](References/effects-catalog.md).
 
 ## Performance budget
 
@@ -156,19 +161,16 @@ Tests that don't care about the effect mock `getContext` to `null` so the effect
   cookie, `useThemeMode`) is theme-system work; this skill only covers its roll effect.
 - [[timeline-player]] — `PlayerProvider` hosts the `<audio>` element and the meter
   contexts; `PlaybackButton`/`PixelWaveform` sit in its rows and bar.
-- [[media-storage]] — R2 CORS `GET`/`HEAD` per bucket, required by `crossOrigin="anonymous"`.
+- [[waveform]] — where the meter signal comes from (desktop analyser, touch stored peaks), its tuning and troubleshooting.
 
 ## Known gaps (as of 2026-10-11)
 
 - **Safari**: `backdrop-filter: url(#filter)` is unsupported, so the CRT tracking band
   shows only its glow and dashed line, no page wobble; the `SweepIcon` clip-path `<rect>` `transform: scaleX(var(--hover-progress))`
   may not animate (icon snaps or stays unfilled). Both degrade silently; no workaround shipped.
-- **No audio-reactive effects on phones/tablets** (by design, 2026-10-11): Web Audio
-  silenced iOS background playback when switching apps, so touch devices skip the analyser.
-  (iOS lock-screen playback is a separate, older gap that has never worked; not caused by
-  Web Audio — see [[timeline-player]].) Waveform shows idle
-  dots, play buttons have no particles. Planned fix: precompute the waveform at upload time
-  and drive visuals from `currentTime` (see [[timeline-player]]).
+- **Touch devices need stored peaks.** On phones and tablets, a track without
+  `peaks/<id>.bin` shows idle dots and no particles until **Analyze all** runs on its release
+  page. Causes, desktop vs touch troubleshooting, and the waveform's other gaps: [[waveform]].
 - **`GlitchArt` is hover-only** — no touch/focus equivalent, so phones never see the tears.
 - **`GlitchArt` is not rendered on the album page**: `album_art_url` holds an unsigned R2
   key, so `<Art>` would be a blank square. `Art`/`ArtPlaceholder` in

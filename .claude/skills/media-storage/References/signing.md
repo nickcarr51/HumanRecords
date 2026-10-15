@@ -33,16 +33,23 @@ can't alter it. `region: "auto"` is R2's region.
 | `signStreamUrl(key)` | GET | `STREAM_TTL_SECONDS` | 7200 (2h) | Must outlast the longest track so seeking (new range requests) keeps working. |
 | `signDownloadUrl(key, filename)` | GET | `DOWNLOAD_TTL_SECONDS` | 300 (5m) | One-shot grab. |
 | `signImageUrl(key \| null)` | GET | `IMAGE_TTL_SECONDS` | 3600 (1h) | Outlasts a page session. Returns `null` for a null key (art columns are nullable). |
-| `signUploadUrl(key, contentType)` | PUT | `UPLOAD_TTL_SECONDS` | 900 (15m) | Enough for a 50 MB file on a slow link. |
+| `signUploadUrl(key, contentType)` | PUT | `UPLOAD_TTL_SECONDS` | 900 (15m) | Enough for a 50 MB file on a slow link. Also signs the `peaks/<id>.bin` PUT (`PEAKS_CONTENT_TYPE`, `application/octet-stream`). |
+
+`getTrackPeaksUrl` (storage actions) signs `peaks/<id>.bin` with `signStreamUrl`; `getPeaksJob`
+(`src/lib/admin/peaks-actions.ts`, label members only) mints a fresh `signStreamUrl(audio_url)`
+GET plus `signUploadUrl(peaksKey, PEAKS_CONTENT_TYPE)` PUT per track so the 15-minute PUT can't
+expire mid-run; `createUploadUrls` returns a `peaksUrl` beside each MP3 `url`. As with any
+signed PUT, the browser must send exactly the signed `Content-Type`.
 
 All GET signers share the private `signObjectUrl(key, { expiresIn, downloadFilename? })`.
 
-Signing says nothing about CORS. A stream URL is consumed by `<audio crossOrigin="anonymous">`,
-so the **bucket** must also answer with `Access-Control-Allow-Origin` for the site origin
-(`GET`/`HEAD` in `infra/r2/cors.<env>.json`) or the browser refuses the media; a download URL is
-consumed by navigation and an image URL by `<img>`, neither of which needs CORS. A correctly
-signed URL that plays in a new tab but errors in the player is a CORS problem, not a signing one
-— see [object-keys.md](object-keys.md#cors).
+Signing says nothing about CORS. A stream URL is consumed by an `<audio>`: plain on touch devices (no
+`crossOrigin`, needs no CORS), `crossOrigin="anonymous"` on desktop (needs the `GET` rule); a stream-signed `peaks/<id>.bin` URL is consumed by
+`fetch`, and the admin MP3 URL by `fetch`, so the **bucket** must answer with
+`Access-Control-Allow-Origin` for the site origin (`GET`/`HEAD` in `infra/r2/cors.<env>.json`);
+a download URL is consumed by navigation and an image URL by `<img>`, neither of which needs
+CORS. A correctly signed URL that opens in a new tab but fails in a `fetch` is a CORS problem,
+not a signing one — see [object-keys.md](object-keys.md#cors).
 
 `signImageUrl` is the intended way to render `*_art_url` keys (they are keys, not URLs); it has
 no caller yet because the album page hides artwork until image upload ships.

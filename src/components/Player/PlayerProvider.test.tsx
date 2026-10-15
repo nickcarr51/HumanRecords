@@ -1,12 +1,13 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithTheme } from "@/test/renderWithTheme";
 
-vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn() }));
-import { getTrackStreamUrl } from "@/lib/storage/actions";
+vi.mock("@/lib/storage/actions", () => ({ getTrackStreamUrl: vi.fn(), getTrackPeaksUrl: vi.fn() }));
+import { getTrackPeaksUrl, getTrackStreamUrl } from "@/lib/storage/actions";
 vi.mock("@/lib/feed/actions", () => ({ loadFeedPage: vi.fn(), continueAfterRelease: vi.fn() }));
 import { continueAfterRelease, loadFeedPage } from "@/lib/feed/actions";
+import { useAudioMeter } from "./audioMeter";
 import { PlayerProvider, usePlayer, toPlayerTrack } from "./PlayerProvider";
 import type { PlayerTrack, QueueSource } from "./queue";
 
@@ -24,6 +25,7 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGet.mockImplementation(async (id: string) => ({ url: `https://signed.example/${id}`, error: null }));
+  vi.mocked(getTrackPeaksUrl).mockResolvedValue({ url: null, error: null });
   // clearAllMocks keeps return values; reset so one test's deferred page can't leak into the next.
   mockLoad.mockReset();
   mockAfterRelease.mockReset();
@@ -74,26 +76,98 @@ describe("toPlayerTrack", () => {
   });
 });
 
+// Touch device (iOS/Android): the provider skips Web Audio and draws from stored peaks.
+// jsdom has no matchMedia, so tests run as desktop unless they call this.
+function asTouch() {
+  vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", addEventListener() {}, removeEventListener() {} }));
+}
+
 describe("PlayerProvider", () => {
-  it("plays the signed R2 URL directly on a CORS-enabled audio element", async () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("desktop: plays on a CORS-enabled audio element and never fetches peaks", async () => {
     const { container } = renderPlayer();
     await userEvent.click(screen.getByText("play"));
     await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
     // crossOrigin is what lets Web Audio read the signal for the waveform/particles.
     expect(container.querySelector("audio")?.crossOrigin).toBe("anonymous");
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("playing"));
+    fireEvent(container.querySelector("audio")!, new Event("playing"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
   });
 
-  it("skips CORS mode on touch devices so a plain <audio> keeps playing in the background", async () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", addEventListener() {}, removeEventListener() {} }));
-    try {
-      const { container } = renderPlayer();
-      await userEvent.click(screen.getByText("play"));
-      await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
-      expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+  it("touch: plays on a plain audio element (no CORS mode, so background playback survives)", async () => {
+    asTouch();
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    expect(container.querySelector("audio")?.hasAttribute("crossorigin")).toBe(false);
   });
+
+  it("touch: gives effects a level reader once the track's peaks load", async () => {
+    asTouch();
+    vi.mocked(getTrackPeaksUrl).mockResolvedValue({ url: "https://signed.example/peaks", error: null });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(10).buffer })));
+    function Meter() {
+      return <span data-testid="meter">{useAudioMeter() ? "on" : "off"}</span>;
+    }
+    const { container } = renderWithTheme(<PlayerProvider><Harness /><Meter /></PlayerProvider>);
+    expect(screen.getByTestId("meter")).toHaveTextContent("off");
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    act(() => { fireEvent(container.querySelector("audio")!, new Event("playing")); });
+    await waitFor(() => expect(screen.getByTestId("meter")).toHaveTextContent("on"));
+    expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1");
+  });
+
+  it("touch: waits for 'playing' before requesting peaks, so skipped tracks never request them", async () => {
+    asTouch();
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t1"));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(container.querySelector("audio")?.getAttribute("src")).toBe("https://signed.example/t2"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
+    act(() => { fireEvent(container.querySelector("audio")!, new Event("playing")); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledWith("t2"));
+    expect(getTrackPeaksUrl).not.toHaveBeenCalledWith("t1");
+  });
+
+  it("touch: going back to the last track that played waits for its 'playing' again", async () => {
+    asTouch();
+    const { container } = renderPlayer();
+    const audio = () => container.querySelector("audio")!;
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(audio().getAttribute("src")).toBe("https://signed.example/t1"));
+    act(() => { fireEvent(audio(), new Event("playing")); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByText("next"));
+    await waitFor(() => expect(audio().getAttribute("src")).toBe("https://signed.example/t2"));
+    await userEvent.click(screen.getByText("prev"));
+    await waitFor(() => expect(screen.getByTestId("title")).toHaveTextContent("One"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).toHaveBeenCalledTimes(1);
+  });
+  it("touch: requests the stream URL before the peaks URL, and peaks wait for the stream URL to resolve", async () => {
+    asTouch();
+    let resolveStream: (v: { url: string; error: null }) => void = () => {};
+    mockGet.mockImplementation((id: string) =>
+      id === "t1" ? new Promise((r) => { resolveStream = r; }) : Promise.resolve({ url: `https://signed.example/${id}`, error: null }),
+    );
+    renderPlayer();
+    await userEvent.click(screen.getByText("play"));
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith("t1"));
+    await act(async () => { await Promise.resolve(); });
+    expect(getTrackPeaksUrl).not.toHaveBeenCalled();
+    await act(async () => { resolveStream({ url: "https://signed.example/t1", error: null }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("playing"));
+    act(() => { fireEvent(document.querySelector("audio")!, new Event("playing")); });
+    await waitFor(() => expect(getTrackPeaksUrl).toHaveBeenCalledWith("t1"));
+    expect(mockGet.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(getTrackPeaksUrl).mock.invocationCallOrder[0]);
+  });
+
   it("playQueue sets the current track and requests its signed URL", async () => {
     renderPlayer();
     await userEvent.click(screen.getByText("play"));

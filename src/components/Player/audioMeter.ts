@@ -5,7 +5,8 @@ import { createContext, useContext, useEffect, useRef, useCallback, useState, ty
  * AudioContext (createMediaElementSource) makes iOS stop the sound as soon as
  * Safari is backgrounded, and Android is inconsistent and burns battery. A plain
  * media element keeps playing in the background, so phones/tablets skip the
- * analyser (and `crossOrigin`) entirely; the waveform shows its idle dots.
+ * analyser (and `crossOrigin`) entirely and draw from the track's stored peaks
+ * instead (./peaks.ts, wired in PlayerProvider).
  */
 export function isTouchDevice(): boolean {
   if (typeof window === 'undefined') return false;
@@ -25,8 +26,9 @@ export function useAudioMeterSource(audioRef: RefObject<HTMLAudioElement | null>
   const meter = useRef<{ context: AudioContext; analyser: AnalyserNode; source: MediaElementAudioSourceNode; bytes: Uint8Array<ArrayBuffer> } | null>(null);
   const level = useRef(0);
   const lastRead = useRef(-Infinity);
-  // Server: false. Client: decided once at mount; only feeds context values,
-  // never markup, so there is no hydration mismatch.
+  // Server: true (no window, so not a touch device). Client: decided once at
+  // mount; only feeds context values and an effect, never markup, so there is
+  // no hydration mismatch.
   const [supported] = useState(() => !isTouchDevice());
 
   const enable = useCallback(() => {

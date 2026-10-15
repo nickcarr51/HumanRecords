@@ -1,7 +1,9 @@
 # Reference: The publish / upload flow
 
 Files: `src/components/Upload/upload-engine.ts` (browser), `src/lib/admin/actions.ts`
-(server), `src/lib/storage/sign.ts` (R2), `src/lib/admin/rules.ts` (limits).
+(server), `src/lib/storage/sign.ts` (R2), `src/lib/admin/rules.ts` (limits), `src/lib/peaks/{compute,format}.ts`
+(waveform), `src/lib/admin/peaks-actions.ts` and `src/components/AdminReleases/AnalyzeWaveforms.tsx`
+(re-analyze).
 
 ## Sequence (`runPublish(state, deps)`)
 
@@ -13,14 +15,47 @@ Files: `src/components/Upload/upload-engine.ts` (browser), `src/lib/admin/action
    other track needs uploading.
 5. If any: `createUploadUrls([{clientId, name, size}])`. Server: role check; 1–50 files;
    each passes `audioFileError`; mints `tracks/<randomUUID>.mp3` and a presigned PUT per
-   file. Client checks the returned targets are exactly the requested `clientId`s.
+   file, plus a `peaksUrl` (presigned PUT for `peaks/<same uuid>.bin`, signed with
+   `application/octet-stream`) on each target (`UploadTarget`). Client checks the returned targets are exactly the requested `clientId`s.
 6. `runPool(targets, 2, …)`: for each target, `uploadStarted` → `putFile` (XHR PUT with
-   `Content-Type: audio/mpeg`, progress → `uploadProgress`) → `uploadDone(key)`. On a PUT
+   `Content-Type: audio/mpeg`, progress → `uploadProgress`) → `storePeaks` → `uploadDone(key)`. On a PUT
    failure: `uploadFailed("Upload failed.")`, no new uploads start, in-flight ones finish.
+   **After a successful MP3 PUT**, `deps.storePeaks(file, target.peaksUrl)` decodes the file in
+   the browser (`computePeaks`, `OfflineAudioContext`) and PUTs the 50-bytes-per-second loudness
+   file. It is best-effort and never throws: a failure is ignored (`uploadDone` still fires,
+   publish still succeeds) and the track just shows idle dots on touch devices until Analyze all.
+   Because `uploadDone` waits for it, the bar sits at 100% with no "analyzing…" text while the
+   decode runs, and the lane waits on the page-wide decode queue (deferred, owner 2026-10-14;
+   see [[waveform]] Known gaps). `uploadOne` behaves the same: it returns the key only after
+   `storePeaks`.
 7. `publishRelease(buildPayload(state, keys))`. Server: role check; runtime shape check;
    ≤ 50 tracks; every `audioKey` a string matching `AUDIO_KEY_RE`, no duplicates; `HEAD`
    each key (missing or size ≤ 0 → "didn't finish uploading"; > 50 MB → rejected);
    `rpc("publish_release")`; `revalidatePath("/feed")`; `redirect("/feed")`.
+
+## Peaks (stored waveform)
+
+The player's waveform and button particles read `peaks/<id>.bin` ([[media-storage]]
+`References/object-keys.md#peaks-files`). Three paths write it, all from the admin browser, all
+best-effort, all using the same `storePeaks`:
+
+- `runPublish` (new releases), after each MP3 PUT.
+- `uploadOne` (`src/components/AdminReleases/upload-one.ts`, used by `ReplaceAudio` and
+  `AddTrackForm`), after the MP3 PUT; a peaks failure never fails add-track / replace-audio.
+- **Analyze all** on `/admin/releases/[id]` (`AnalyzeWaveforms`), for tracks with no peaks
+  (everything uploaded before this feature) or to redo them. `getPeaksStatus(trackIds)` HEADs each
+  live track's peaks key; per track, sequentially, `getPeaksJob(trackId)` returns a signed
+  MP3 GET (`audioUrl`) and a signed peaks PUT (`peaksUrl`), minted per track so the 15-minute
+  PUT can't expire mid-run. The browser fetches the MP3, `storePeaks` it, and the row flips to
+  "analyzed". Re-running overwrites in place (rows that already have peaks are redone too). Late
+  status responses are ignored and the run stops after unmount. Status is keyed on each track's
+  id + `audioKey` (`AdminTrack.audioKey`, `src/lib/admin/releases.ts`): after Replace MP3 the
+  page refreshes with the same id and a new key, and that row is re-checked. Rows show the
+  title only (no `HSS###`, accepted). Both actions check `label_member` first (server actions
+  are callable directly). End-to-end: [[waveform]].
+
+The peaks key is derived from the audio key, never stored: no DB column, no migration, and
+`publishRelease` does not HEAD or require it. Prod rule: PUT/overwrite only, never delete.
 
 ## Key format and why it's checked
 
@@ -40,7 +75,8 @@ operation on that one key until it expires — no credentials in the browser.
 `allHeaders` is needed because aws4fetch doesn't sign `Content-Type` by default; with it
 signed, the browser **must** send exactly `audio/mpeg` or R2 answers
 `SignatureDoesNotMatch`. `putFile` always sends `AUDIO_CONTENT_TYPE` (not `File.type`,
-which varies by OS).
+which varies by OS). The peaks PUT is signed with `PEAKS_CONTENT_TYPE`
+(`application/octet-stream`) and `storePeaks` sends exactly that.
 
 ## HEAD verification
 
@@ -66,6 +102,7 @@ can make publish slow before it fails.
 | `createUploadUrls` error (role, bad file, signing) | banner with the error | nothing | nothing |
 | `createUploadUrls` / `publishRelease` rejects (network, server crash) | "Couldn't reach the server. Publish again to retry." | nothing | maybe objects |
 | Returned targets don't match | "Couldn't prepare the upload." | nothing | nothing |
+| A peaks PUT or its decode fails | nothing (best-effort); the track shows idle dots on touch devices; run Analyze all later | nothing | MP3 stays, no peaks file |
 | A PUT fails (CORS, signature, offline, 4xx/5xx) | red progress + "Upload failed." on that track; banner "Some files didn't upload. Publish again to retry." | nothing | uploaded siblings stay |
 | Bad/duplicate key, > 50 tracks, malformed payload | "Invalid audio file reference." / "Too many tracks." / "Invalid release." | nothing | objects stay |
 | HEAD missing / zero / too big / throws | see HEAD section | nothing | objects stay |
@@ -80,10 +117,12 @@ navigation isn't mistaken for a failure.
 The browser PUTs cross-origin to the R2 endpoint, so every bucket needs a CORS rule or every
 upload fails at the PUT step (the preflight is rejected). One rule per bucket, pasted by the user
 into Cloudflare -> R2 -> bucket -> Settings -> CORS policy. The source of truth is
-`infra/r2/cors.{local,dev,prod}.json` (`GET`, `HEAD`, `PUT` with `content-type`). Uploads need
-only `PUT`; `GET`/`HEAD` exist for the CORS-mode `<audio>` element (`crossOrigin="anonymous"`,
-see [[media-storage]]). Downloads (navigation) and artwork (`<img>`) don't need CORS — see
-`infra/r2/README.md`.
+`infra/r2/cors.{local,dev,prod}.json` (`GET`, `HEAD`, `PUT` with `content-type`). Uploads (MP3 and
+peaks) need `PUT` with `content-type`; `GET` is needed by Analyze all (it `fetch`es the MP3 in the
+admin browser) and by the player's peaks `fetch` (see [[media-storage]]). The desktop `<audio>`
+element uses `crossOrigin="anonymous"` (live analyser) and so needs the same `GET` rule; the touch
+element is plain and needs no CORS. Downloads (navigation) and artwork
+(`<img>`) don't need CORS — see `infra/r2/README.md`. The stored-peaks work changed no CORS rule.
 
 Status: applied to all three buckets 2026-10-06 (prod updated 2026-10-09; `GET`/`HEAD` added to
 all three 2026-10-11); the exact rules live in

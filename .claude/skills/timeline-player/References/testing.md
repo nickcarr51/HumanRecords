@@ -6,17 +6,21 @@
 React Testing Library). jsdom has no media playback, so `beforeAll` stubs
 `HTMLMediaElement.prototype.play/pause/load`. `getTrackStreamUrl` and the feed actions are
 mocked. A small `Harness` component drives the actions through `usePlayer()`. Covers:
-`toPlayerTrack` fallback; **"plays the signed R2 URL directly on a CORS-enabled audio
-element"** (asserts `audio.src` is exactly the mocked signed URL and `audio.crossOrigin ===
-"anonymous"` — the guard against anyone reintroducing a proxy route or dropping
-`crossOrigin`); `playQueue` sets current + requests signed URL; `next` advances + re-signs;
+`toPlayerTrack` fallback; the exact-signed-URL tests (assert `audio.src` is exactly the mocked signed URL — the guard
+against anyone reintroducing a proxy route): **"desktop: plays on a CORS-enabled audio element
+and never fetches peaks"** (asserts `crossOrigin === "anonymous"`) and the **"touch:"** tests
+(stub `matchMedia` `(pointer: coarse)` via the `asTouch()` helper; assert no `crossorigin`, so
+background playback survives, and that peaks load). jsdom has no `matchMedia`, so tests run as
+desktop unless they call `asTouch()`; `playQueue` sets current + requests signed URL; `next` advances + re-signs;
 `ended` auto-advances; `next()` at the end of a queue that can't extend is a no-op; `prev()`
 back-nav; signing error → `status:"error"` (never stuck on loading); a rejected action call
 treated as a signing error; autoplay-block → off loading; `toggle()` plays; `toggle()` no-op
-+ `src` cleared after an error; superseded `moveTo`/`play()` races. The Web Audio meter is
-**not** exercised here: jsdom has no `AudioContext`, so `useAudioMeterSource.enable` returns
-early on its `typeof AudioContext === 'undefined'` check. There is no test of the analyser
-graph; verify waveform/particles in a browser.
++ `src` cleared after an error; superseded `moveTo`/`play()` races. The touch
+meter is covered by "gives effects a level reader once the track's peaks load" (mocks
+`getTrackPeaksUrl`, under `asTouch()`), and the pure readers (`levelAt`, `shimmer`, `loadPeaks`, `usePeaks`,
+`usePeakReaders`) by `src/components/Player/peaks.test.tsx`. jsdom has no `AudioContext`, so
+the desktop analyser's `enable()` is a no-op in tests (`readLevel` / `readWaveform` are
+non-null); there is no Web Audio to mock. Verify the particle look in a browser.
 
 **PlayerBar** — `src/components/Player/PlayerBar.test.tsx` (unit). Mocks **both**
 `usePlayer` and `usePlayerTime` (`vi.mock("./PlayerProvider", () => ({ usePlayer: vi.fn(),
@@ -116,7 +120,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 Render through `renderWithTheme` (`src/test/renderWithTheme.tsx`; `{ dark: true }` for the amber
 theme) — `PixelWaveform`, `PlaybackButton`, `PixelAccordion` and `SweepIcon` all read the theme.
-`AudioContext` is never stubbed: the meter stays off in tests and the canvas components receive
+jsdom has no `AudioContext` and none needs stubbing (desktop `enable()` is a no-op; touch reads stored peaks): the canvas components receive
 their samplers through `AudioMeterContext` / `AudioWaveformContext` providers instead.
 
 ## What is deliberately NOT tested (agreed scope)
@@ -124,7 +128,7 @@ their samplers through `AudioMeterContext` / `AudioWaveformContext` providers in
 Pure presentational render tests for `SingleTrackRow`/`AlbumRow` layout and `AppShell`'s
 player mount are intentionally skipped — the player state machine, the feed queue logic, and
 the data layer carry the meaningful coverage. `AppShell.test.tsx` covers only the
-label-member Admin nav link ([[admin-upload]]). The Web Audio graph, the particle look, and
+label-member Admin nav link ([[admin-upload]]). The particle look and
 iOS lock-screen behaviour (never worked; cause unknown) are browser/device checks, not unit tests.
 If you add feature logic to these components, add tests for the logic (not just render).
 
@@ -138,5 +142,6 @@ If you add feature logic to these components, add tests for the logic (not just 
   environment, not a regression).
 - Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files,
   so a pre-existing `tsc --noEmit` error in `actions.test.ts` does not break the build).
-- Playback itself (CORS, meter, lock screen) needs a browser against a bucket with the CORS
-  rule applied: `yarn dev` + the local bucket (`infra/r2/README.md`).
+- Playback itself (desktop live meter, touch waveform with real peaks, lock screen) needs a real
+  browser against a bucket with the CORS `GET` rule applied (desktop playback is CORS mode; the
+  touch peaks fetch is cross-origin): `yarn dev` + the local bucket (`infra/r2/README.md`).

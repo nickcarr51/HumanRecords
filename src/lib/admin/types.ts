@@ -11,7 +11,7 @@ export type ReleasePayload = {
 export type ArtistMatch = { id: string; name: string };
 export type ArtistSearchResult = { artists: ArtistMatch[]; error: string | null };
 export type UploadRequest = { clientId: string; name: string; size: number };
-export type UploadTarget = { clientId: string; key: string; url: string };
+export type UploadTarget = { clientId: string; key: string; url: string; peaksUrl: string };
 export type UploadUrlsResult =
   | { targets: UploadTarget[]; error: null }
   | { targets: null; error: string };

@@ -1,6 +1,6 @@
 ---
 name: media-storage
-description: Use when working with audio or image files in Cloudflare R2 — signing stream, download, image, or upload URLs (`src/lib/storage/sign.ts`), the `getTrackStreamUrl` / `getTrackDownloadUrl` server actions (`src/lib/storage/actions.ts`), R2 env config (`config.ts`, `R2_*` vars), `headObject`, recording downloads with the service-role client, the download filename (`filename.ts`: `downloadFilename`, `extFromKey`, `Content-Disposition`/`filename*`), object-key conventions for `audio_url` / `*_art_url`, `r2_cleanup_queue`, or R2 CORS (`infra/r2/cors.*.json`, GET/HEAD/PUT per bucket — the `<audio>` element loads with `crossOrigin="anonymous"` so Web Audio can read the signal). Also when playback fails with a CORS error, the waveform is flat while audio plays, a link returns 403/SignatureDoesNotMatch, a signed URL expires mid-track, a download has the wrong name or altered bytes/ID3 tags, "Missing R2 env vars" is thrown, or someone proposes proxying audio through an API route.
+description: Use when working with audio or image files in Cloudflare R2 — signing stream, download, image, or upload URLs (`src/lib/storage/sign.ts`), the `getTrackStreamUrl` / `getTrackDownloadUrl` / `getTrackPeaksUrl` server actions (`src/lib/storage/actions.ts`), R2 env config (`config.ts`, `R2_*` vars), `headObject`, recording downloads with the service-role client, the download filename (`filename.ts`: `downloadFilename`, `extFromKey`, `Content-Disposition`/`filename*`), object-key conventions for `audio_url` / `*_art_url` and the derived `peaks/<id>.bin` waveform file (`peaksKeyFor`, `src/lib/peaks/format.ts`; `getPeaksJob`), `r2_cleanup_queue`, or R2 CORS (`infra/r2/cors.*.json`, GET/HEAD/PUT per bucket — the desktop `<audio>` element uses `crossOrigin="anonymous"` for the live meter, touch does not; CORS `GET` is also needed for the touch peaks `fetch` and the admin MP3 fetch, and `PUT` with `content-type` for uploads; the waveform end to end is the `waveform` skill). Also when a link returns 403/SignatureDoesNotMatch, a signed URL expires mid-track, a download has the wrong name or altered bytes/ID3 tags, "Missing R2 env vars" is thrown, or someone proposes proxying audio through an API route.
 ---
 
 # Media Storage (Cloudflare R2)
@@ -32,27 +32,29 @@ importing either from a client component is a build error. Actions always return
 44.1 kHz, ID3 incl. art) before upload and DJs rely on them. Only the saved filename changes.
 Verified byte-identical (SHA-256) on 2026-10-10 through `signUploadUrl` then `signDownloadUrl`.
 
-## Audio goes R2 → browser directly, in CORS mode
+## Audio goes R2 → browser directly, (plain request on touch, CORS on desktop)
 
 The signed stream URL is set straight on the app's single `<audio>` element
-(`PlayerProvider.tsx`), which has `crossOrigin="anonymous"` **on desktop only** (touch devices
-skip it so a plain element keeps playing in the background on iOS; see [[timeline-player]]
-"Desktop only"). That attribute is what lets Web
-Audio (`audioMeter.ts`: one `AudioContext` + `AnalyserNode` on a `MediaElementAudioSourceNode`)
-read the signal for the player waveform (`PixelWaveform`) and the button particles
-(`PlaybackButton`). Without it the media is "tainted" and the analyser reads silence.
+(`PlayerProvider.tsx`). On **desktop** the element gets `crossOrigin="anonymous"` (set by an effect in
+`PlayerProvider`) because the live Web Audio analyser needs it; the existing bucket `GET`
+rule covers it. On **touch devices** it has **no `crossOrigin`** and is never routed through an
+`AudioContext` (that silenced iOS background playback; see [[timeline-player]]), so the media
+request is not CORS and playback does not depend on the bucket's CORS policy.
 
-Consequence: **playback itself now depends on the bucket's CORS policy.** A CORS-mode media
-request needs `Access-Control-Allow-Origin` on the response; a bucket that doesn't allow `GET`
-from the site origin returns none, and the browser refuses the media entirely (`error` event →
-player error state), even though the same signed URL opens fine in a new tab. Downloads
-(top-level navigation to the signed URL) and `<img>` artwork are not CORS requests and don't need
-it. Each bucket therefore allows `GET`, `HEAD`, `PUT` from exactly its own site origin —
-policy JSON, paste location, and rollout order in [object-keys.md](References/object-keys.md#cors).
+On touch devices the waveform reads a precomputed loudness file instead of the live analyser:
+`peaks/<id>.bin` next to `tracks/<id>.mp3` (key derived by `peaksKeyFor`, never stored, no DB
+column; storage rules in [object-keys.md](References/object-keys.md#peaks-files); end-to-end in
+[[waveform]]). The player gets a signed GET from `getTrackPeaksUrl(trackId)` and `fetch`es it,
+which **is** a cross-origin request, so each bucket allows `GET` from its own site origin (a
+missing rule leaves the touch waveform on idle dots, and breaks desktop playback). The admin pages also `fetch` the MP3
+(Analyze all) and `PUT` peaks files with a `content-type` header. Downloads (top-level
+navigation to the signed URL) and `<img>` artwork are not CORS requests. Each bucket allows
+`GET`, `HEAD`, `PUT` from exactly its own site origin — policy JSON, paste location, and
+rollout order in [object-keys.md](References/object-keys.md#cors).
 
 **There is no server-side audio proxy, and don't add one.** A same-origin `/api/tracks/[id]/stream`
 route (commit `4beeed1`) was tried and removed on `feat/playback-vector-icons`: it would have made
-R2 CORS irrelevant, but every byte of audio would then flow through a Vercel function — metered
+R2 CORS irrelevant for the peaks fetch, but every byte of audio would then flow through a Vercel function — metered
 bandwidth instead of R2's free egress, function duration limits on long tracks and range
 requests, and a presigned URL minted only to be consumed server-side. Bucket CORS is the
 intended fix; the R2 free egress is the reason the architecture is presigned URLs at all.
@@ -66,14 +68,16 @@ intended fix; the R2 free egress is the reason the architecture is presigned URL
 | Session-gated server actions | `src/lib/storage/actions.ts` (`getTrackStreamUrl`, `getTrackDownloadUrl`) |
 | Download filename (pure) | `src/lib/storage/filename.ts` (`downloadFilename`, `extFromKey`) |
 | Download button (client) | `src/components/Downloads/DownloadButton.tsx` (calls `getTrackDownloadUrl`) |
-| The `<audio>` element (`crossOrigin="anonymous"`) + Web Audio analyser | `src/components/Player/PlayerProvider.tsx`, `src/components/Player/audioMeter.ts` ([[timeline-player]]) |
+| The `<audio>` element + meter (desktop live `useAudioMeterSource`; touch stored-peaks `usePeaks`, `usePeakReaders`) | `src/components/Player/PlayerProvider.tsx`, `src/components/Player/peaks.ts`, `src/components/Player/audioMeter.ts` (contexts) ([[timeline-player]]) |
+| Peaks key + format (`PEAKS_PER_SECOND`, `PEAKS_CONTENT_TYPE`, `peaksKeyFor`) and browser compute/store (`computePeaks`, `storePeaks`) | `src/lib/peaks/format.ts`, `src/lib/peaks/compute.ts` ([[admin-upload]]) |
+| Peaks signing: `getTrackPeaksUrl` (listener GET), `getPeaksStatus` / `getPeaksJob` (admin HEAD / GET+PUT) | `src/lib/storage/actions.ts`, `src/lib/admin/peaks-actions.ts` |
 | Service-role client (download recording) | `src/lib/supabase/service.ts` |
 | Upload-side actions (presigned PUT + HEAD) | `src/lib/admin/actions.ts`; replace/add-track in `src/lib/admin/release-actions.ts` ([[admin-upload]]) |
 | Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
 | CORS policy per bucket (GET/HEAD/PUT, exact origins) | `infra/r2/cors.{local,dev,prod}.json` + status table in `infra/r2/README.md`; applied by pasting into the Cloudflare dashboard, no CLI |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
 | Keys that may be deletable later | `r2_cleanup_queue` table (service-role only; see [[content-lifecycle]]) |
-| Tests | `src/lib/storage/{config,sign,actions,filename}.test.ts`; `PlayerProvider.test.tsx` asserts `crossOrigin` |
+| Tests | `src/lib/storage/{config,sign,actions,filename}.test.ts`; `PlayerProvider.test.tsx` asserts `crossOrigin` is `anonymous` on desktop and absent on touch; `src/lib/peaks/*.test.ts`, `src/components/Player/peaks.test.tsx` |
 
 ## References
 
@@ -90,10 +94,10 @@ intended fix; the R2 free egress is the reason the architecture is presigned URL
 
 | Symptom | Cause / first check |
 |---|---|
-| Plays on desktop `localhost`, not on a phone at `http://192.168.x.x:3000` | Different origin; the local bucket allows only `localhost`/`127.0.0.1`. Add the LAN origin to the local bucket's CORS policy in the dashboard (don't commit it). |
-| Media error / nothing plays after a CORS edit (status `error` right after load; the signed URL opens fine in a new tab) | The bucket's CORS policy no longer allows `GET` (and `HEAD`) from the site origin, or the origin is wrong (scheme, host, or port must match exactly — no trailing slash). The `<audio>` element requests in CORS mode, so a missing `Access-Control-Allow-Origin` is fatal. Compare the live policy with `infra/r2/cors.<env>.json`, re-paste, hard-reload (`MaxAgeSeconds: 3600` caches the preflight). |
-| Track plays locally but not on develop/prod after a deploy | Same check, for that environment's bucket: Cloudflare → R2 → `humanrecords-media-dev`/`-prod` → Settings → CORS Policy must match `cors.dev.json`/`cors.prod.json` (the dev policy allows only `https://humanservices-dev.vercel.app`). Then confirm that deployment's `R2_BUCKET_NAME` points at that bucket. |
-| Waveform flat / particles still, but audio plays | On a phone or tablet this is by design (no Web Audio on touch devices). On desktop, Web Audio isn't reading the signal: `crossOrigin="anonymous"` missing from the `<audio>` element (`enable()` in `audioMeter.ts` bails if it isn't exactly `"anonymous"`), or the `AudioContext` is still `suspended` because `enable()` wasn't called from a user gesture (`playQueue`/`play` call it; `readLevel`/`readWaveform` return 0/`null` unless `context.state === "running"`). |
+| Testing from another device at `http://192.168.x.x:3000`: a desktop browser won't play, a phone plays but shows idle dots | Different origin; the local bucket allows only `localhost`/`127.0.0.1`. Desktop playback is CORS mode, touch only `fetch`es peaks cross-origin. Add the LAN origin to the local bucket's CORS policy in the dashboard (don't commit it). |
+| Waveform stays idle after a CORS edit, but audio plays | The bucket's CORS policy no longer allows `GET` from the site origin, or the origin is wrong (scheme, host, or port must match exactly — no trailing slash), so the peaks `fetch` is refused. (Touch playback is not CORS mode and keeps working; on desktop a missing `GET` rule also breaks playback and the live meter. A track that *won't* play is a signing/object problem: check `getTrackStreamUrl`.) Compare the live policy with `infra/r2/cors.<env>.json`, re-paste, hard-reload (`MaxAgeSeconds: 3600` caches the preflight). |
+| Track plays locally but not on develop/prod after a deploy | Check that environment's bucket (object present, `R2_BUCKET_NAME`; for a missing waveform also its CORS): Cloudflare → R2 → `humanrecords-media-dev`/`-prod` → Settings → CORS Policy must match `cors.dev.json`/`cors.prod.json` (the dev policy allows only `https://humanservices-dev.vercel.app`). Then confirm that deployment's `R2_BUCKET_NAME` points at that bucket. |
+| Waveform flat / particles still, but audio plays | Touch: usually no `peaks/<id>.bin` (run **Analyze all** on `/admin/releases/[id]`), else the CORS `GET` row above. Desktop: not a CORS problem (that stops playback); the analyser didn't start. Full split: [[waveform]] Troubleshooting. |
 | 403 `SignatureDoesNotMatch` | For uploads: the browser sent a different `Content-Type` than the one signed (see signing.md). For GETs: the URL was altered after signing (any query param is covered), the `R2_*` key pair doesn't match the bucket, or the clock is far off. Re-mint; never hand-edit a signed URL. |
 | 403 with `Request has expired` / playback dies mid-track | Stream TTL is 2 h and the player re-signs anything older than 1 h; a page left open longer plays until the next track load. Downloads expire in 5 min — never pre-fetch them. |
 | 404 from the signed URL | Signing never checks the object exists. The key isn't in `R2_BUCKET_NAME` (local seed objects live only in `-local`; run `yarn r2:seed-local`). |
@@ -108,8 +112,8 @@ intended fix; the R2 free egress is the reason the architecture is presigned URL
 
 - [[content-lifecycle]] — decides which keys are queued for cleanup and when they may be deleted.
 
-Used by: [[timeline-player]] (player calls `getTrackStreamUrl`; owns the `<audio>` element and
-Web Audio meter), [[admin-upload]] (`signUploadUrl`, `headObject`).
+Used by: [[waveform]] (peaks key, `getTrackPeaksUrl`, CORS), [[timeline-player]] (player calls `getTrackStreamUrl` and `getTrackPeaksUrl`; owns the `<audio>` element and
+the meter), [[admin-upload]] (`signUploadUrl`, `headObject`, peaks upload and Analyze all).
 
 ## Known deferrals (as of 2026-10-11)
 
@@ -118,9 +122,11 @@ Web Audio meter), [[admin-upload]] (`signUploadUrl`, `headObject`).
   `src/app/(app)/albums/[id]/page.tsx`). Downloads are wired: `DownloadButton` on feed and album track rows ([[timeline-player]]).
 - No artwork upload; art columns are null in practice (fixtures may set keys), so image signing is unused.
 - Orphaned objects (failed uploads, retried add/replace) are not cleaned up. `r2_cleanup_queue` records archived and replaced keys; the job that reads it is not built ([[content-lifecycle]]).
-- CORS is applied to all three buckets (2026-10-11, GET/HEAD/PUT). It must be re-pasted after any
-  origin change (domain cut-over, new preview host) and **before** a code change that depends on
-  it deploys to that environment.
+- CORS is applied to all three buckets (2026-10-11, GET/HEAD/PUT) and is unchanged by the
+  stored-peaks work. It must be re-pasted after any origin change (domain cut-over, new
+  preview host) and **before** a code change that depends on it deploys to that environment.
+- Peaks files are PUT/overwritten only, never deleted (prod is locked). Replacing a track's
+  MP3 mints a new id, so the old `peaks/<oldid>.bin` is orphaned like the old MP3.
 - Orphan cleanup must never delete from the prod bucket (lock + soft-delete rule above); the future job runs only where deletion is allowed.
 
 A code guide is in `Walkthrough/walkthrough.md` (gitignored).

@@ -44,6 +44,9 @@ Delete an object only if **all** hold: the row is uncleaned, `queued_at` is 30+ 
 never run against the locked prod bucket unless the lock is deliberately lifted in Cloudflare.
 Until then nothing deletes from R2.
 
+Each `tracks/<id>.mp3` also has a derived `peaks/<id>.bin` waveform file (`media-storage`
+`References/object-keys.md`); the job should delete it alongside the MP3, wherever deletion is allowed (never prod).
+
 The job must lock the owning release row (or re-check `archived_at` on the source row) before
 deleting a key; otherwise a restore that runs between the job's check and its delete brings a
 release back with a missing file.

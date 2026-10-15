@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentRole } from "@/lib/auth/role";
+import { PEAKS_CONTENT_TYPE, peaksKeyFor } from "@/lib/peaks/format";
 import { createClient } from "@/lib/supabase/server";
 import { escapeLike } from "@/lib/supabase/artists";
 import type { Json } from "@/lib/supabase/database.types";
@@ -68,7 +69,14 @@ export async function createUploadUrls(files: UploadRequest[]): Promise<UploadUr
     const targets = await Promise.all(
       files.map(async (f) => {
         const key = `tracks/${randomUUID()}.mp3`;
-        return { clientId: f.clientId, key, url: await signUploadUrl(key, AUDIO_CONTENT_TYPE) };
+        // Minted just above, so it always has a peaks key.
+        const peaksKey = peaksKeyFor(key) as string;
+        return {
+          clientId: f.clientId,
+          key,
+          url: await signUploadUrl(key, AUDIO_CONTENT_TYPE),
+          peaksUrl: await signUploadUrl(peaksKey, PEAKS_CONTENT_TYPE),
+        };
       }),
     );
     return { targets, error: null };

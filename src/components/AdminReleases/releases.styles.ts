@@ -84,3 +84,11 @@ export const HeaderRow = styled.div`
   align-items: center;
   gap: ${({ theme }) => theme.space.md};
 `;
+
+export const PlainList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: ${({ theme }) => theme.space.xs};
+`;

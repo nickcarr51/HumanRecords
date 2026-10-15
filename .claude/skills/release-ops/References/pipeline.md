@@ -47,7 +47,7 @@ string, percent-encoded.
 ## Approving a prod deploy
 
 Before merging (develop or main): if the change alters what the browser requests from R2 (e.g.
-`crossOrigin` media, a new method or header), the owner applies that env's
+a `fetch` of an R2 URL from a new origin, a new method or header), the owner applies that env's
 `infra/r2/cors.<env>.json` in Cloudflare **first** and updates the status table in
 `infra/r2/README.md`; the deploy hook does not touch bucket CORS.
 

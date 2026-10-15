@@ -25,14 +25,24 @@ Never throws to the client. Error strings are fixed and user-safe:
 4. `{ url, error: null }`.
 
 Caller: `PlayerProvider`'s load-and-play effect ([[timeline-player]]). It sets
-`audio.src = url` on the app's single `<audio preload="metadata" crossOrigin="anonymous">`
-element — the bytes go R2 → browser directly, there is no proxy route in between. Because the
-element requests in CORS mode (so Web Audio can read the signal for the waveform/particles), the
-bucket's CORS policy must allow `GET`/`HEAD` from the site origin or the `error` event fires and
-the player shows its error state even with a valid URL
-([object-keys.md](object-keys.md#cors)). On `{ error }` from the action it clears `src` and
+`audio.src = url` on the app's single `<audio preload="metadata">`
+element — the bytes go R2 → browser directly, there is no proxy route in between. On desktop the
+element has `crossOrigin="anonymous"` (live analyser), so playback is a CORS request and needs
+the bucket's `GET` rule; on touch it has none, so playback is not CORS and doesn't depend on
+the policy (the touch waveform's peaks `fetch` does; see `getTrackPeaksUrl` below and
+[object-keys.md](object-keys.md#cors)). On `{ error }` from the action it clears `src` and
 shows the error state. The provider also pre-signs the *next* track (`presignedRef`) and re-signs
 anything older than `PRESIGN_MAX_AGE_MS` (1 h) so a URL can't expire mid-track.
+
+## `getTrackPeaksUrl(trackId)`
+
+Same session check and archived check as `getTrackStreamUrl` (both go through the shared
+`liveAudioKey(trackId)` helper). Then `peaksKeyFor(audio_url)` (`src/lib/peaks/format.ts`) and
+`signStreamUrl(peaksKey)`. A key that isn't `tracks/<id>.mp3` returns `{ url: null, error: null }`.
+The object may not exist (never analyzed): the signed URL then 404s on `fetch` and the caller
+shows idle dots. Caller: `loadPeaks` in `src/components/Player/peaks.ts` ([[timeline-player]]).
+The admin counterparts (`getPeaksStatus`, `getPeaksJob`) live in `src/lib/admin/peaks-actions.ts`
+([[admin-upload]]).
 
 ## `getTrackDownloadUrl(trackId)`
 

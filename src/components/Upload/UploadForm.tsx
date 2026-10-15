@@ -13,6 +13,7 @@ import { ArtistCombobox } from './ArtistCombobox';
 import { KindToggle } from './KindToggle';
 import { TrackWidget } from './TrackWidget';
 import { putFile, runPublish } from './upload-engine';
+import { storePeaks } from '@/lib/peaks/compute';
 import {
   createInitialState,
   isDirty,
@@ -66,7 +67,7 @@ export function UploadForm() {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      await runPublish(state, { createUploadUrls, putFile, publishRelease, dispatch });
+      await runPublish(state, { createUploadUrls, putFile, storePeaks, publishRelease, dispatch });
     } finally {
       inFlight.current = false;
     }
