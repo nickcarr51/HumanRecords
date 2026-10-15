@@ -1,18 +1,17 @@
 'use client';
 
 import styled from 'styled-components';
+import { centeredColumn } from '@/components/field/centeredColumn';
 import { GlitchArt } from '@/components/GlitchArt/GlitchArt';
 
 export const Page = styled.div`
   flex: 1;
   min-height: 0;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: ${({ theme }) => theme.space.lg};
+  /* Full-width scroller (scrollbar at the screen edge), 672px content column. */
+  ${centeredColumn('672px')}
+  padding-block: ${({ theme }) => theme.space.lg};
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
   overflow-y: auto;
 `;
 

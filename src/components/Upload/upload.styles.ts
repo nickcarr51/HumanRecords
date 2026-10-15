@@ -1,6 +1,7 @@
 'use client';
 
 import styled from 'styled-components';
+import { centeredColumn } from '@/components/field/centeredColumn';
 
 // Fills AppShell's Main and owns its own scroll (see feed-page.styles.ts).
 // No bottom padding: the sticky Footer sits flush with the scroll edge.
@@ -8,17 +9,15 @@ export const Page = styled.div`
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: ${({ theme }) => theme.space.xl} ${({ theme }) => theme.space.lg} 0;
-  box-sizing: border-box;
+  /* Full-width scroller (scrollbar at the screen edge), 712px content column. */
+  ${centeredColumn('712px')}
+  padding-block: ${({ theme }) => theme.space.xl} 0;
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.lg};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    padding: ${({ theme }) => theme.space.lg} ${({ theme }) => theme.space.md} 0;
+    padding-block: ${({ theme }) => theme.space.lg} 0;
   }
 `;
 

@@ -11,8 +11,6 @@ export const Nav = styled.nav`
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.bg};
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    flex-direction: column;
-    align-items: stretch;
     gap: ${({ theme }) => theme.space.sm};
     padding: ${({ theme }) => theme.space.md};
   }
@@ -36,10 +34,5 @@ export const NavLinks = styled.div`
     justify-content: flex-end;
     gap: ${({ theme }) => theme.space.md};
     white-space: nowrap;
-  }
-  > form {
-    display: flex;
-    align-items: center;
-    margin: 0;
   }
 `;

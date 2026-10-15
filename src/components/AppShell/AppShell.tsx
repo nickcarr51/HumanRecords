@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useCallback, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { signOut } from '@/lib/auth/actions';
 import { Nav, NavLinks } from '@/components/Nav';
 import { PlayerProvider, PlayerBar } from '@/components/Player';
 import { ToastProvider } from '@/components/Toast';
-import { textSweepStyles } from '@/components/field/hoverStyles';
 import { useThemeMode } from '@/lib/theme/ThemeModeProvider';
 import { PlayButton } from '@/components/Feed/feed.styles';
 import { SweepIcon } from '@/components/Player/SweepIcon';
+import { NavDrawer, type Account } from './NavDrawer';
+import { AccountMenu } from './AccountMenu';
 
 const Wrapper = styled.div`
   height: 100dvh;
@@ -64,29 +65,38 @@ const BrandBy = styled.span`
   color: ${({ theme }) => theme.colors.muted};
 `;
 
-const SignOutButton = styled.button`
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  ${textSweepStyles}
+// Desktop: the account menu. Phones: the same items live in the drawer
+// behind the hamburger.
+const DesktopOnly = styled.div`
+  display: contents;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    display: none;
+  }
 `;
 
-const NavLink = styled(Link)`
-  text-decoration: none;
-  border: 0;
-  ${textSweepStyles}
+const MobileOnly = styled.div`
+  display: none;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    display: contents;
+  }
 `;
 
 export function AppShell({
   children,
   isLabelMember = false,
+  account = { name: null, email: null },
 }: {
   children: React.ReactNode;
   isLabelMember?: boolean;
+  account?: Account;
 }) {
   const { dark, toggle } = useThemeMode();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    menuButton.current?.focus();
+  }, []);
   return (
     <PlayerProvider>
       <Wrapper>
@@ -109,12 +119,32 @@ export function AppShell({
                   )}
                 </SweepIcon>
               </PlayButton>
-              {isLabelMember ? <NavLink href="/admin">Admin</NavLink> : null}
-              <form action={signOut}>
-                <SignOutButton type="submit">Sign out</SignOutButton>
-              </form>
+              <DesktopOnly>
+                <AccountMenu account={account} isLabelMember={isLabelMember} />
+              </DesktopOnly>
+              <MobileOnly>
+                <PlayButton
+                  ref={menuButton}
+                  type="button"
+                  aria-label="Open menu"
+                  aria-haspopup="dialog"
+                  aria-expanded={menuOpen}
+                  aria-controls="nav-drawer"
+                  onClick={() => setMenuOpen(true)}
+                >
+                  <SweepIcon fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square">
+                    <path d="M4 7h16M4 12h16M4 17h16" />
+                  </SweepIcon>
+                </PlayButton>
+              </MobileOnly>
             </NavLinks>
           </Nav>
+          <NavDrawer
+            open={menuOpen}
+            onClose={closeMenu}
+            account={account}
+            isLabelMember={isLabelMember}
+          />
           <Main>{children}</Main>
           <PlayerBar />
         </ToastProvider>

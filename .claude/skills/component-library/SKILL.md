@@ -48,6 +48,8 @@ says, because the root layout reads that cookie on the server.
 | Live catalog of the primitives (dev only) | `src/app/style-guide/page.tsx` (404s in production via `layout.tsx`) |
 | Toasts: `ToastProvider` mounted once in `AppShell`; `--toast-offset` (set on its Wrapper: 4rem, 6rem at ≤`sm` where the player bar wraps to two rows) lifts them above the player bar; any page under `(app)` can call `useToast()`, so don't add another provider; components that may render outside it (feed rows in tests/reuse) use `useOptionalToast()` → `null` | `src/components/AppShell/AppShell.tsx`, `src/components/Toast/` |
 | Day/night toggle button in the nav (`useThemeMode`, `PlayButton` + `SweepIcon` sun/moon, `aria-pressed`) | `src/components/AppShell/AppShell.tsx` |
+| Nav account menu + mobile drawer: on desktop `AccountMenu` (name, else email, as a button; panel with email, Admin for label members, Sign out; Escape/outside click/navigation close) ( `account` prop from the `(app)` layout via `getOwnName` in `src/lib/auth/profile.ts`); at ≤`sm` the account/Admin/Sign out collapse behind a hamburger into `NavDrawer` (right-side dialog, Escape/overlay close, focus trap, closes on route change, unmounts after its slide-out) | `src/components/AppShell/{AppShell,AccountMenu,NavDrawer}.tsx` |
+| `centeredColumn(contentMax)`: full-width scroll container with a centered content column, so scrollbars sit at the screen edge (feed, album, admin, upload pages) | `src/components/field/centeredColumn.ts` |
 | Test render helper — `renderWithTheme(ui)` (day) / `renderWithTheme(ui, { dark: true })` (night) | `src/test/renderWithTheme.tsx` |
 
 ## References
@@ -99,7 +101,12 @@ colors.
   for a themed in-app link (see `ArtistsTable`, `UsersTable`, the album page). A bare
   `next/link` renders browser-default blue — never ship one unstyled.
 - `Modal` has Escape + overlay-close but no focus trap.
-- The day/night toggle lives only in `AppShell`'s nav; `/` and `/login*` are always amber
+- `NavDrawer`'s focus trap (deferred 2026-10-14, from the ux-touchups review) only wraps when
+  focus is on the first or last item. Clicking non-focusable text in the panel can drop focus to
+  `<body>`, and Tab then reaches the page behind the overlay, which is also not `inert`. Fix:
+  `tabIndex={-1}` on the Panel, send focus to the first item when `activeElement` is outside it,
+  and optionally `inert` the Nav/Main/PlayerBar siblings while open.
+- The day/night toggle lives only in `AppShell`'s nav (both widths; it stays outside the phone drawer); `/` and `/login*` are always amber
   and have no toggle.
 
 A code guide (reading order through the theme → mode provider → registry → components →

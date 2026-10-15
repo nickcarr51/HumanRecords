@@ -116,7 +116,8 @@ export async function updateUserProfile(
   userId: string,
   input: { name: string; email: string },
 ): Promise<ActionResult> {
-  if (!(await labelMemberId())) return { error: FORBIDDEN };
+  const caller = await labelMemberId();
+  if (!caller) return { error: FORBIDDEN };
   if (typeof userId !== "string" || !UUID_RE.test(userId)) return { error: "Unknown user." };
   const email = typeof input?.email === "string" ? input.email.trim().toLowerCase() : "";
   if (!EMAIL_RE.test(email)) return { error: "Enter a valid email." };
@@ -144,6 +145,9 @@ export async function updateUserProfile(
 
   const { error: nameError } = await service.from("users").update({ name }).eq("id", userId);
   revalidateUser(userId);
+  // Editing yourself: re-render the (app) layout so the nav shows the new name.
+  // (The nav's email comes from the session token and updates on its next refresh.)
+  if (userId === caller) revalidatePath("/", "layout");
   if (nameError) {
     console.error("users.name update failed after auth update", nameError);
     return { error: emailChanged ? "Email saved, but the name didn't. Try again." : "Couldn't save the name. Try again." };
