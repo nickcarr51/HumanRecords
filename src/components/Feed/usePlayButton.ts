@@ -17,5 +17,5 @@ export function usePlayButton(trackIds: string[], start: () => void) {
     else if (!loading) toggle(); // pause, or resume where it left off
   }
 
-  return { playing, onClick };
+  return { playing, activePlaying: active && isPlaying && status !== 'error', onClick };
 }

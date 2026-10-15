@@ -82,6 +82,9 @@ describe("getFeed", () => {
       const [s, a] = items;
       if (s.kind !== "track" || a.kind !== "album") throw new Error("unexpected kinds");
       expect(s.id).toBe(single);
+      expect(s.catalogNumber).toBeGreaterThan(0);
+      expect(a.catalogNumber).toBeGreaterThan(0);
+      expect(a.tracks[0].catalogNumber).toBeGreaterThan(0);
       expect(s.artistNames).toEqual([`${tag}Feat`]);
       expect(a.id).toBe(albumId);
       expect(a.artistNames).toEqual([`${tag}Lead`]);

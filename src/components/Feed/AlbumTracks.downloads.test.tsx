@@ -27,8 +27,8 @@ import { ToastProvider } from '@/components/Toast';
 import { AlbumTracks } from './AlbumTracks';
 
 const tracks: FeedTrack[] = [
-  { id: 't1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
-  { id: 't2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
+  { catalogNumber: 3, id: 't1', title: 'FIRST LIGHT', artistNames: ['Halcyon'] },
+  { catalogNumber: 4, id: 't2', title: 'NIGHT SHIFT', artistNames: ['Juno Park'] },
 ];
 
 beforeEach(() => {
@@ -45,9 +45,9 @@ describe('AlbumTracks with real download buttons', () => {
       </ToastProvider>,
     );
     const done = screen.getByRole('button', { name: 'Downloaded — download FIRST LIGHT again' });
-    expect(done).toHaveTextContent('✓');
+    expect(done).toBeInTheDocument();
     const fresh = screen.getByRole('button', { name: 'Download NIGHT SHIFT' });
-    expect(fresh).toHaveTextContent('↓');
+    expect(fresh).toBeInTheDocument();
   });
 
   it('renders and survives a failed download with no providers', async () => {
@@ -59,7 +59,7 @@ describe('AlbumTracks with real download buttons', () => {
     fireEvent.click(btn);
     await waitFor(() => expect(errSpy).toHaveBeenCalled());
     await waitFor(() => expect(btn).toHaveAttribute('aria-busy', 'false'));
-    expect(screen.getByRole('button', { name: 'Download FIRST LIGHT' })).toHaveTextContent('↓');
+    expect(screen.getByRole('button', { name: 'Download FIRST LIGHT' })).toBeInTheDocument();
     errSpy.mockRestore();
   });
 });

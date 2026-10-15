@@ -42,7 +42,9 @@ All return `{ error: string | null }` and never surface raw GoTrue text.
 
 ## `/login` (`src/app/login/page.tsx`)
 
-Server component (reads `searchParams`; see Invite links below) rendering `LoginForm`
+Server component (reads `searchParams`; see Invite links below) rendering, inside
+`SignInGlitch` (`src/components/Login/SignInGlitch.tsx`; the page is always in the amber
+entrance theme, [[component-library]]), `LoginForm`
 (`src/components/Login/LoginForm.tsx`, client). State: `step: 'email' | 'code'`, `email`, `code`, `error`, `pending`.
 - Props: `next` (passed through to `submitOtp`) and `?error=auth` (shows "That link didn't
   work — request a new code below.").

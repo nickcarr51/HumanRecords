@@ -37,6 +37,9 @@ describe("getAlbum", () => {
       const detail = await getAlbum(client, album!.id);
       expect(detail).not.toBeNull();
       expect(detail!.title).toBe(`${tag}Album`);
+      expect(detail!.catalogNumber).toBeGreaterThan(0);
+      expect(detail!.tracks[0].catalogNumber).toBeGreaterThan(0);
+      expect((await getAlbum(client, album!.id))!.catalogNumber).toBe(detail!.catalogNumber);
       expect(detail!.artistNames).toContain(`${tag}Art`);
       expect(detail!.tracks.map((t) => t.title)).toContain(`${tag}T1`);
 

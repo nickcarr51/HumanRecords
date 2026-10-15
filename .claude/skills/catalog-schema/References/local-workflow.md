@@ -60,6 +60,9 @@ bucket: put the seed MP3s in gitignored `supabase/seed-media/` and run `yarn r2:
    project — add a new one. Comment the *why* at the top (house style).
 3. `yarn supabase migration up` locally (keeps data). Use `db reset` only if you edited an
    already-applied migration — it wipes local data; say so first (see CLAUDE.md "Database safety").
+   Adding a required column to a populated table? Follow the backfill dance: add nullable →
+   `update` → `set not null` (`position` in `20260929120000`, `catalog_number` in `20261011170000`,
+   which then adds `generated always as identity` + `setval` so new rows continue the sequence).
 4. Regenerate types (see [clients-and-types.md](clients-and-types.md)).
 5. Update `seed.sql` if new `not null` columns or tables need local data.
 6. Add/adjust schema tests.
@@ -85,6 +88,16 @@ The local CLI stays linked to the develop project, so `db push` and any `--linke
 `--db-url` / `--project-ref` command reach hosted data. `.claude/hooks/guard-db.sh` (wired in
 `.claude/settings.json`) forces a permission prompt on these; local commands pass through.
 
+### Switched branches and the app or a test now fails with 42703?
+
+Symptom: `/feed` or `/albums/[id]` throws, or a `db` test fails, with
+`column tracks_1.catalog_number does not exist` (SQLSTATE `42703`; the alias may be `albums_1`).
+Cause: the checked-out code selects `catalog_number` (added by `20261011170000`) but your local
+database hasn't run that migration yet. Fix: `yarn supabase migration up` (only pending migrations,
+keeps data) — **not** `db reset`. Going the other way (older branch, newer DB) is harmless: the
+column is additive and old code never asks for it. The same symptom on a hosted environment means
+`deploy.yml` hasn't run the migration there yet; wait for the deploy, don't push by hand.
+
 ## Data / schema tests
 
 - Files: `*.data.test.ts` (query functions) and `users|artists|catalog|catalog-relations.test.ts`
@@ -101,11 +114,25 @@ The local CLI stays linked to the develop project, so `db push` and any `--linke
   `admin.generateLink('magiclink')` + `verifyOtp({ token_hash, type: 'email' })` — the real
   OTP path, no password.
 - Always clean up in `finally`/`afterEach` (delete the user; delete catalog rows you inserted).
+- **Catalog fixtures: `src/lib/supabase/release-admin-fixtures.ts`.** New data tests that need
+  releases should use it rather than hand-rolling inserts: `admin` (service-role client), `newTag(prefix)`
+  (unique tag; put it in every title/name/key you create), `makeSingle(tag)` → `{ releaseId, trackId }`,
+  `makeAlbum(tag, nTracks)` → `{ releaseId, albumId, trackIds }`, `makeArtist`, `signedIn(role)` (a
+  signed-in client for a fresh test user), `archivedAt`, `positions`, `queueRows`, and `cleanup(tag)` in
+  `afterEach`. `cleanup` deletes by tag (tracks/albums cascade to releases and link rows) and removes
+  the test users — it never bulk-deletes, so other tests' and the seed's rows survive. Deleting fixture
+  rows consumes `catalog_number`s; that is fine and expected (never reused). Used by
+  `{archive-release,archive-track,add-track-replace-audio,update-release,catalog-numbers}.data.test.ts`.
 - Vitest loads `.env*` via `loadEnv` in `vitest.config.mts`, so `.env.local` keys apply.
 
 ```bash
 yarn supabase start
-yarn test --run src/lib/supabase
+yarn supabase migration up                                      # pending migrations first, or expect 42703
+yarn test --run src/lib/supabase                                 # everything under the folder
+yarn vitest run --project db src/lib/supabase/catalog-numbers.data.test.ts   # one db file
 ```
+
+Run a single DB-backed file with `--project db` so it uses the serial project (and the `.env.local`
+keys); the migration it covers must already be applied locally.
 
 A connection error when the stack is down is environment, not a regression.

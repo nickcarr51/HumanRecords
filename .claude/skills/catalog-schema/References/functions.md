@@ -2,7 +2,11 @@
 
 All are `security definer` with `set search_path = public` (pinning the search path is what
 makes a definer function safe from search-path hijacking), except `resolve_artist_refs`,
-which is invoker but only reachable from inside `publish_release`.
+which is invoker but only reachable from inside `publish_release`, and the plain trigger
+functions at the end. One of those, `keep_catalog_number`, pins `search_path = ''` (the stricter
+Supabase-linter form) while every older function uses `= public`. Both pin the path, so the
+inconsistency is acceptable; don't churn old migrations to align them, and either form is fine
+for new functions as long as `''` functions schema-qualify every reference.
 
 ## `handle_new_user()` → trigger
 
@@ -112,11 +116,23 @@ which is invoker but only reachable from inside `publish_release`.
   must include `pinned, sort_at` (as `RELEASE_SELECT` does).
 - Caller: `getFeed` in `src/lib/supabase/feed.ts` (the `/feed` search box), via the shared order helper.
 
-## Triggers `releases_default_sort_at()` and `keep_created_at()`
+## Triggers `releases_default_sort_at()`, `keep_created_at()` and `keep_catalog_number()`
 
 - Migration `20261010120000`. `releases_default_sort_at` (before insert on `releases`): sets
   `sort_at := created_at` when null. `keep_created_at` (before update of `created_at` on `releases`,
-  `tracks`, `albums`): resets `created_at` to the old value. Plain invoker triggers, not callable via the API.
+  `tracks`, `albums`): **silently resets** `created_at` to the old value — the update succeeds, the
+  column just doesn't move. Plain invoker triggers, not callable via the API.
+- Migration `20261011170000`. `keep_catalog_number()` — `plpgsql`, `set search_path = ''`, no
+  `security definer`. Triggers `albums_keep_catalog_number` / `tracks_keep_catalog_number`:
+  `before update of catalog_number … for each row`. If `new.catalog_number is distinct from
+  old.catalog_number` it **raises** `'Catalog numbers cannot be changed'` (no `errcode`, so
+  SQLSTATE `P0001`) and the whole statement fails — the opposite choice from `keep_created_at`,
+  because a renumber should be loud, not quietly ignored. Note the belt-and-braces: Postgres already
+  refuses `set catalog_number = <value>` on an always-identity column (`428C9`) before any trigger
+  runs; the trigger's job is `set catalog_number = default`, which would otherwise pull a fresh
+  sequence value. Setting the column to its current value passes. No grants (not an RPC).
+  `session_replication_role = replica` (restores) disables it, like every ordinary trigger.
+  Test: `src/lib/supabase/catalog-numbers.data.test.ts`.
 
 ## Release admin functions (archive, restore, edit, add/replace track)
 
@@ -146,7 +162,9 @@ Callers: the release-admin server actions ([[content-lifecycle]]). Tests:
   release too (same timestamp, queues album art). `restore_track` clears one track and its uncleaned rows.
 - `add_album_track` payload `{ title, audioKey, artists: [{id}|{newName}] }`; the position is
   `max(position) + 1` over every track on the album (live or removed), so it lands last. Key format
-  and object existence are checked in the server action, not here.
+  and object existence are checked in the server action, not here. The new track's
+  `catalog_number` comes from the identity sequence — neither this function nor `publish_release`
+  names the column (see `tables-and-relations.md` "Catalog numbers").
 - `replace_track_audio` queues the old key (`replaced`) and swaps `audio_url`.
 - `update_release` payload `{ album?: { title, artists }, tracks: [{ id, title, artists }] }`. `tracks`
   must list exactly the release's live tracks (else `22023` "This release changed since you opened it.

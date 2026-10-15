@@ -28,7 +28,7 @@ const sizeStyles: Record<ButtonSize, ReturnType<typeof css>> = {
 const variantStyles: Record<ButtonVariant, ReturnType<typeof css>> = {
   primary: css`
     background: ${({ theme }) => theme.colors.accent};
-    color: ${({ theme }) => theme.colors.bg};
+    color: ${({ theme }) => theme.mode === 'dark' ? theme.colors.bg : theme.colors.text};
     border: 1px solid ${({ theme }) => theme.colors.accent};
     &:hover:not(:disabled) {
       background: ${({ theme }) => theme.colors.accentDim};

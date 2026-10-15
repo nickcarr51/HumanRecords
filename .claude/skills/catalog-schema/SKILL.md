@@ -1,6 +1,6 @@
 ---
 name: catalog-schema
-description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), a table, column, RLS policy, grant, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`, `restore_release`, `archive_track`, `restore_track`, `add_album_track`, `replace_track_audio`, `update_release`), the soft-delete columns (`archived_at`), `r2_cleanup_queue`, editing `supabase/seed.sql` or `supabase/config.toml`, regenerating `src/lib/supabase/database.types.ts`, choosing between the browser/server/service Supabase clients (`src/lib/supabase/{client,server,service}.ts`), or writing a `*.data.test.ts` / schema test with `test-helpers.ts`. Also when a query silently returns zero rows, a column read errors with permission denied, or a data test refuses to run against a non-local URL.
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), table, column, RLS policy, grant, trigger, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`, `replace_track_audio`, `update_release`, `keep_created_at`, `keep_catalog_number`), `archived_at`, `catalog_number` / HS### / HSS### catalog numbers, `r2_cleanup_queue`, `supabase/seed.sql`, `supabase/config.toml`, regenerating `database.types.ts`, the browser/server/service clients (`src/lib/supabase/{client,server,service}.ts`), or a `*.data.test.ts` / schema test (`test-helpers.ts`, `release-admin-fixtures.ts`). Also when a query silently returns zero rows, a column read errors with permission denied, "column catalog_number does not exist" (42703), or a data test refuses to run against a non-local URL.
 ---
 
 # Catalog Schema + Supabase Data Layer
@@ -45,6 +45,8 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
 | `admin_list_users` returns `banned_until` | `…20261010120500_admin_list_users_banned_until.sql` |
 | `artists` label-member insert/update policies, `admin_delete_artist` | `…20261010130000_artists_admin_writes.sql` |
+| Release admin: `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`/`replace_track_audio`, `update_release` | `…20261010140000`..`…20261010140300` |
+| `catalog_number` on `albums` + `tracks` (identity, backfilled), `keep_catalog_number` trigger | `…20261011170000_catalog_numbers.sql` |
 | Local seed (example users, 4 artists, 1 album, 1 single, releases; `seed_helpers.seed_user`) | `supabase/seed.sql` |
 | Optional gitignored real-account seed (template: `supabase/seed-local.example.sql`) | `supabase/seed.local.sql` (`sql_paths` globs `./seed.local*.sql`) |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
@@ -56,25 +58,43 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | Test helpers (local-only guard, OTP test users) | `src/lib/supabase/test-helpers.ts` |
 | Schema/RLS tests | `src/lib/supabase/{users,artists,catalog,catalog-relations,releases-schema.data,publish-release.data,artists-admin-writes.data}.test.ts` |
 | v1 schema tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts` (+ `invites.data.test.ts` covers `banned_until`) |
+| Release-admin + catalog-number tests (tagged fixtures) | `src/lib/supabase/{archive-release,archive-track,add-track-replace-audio,update-release,catalog-numbers}.data.test.ts` via `release-admin-fixtures.ts` |
+| Catalog-number formatting (`HS###` / `HSS###`) | `src/components/CatalogId/CatalogId.tsx` (+ `CatalogLine.tsx`); the DB stores only the integer |
 | Unit vs DB test projects | `vitest.config.mts` (`unit` parallel, `db` serial; `dbTests` list) |
 
 ## References
 
 - [tables-and-relations.md](References/tables-and-relations.md) — every table and column,
-  the many-to-many link tables, `position` ordering, `releases`, indexes, and the
-  "`audio_url` holds an R2 key, not a URL" rule.
+  the many-to-many link tables, `position` ordering, `releases`, catalog numbers
+  (`catalog_number`), indexes, and the "`audio_url` holds an R2 key, not a URL" rule.
 - [rls-model.md](References/rls-model.md) — read policies, the column grant hiding `role`,
   owner-only downloads, definer functions, and how to add a write path safely.
 - [functions.md](References/functions.md) — `handle_new_user` + role-sync trigger, `increment_play_count`,
   `current_user_role`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `resolve_artist_refs`, `publish_release`,
-  `move_release`, `search_feed`, `releases_default_sort_at`/`keep_created_at` (signatures, grants, callers).
+  `move_release`, `search_feed`, the release-admin functions,
+  `releases_default_sort_at`/`keep_created_at`/`keep_catalog_number` (signatures, grants, callers).
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
-  dependency-injection convention for data functions, and regenerating `database.types.ts`.
+  dependency-injection convention for data functions, regenerating `database.types.ts`, and
+  what the generated types look like for an identity column (`catalog_number?: never`).
 - [local-workflow.md](References/local-workflow.md) — `supabase start`/`db reset`, seed
   accounts + `seed.local.sql`, Mailpit, adding a migration, hosted rollout (via `deploy.yml`
-  only), the data-test conventions, and the `unit`/`db` Vitest projects.
+  only), the data-test conventions (`test-helpers.ts`, `release-admin-fixtures.ts`), running one
+  `db` test file, the `unit`/`db` Vitest projects, and the "column … does not exist" symptom.
 - [[release-ops]] `References/migrations.md` — the add-only rule and expand/contract (two-release
   rename/drop). Read before any migration that renames, drops, or tightens something.
+
+## Catalog numbers (HS### / HSS###)
+
+Since `20261011170000`, `albums.catalog_number` and `tracks.catalog_number` are permanent,
+unique integers assigned by Postgres on insert (`generated always as identity`, one sequence
+per table). Vocabulary: **`HS###` = an album, `HSS###` = any track** — every track gets one,
+not only singles, so a single is `HSS###` and never has an `HS` number. The database stores
+only the integer; the prefix and zero-padding (`padStart(3)`) live in the UI (`CatalogId`).
+Nobody can supply or change a number: Postgres rejects an explicit value on an always-identity
+column, the `keep_catalog_number` trigger raises on any update that would change it, and the
+generated types mark it `never` in `Insert`/`Update`. Archived rows keep their number;
+deleting a row (tests only) consumes it — numbers are never reused. Details:
+[tables-and-relations.md](References/tables-and-relations.md) "Catalog numbers".
 
 ## Depends on
 
@@ -84,11 +104,13 @@ role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timel
 [[release-ops]] (how migrations
 reach hosted databases).
 
-## Known deferrals (as of 2026-10-10)
+## Known deferrals (as of 2026-10-11)
 
 - Soft delete exists in the schema (`archived_at`); the release admin UI for it is built
   ([[content-lifecycle]]).
 - `play_count` has an RPC but nothing in the app calls it yet.
+- Catalog numbers are display-only: nothing searches or sorts by `catalog_number` yet, and the
+  admin UI does not show them.
 - No ORM. Raw supabase-js + SQL functions; edit/delete shipped as SQL functions without one; revisit (likely Drizzle) only if more multi-table writes appear.
 
 A code guide (migration-by-migration read, with why each security fix exists) is in

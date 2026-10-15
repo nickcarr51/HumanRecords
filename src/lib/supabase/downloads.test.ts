@@ -12,10 +12,10 @@ function mockClient(result: (ids: string[]) => { data: unknown; error: unknown }
 describe("feedTrackIds", () => {
   it("returns single ids and album track ids in feed order", () => {
     const items: FeedItem[] = [
-      { kind: "track", id: "s1", title: "S", trackArtUrl: null, artistNames: [], createdAt: "" },
+      { kind: "track", catalogNumber: 23, id: "s1", title: "S", trackArtUrl: null, artistNames: [], createdAt: "" },
       {
-        kind: "album", id: "a1", title: "A", albumArtUrl: null, artistNames: [], createdAt: "",
-        tracks: [{ id: "t1", title: "x", artistNames: [] }, { id: "t2", title: "y", artistNames: [] }],
+        kind: "album", catalogNumber: 24, id: "a1", title: "A", albumArtUrl: null, artistNames: [], createdAt: "",
+        tracks: [{ catalogNumber: 21, id: "t1", title: "x", artistNames: [] }, { catalogNumber: 22, id: "t2", title: "y", artistNames: [] }],
       },
     ];
     expect(feedTrackIds(items)).toEqual(["s1", "t1", "t2"]);

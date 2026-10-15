@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/role", () => ({ requireLabelMember: () => requireLabelMember
 vi.mock("@/lib/admin/releases", () => ({ getAdminRelease: (...a: unknown[]) => getAdminRelease(...a) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("next/navigation", () => ({ notFound: () => notFound() }));
-vi.mock("@/components/AdminReleases", () => ({ EditReleaseForm: () => null }));
+vi.mock("@/components/AdminReleases", () => ({ EditReleaseForm: () => null, AnalyzeWaveforms: () => null }));
 
 import EditReleasePage from "./page";
 

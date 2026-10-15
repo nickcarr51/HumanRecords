@@ -1,17 +1,17 @@
 'use client';
 
 import styled from 'styled-components';
+import { centeredColumn } from '@/components/field/centeredColumn';
+import { GlitchArt } from '@/components/GlitchArt/GlitchArt';
 
 export const Page = styled.div`
   flex: 1;
   min-height: 0;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: ${({ theme }) => theme.space.lg};
+  /* Full-width scroller (scrollbar at the screen edge), 672px content column. */
+  ${centeredColumn('672px')}
+  padding-block: ${({ theme }) => theme.space.lg};
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
   overflow-y: auto;
 `;
 
@@ -25,18 +25,18 @@ export const Back = styled.a`
   }
 `;
 
+// Single column while artwork is hidden; restore `96px 1fr` with <Art> once
+// image upload exists.
 export const Head = styled.header`
   display: grid;
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 1fr;
   gap: ${({ theme }) => theme.space.lg};
   align-items: center;
   margin: ${({ theme }) => theme.space.lg} 0 ${({ theme }) => theme.space.xl};
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    grid-template-columns: 1fr;
-  }
 `;
 
-export const Art = styled.img`
+/** Not rendered yet (see Head); kept for the image-upload pass. */
+export const Art = styled(GlitchArt)`
   width: 96px;
   height: 96px;
   object-fit: cover;

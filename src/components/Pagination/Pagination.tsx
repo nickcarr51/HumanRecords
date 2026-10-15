@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import styled from 'styled-components';
 import { pageHref } from './pageHref';
+import { textSweepStyles } from '@/components/field/hoverStyles';
 
 const Bar = styled.nav`
   display: flex;
@@ -10,13 +11,16 @@ const Bar = styled.nav`
   justify-content: center;
   gap: ${({ theme }) => theme.space.lg};
   padding: ${({ theme }) => theme.space.lg} 0;
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
+    padding: ${({ theme }) => theme.space.sm} 0;
+  }
   font-family: ${({ theme }) => theme.fonts.mono};
   font-size: ${({ theme }) => theme.fontSizes.sm};
   color: ${({ theme }) => theme.colors.muted};
 `;
 
 const PageLink = styled(Link)`
-  color: ${({ theme }) => theme.colors.accent};
+  ${textSweepStyles}
   text-decoration: none;
   &:hover,
   &:focus-visible {

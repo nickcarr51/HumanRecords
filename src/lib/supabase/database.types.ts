@@ -70,18 +70,21 @@ export type Database = {
       albums: {
         Row: {
           album_art_url: string | null
+          catalog_number: number
           created_at: string
           id: string
           title: string
         }
         Insert: {
           album_art_url?: string | null
+          catalog_number?: never
           created_at?: string
           id?: string
           title: string
         }
         Update: {
           album_art_url?: string | null
+          catalog_number?: never
           created_at?: string
           id?: string
           title?: string
@@ -331,6 +334,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           audio_url: string
+          catalog_number: number
           created_at: string
           id: string
           play_count: number
@@ -340,6 +344,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           audio_url: string
+          catalog_number?: never
           created_at?: string
           id?: string
           play_count?: number
@@ -349,6 +354,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           audio_url?: string
+          catalog_number?: never
           created_at?: string
           id?: string
           play_count?: number

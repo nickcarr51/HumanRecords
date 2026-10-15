@@ -1,0 +1,220 @@
+# Reference: Effects catalog
+
+Files: `src/components/CRTTexture/CRTTexture.tsx`, `src/components/GlitchArt/GlitchArt.tsx`,
+`src/components/Login/SignInGlitch.tsx`, `src/components/Feed/PixelAccordion.tsx`,
+`src/components/Player/{PlaybackButton,PixelWaveform,SweepIcon,PlaybackIcon}.tsx`,
+`src/components/Player/audioMeter.ts`, `src/components/field/hoverStyles.ts`,
+`src/lib/theme/{ThemeModeProvider.tsx,color.ts,tokens.ts}`, `src/app/globals.css`.
+
+Each entry: what it draws, how it's timed, where it sits, and what it does when it
+can't run. Line numbers are as of 2026-10-11 on `feat/playback-vector-icons`.
+
+## CRTTexture — CSS scanlines/vignette, compositor tracking sweep (no render loop)
+
+Rewritten 2026-10-13 from a full-viewport canvas (24 fps idle / 60 fps during a sweep;
+measured Energy Impact 31.0 + 12.1 "Graphics and Media" on an idle tab vs 7.7 + 4.5 for
+develop while *streaming*). The look is the same four things; the per-frame work is gone.
+
+- **Mount**: once, in `src/app/layout.tsx` inside `StyledComponentsRegistry` after
+  `{children}`, so it has the theme and overlays every route (login included).
+- **`Scanlines`** (styled `div`, `position: fixed; inset: 0; pointer-events: none`,
+  `z-index: theme.zIndex.toast + 1`): `background-color` = `withAlpha(ink, 0.02)` (the old
+  pulsing wash's midpoint); `background-image` = a `radial-gradient(farthest-corner …)`
+  vignette (`withAlpha(vignette, 0)` at 35% → `0.055` at the corners) over a
+  `repeating-linear-gradient(to bottom, withAlpha(ink, 0.06 dark / 0.029 light) 0 1px,
+  transparent 1px 4px)`. The browser rasterises this once and caches it; nothing redraws on
+  resize or scroll. **Pulse**: `@keyframes` `opacity 0.7 → 1`, `3.9s ease-in-out infinite
+  alternate` (same 7.85 s period as the old `sin(t·0.8)`); `opacity` animates on the
+  compositor without a repaint. `@media (hover: none), (prefers-reduced-motion: reduce)
+  { animation: none }` — phones stay static so the display can idle. `[data-paused='true']`
+  → `animation-play-state: paused` (set by the effect while `document.hidden`).
+- **`Band`** (styled `div`, fixed, full width, `visibility: hidden; opacity: 0;
+  will-change: transform, opacity`, same z-index): the tracking sweep. Backgrounds are
+  static and travel with it — a vertical glow `linear-gradient(transparent, rgba(ink,
+  var(--sweep-strength)) 50%, transparent)` and the dashed "tracking noise" row
+  (`repeating-linear-gradient(to right, withAlpha(ink, 0.035) 0 12px, transparent 12px
+  48px)`, `background-size: 100% 1px` at `calc(50% + 12px)`); the vertical `mask-image`
+  softens the edges. Inline `backdrop-filter: url("#crt-<id>") blur(0.1px)` → the inline
+  `<svg width=0 height=0>` `feTurbulence` + `feDisplacementMap` at a constant `scale="1"`
+  (Chrome/Firefox wobble the page under the band; Safari ignores `backdrop-filter: url()`).
+  While hidden the band is not painted, so the filter costs nothing between sweeps.
+- **Effect** (`useEffect`, deps `[]`): a scheduler, no `requestAnimationFrame`.
+  `restart()` runs on mount, `visibilitychange`, and the reduced-motion `change` event: it
+  `stop()`s (clear timer, `running?.cancel()`, hide band), writes `data-paused`, and returns
+  early when `document.hidden || reduced.matches`; otherwise `setTimeout(sweep, 2–5 s)`.
+  `sweep()` picks thickness 8–28 px (band height = 4×), direction, strength 0.02–0.035
+  (written to `--sweep-strength`), shows the band, and calls `element.animate([{transform:
+  translateY(from), opacity: 0}, {opacity: 1, offset: 0.5}, {transform: translateY(to),
+  opacity: 0}], { duration: 5.5–8 s })`. `from`/`to` sit 80 px beyond the viewport.
+  `onfinish` hides the band and schedules the next sweep in 4–11 s. If
+  `element.animate` is missing (jsdom) the sweep is skipped silently.
+- **Cleanup**: `stop()` + remove the two listeners.
+- **Dropped vs the canvas version**: the sub-pixel scanline bend that drifted at 0.35 rad/s
+  and the three wobbled lines beside the band. Restoring either needs a canvas again.
+- **Colors**: `theme.effects.ink` (`withAlpha`, and `rgbTriplet` where the alpha is a CSS
+  variable), `theme.effects.vignette`. Light: gray ink `#646464`; dark: amber accent.
+  Stronger scanlines in night via `theme.mode`.
+- **Test**: `CRTTexture.test.tsx` stubs `matchMedia` and `Element.prototype.animate`, uses
+  fake timers, and checks: sweep after the delay and again after `onfinish`; none under
+  reduced motion; none while hidden + restart on `visibilitychange` (hide mid-sweep cancels);
+  unmount cancels.
+
+## GlitchArt — horizontal tears over an image (kept, not on the album page)
+
+- `<Frame>` (`span`, `overflow: hidden`) wrapping an `<img>` and an absolutely positioned
+  overlay canvas. `onMouseEnter`/`onMouseLeave` flip a `hovered` state; the effect runs
+  only while hovered.
+- Draws with `ctx.drawImage(img, …)` — a cover-fit copy plus four random 2–8 px slices
+  offset ±6 px — and never calls `getImageData`, so it works on tainted (no-CORS) images.
+  Throttled to one paint per 90 ms; full tears for the first 450 ms, then ~35 % of paints.
+- DPR cap 2. Bails on reduced motion. No `document.hidden` guard (hover-only, short-lived).
+- **Where**: `Thumb = styled(GlitchArt)` in `src/components/ArtistCard/ArtistCard.tsx`
+  (retired `/artists` route, see [[artists-read]]). `Art = styled(GlitchArt)` in
+  `src/app/(app)/albums/[id]/album-page.styles.ts` is exported but **not rendered**:
+  `page.tsx` lines 42–45 explain that `album_art_url` holds an R2 key that isn't signed
+  yet, so `<Art>` would be a blank square. `Head` is single-column until image upload
+  ships; restore `grid-template-columns: 96px 1fr` with `<Art>` then.
+- Hover-only means no touch or keyboard equivalent.
+
+## SignInGlitch — randomized tear bursts on `/` and `/login`
+
+- Wraps children in a `<div ref={content}>` and renders an inline SVG filter:
+  `feTurbulence` → `feComponentTransfer` (discrete R table turns noise into horizontal
+  bands, B fixed at 0.5) → `feDisplacementMap` (`xChannelSelector R`, `yChannelSelector B`),
+  so displacement is horizontal only.
+- **Timing**: `schedule(initial)` sets a timeout of 6–14 s (first) or 18–35 s (later); a
+  `burst` picks 2–5 `tear` steps 35–90 ms apart, each setting `scale` 1–9, a sub-pixel
+  `translateX`/`skewX` and a new noise seed, then clears the filter/transform and schedules again.
+- **Guards**: `schedule` and `burst` return if `document.hidden` or reduced motion;
+  `visibilitychange` and the media-query `change` call `resume()` = clear + reschedule.
+  Cleanup clears both timers and resets the styles, so `vi.getTimerCount()` is 0 after unmount.
+- Applies `style.filter` to the wrapper only, so inputs keep focus and value through a burst.
+- **Where**: `src/app/page.tsx` (logo and heading each wrapped) and
+  `src/app/login/page.tsx` (the form block). Both routes are forced to the amber theme by
+  `ThemeModeProvider` (`entrance` paths).
+
+## PixelAccordion — expand/collapse with falling/bursting pixels
+
+- `Panel` is a CSS grid whose `grid-template-rows` goes `0fr` ↔ `1fr` over 420 ms
+  (`cubic-bezier(0.22, 1, 0.36, 1)`) with an opacity fade; `Clip` has `min-height: 0;
+  overflow: hidden`. Reduced motion: `transition: none`.
+- **Children mount only while open or ≤ 450 ms after close** (`CLOSE_MS`, matching the
+  transition). Under reduced motion they unmount immediately. Reason in the source:
+  collapsed rows would otherwise each subscribe to the player and re-render during playback.
+- When closed the panel is `inert` and `aria-hidden` (asserted in `FeedList.test.tsx`).
+- **Particles**: on every open/close transition (tracked with a `previous` ref), the effect
+  creates a `<canvas>` with `position: fixed; inset: 0; pointer-events: none; z-index:
+  theme.zIndex.sticky` (200), appends it to `document.body` (escapes the feed's scroll/clip),
+  and emits 4 pixels every 40 ms for 420 ms from the panel's bottom edge
+  (`getBoundingClientRect`). Open: pixels drift to the bottom of the viewport; close: they
+  burst upward under gravity. Each pixel is a 2–3 px `fillRect` snapped to a 2 px grid,
+  alpha `(1 - age)^1.2 · 0.7`, color `theme.effects.particle`. The loop keeps requesting
+  frames only while `elapsed < 420 || pixels.length`, then removes the canvas; cleanup also
+  cancels and removes it.
+- `start` is set on the first rendered frame (not at effect time) so a busy main thread
+  can't skip the emission window — the test drives `draw(performance.now() + 2000)` and
+  still expects 4 `fillRect`s.
+- DPR cap 2. Reduced motion: no canvas at all.
+- **Where**: `src/components/Feed/AlbumRow.tsx` wraps `AlbumTracks` in it; the chevron is
+  a `styled(SweepIcon)` that rotates 180°.
+
+## PlaybackButton — level-driven particles and accent bloom
+
+- `Shell` (`isolation: isolate`) holds `ActiveButton` (= feed `PlayButton` with accent
+  color/border, inset glow `withAlpha(accent, 0.086)` and an svg `drop-shadow` when
+  `$active`) and, only while `active`, a 130 × 130 px `Particles` canvas centred on the
+  2.25 rem button (`top/left: -47px`) with a radial `mask-image` so pixels fade out past
+  the ring. `Shell::before` is the bloom: a radial gradient of `withAlpha(accent, 0.13 → 0)`
+  fading in over 320 ms.
+- Effect runs when `active && readLevel && !reducedMotion`. Each frame: `energy =
+  document.hidden ? 0 : readLevel()`; if `energy > 0.03`, `emission += delta · energy · 20`;
+  while `emission ≥ 1` and fewer than 35 pixels, spawn one on a 19 px ring with speed
+  `12 + energy·32` and a slight upward bias; pixels live 0.5–1 s, drawn as 2 × 2
+  `fillRect` in `theme.colors.accent` with alpha `(1 - age/life) · 0.5`.
+- DPR cap 2 (`layer.width = layer.height = 130·ratio`). Runs at rAF rate — justified
+  because it exists only for the one playing button. Cleanup cancels and clears.
+- **Where**: `Feed/SingleTrackRow.tsx`, `Feed/AlbumTracks.tsx`, `Player/PlayerBar.tsx`,
+  `Feed/AlbumRow.tsx`; `active` is `activePlaying` from `usePlayButton` (this row is the
+  current track and it is playing).
+
+## PixelWaveform — 30 fps dot waveform
+
+- 24 px-tall canvas, 96 px wide on desktop; ≤ `breakpoints.md` it flexes to the row width via a `ResizeObserver` (guarded for jsdom) and draws `width / 3` columns, next to a text label
+  (`Playing`/`Paused`/`Loading`/`Error`).
+- 32 columns, 3 px apart; each column's peak is the max `|sample - 128| / 128` over its
+  slice of `readWaveform()`, quantised to 3 px steps up to ±10 px, drawn as 2 × 2 dots.
+  Paused or no meter: flat single dots in `theme.colors.faint` at alpha 0.35; playing:
+  `theme.colors.accent` at 0.85.
+- Paints at most every `1000/30` ms; requests another frame only while `playing &&
+  !reduced`. `document.hidden` → samples `null` (flat line), loop continues.
+- DPR cap 2. `draw(performance.now())` runs synchronously once on mount so the static
+  frame exists even when rAF never fires (jsdom, reduced motion).
+- **Where**: `PlayerBar.tsx` line 147.
+
+## audioMeter.ts / peaks.ts — the signal effects read
+
+`PlayerProvider` provides `readLevel` / `readWaveform` through `AudioMeterContext` /
+`AudioWaveformContext`; `useAudioMeter()` / `useAudioWaveform()` return `null` without a
+provider. **Desktop:** a live Web Audio analyser (`useAudioMeterSource`, `fftSize` 256,
+enabled from `playQueue` / `play`, `<audio crossOrigin="anonymous">`). **Touch**
+(`isTouchDevice()`): stored `peaks/<id>.bin` read against `audio.currentTime` via
+`usePeaks` / `usePeakReaders`, with no `crossOrigin` and no `AudioContext` (it silences iOS
+background playback). On touch the hooks are `null` until the track's peaks load (requested on
+the `<audio>` 'playing' event). Readers return `0` / `null` while paused.
+
+Reader math (`levelAt`, `shimmer`, the desktop smoothing), tuning constants (`LEVEL_GAIN`,
+`WAVE_GAIN`, `WAVE_MIX`), CORS and troubleshooting: [[waveform]] and its
+`References/internals.md`.
+
+## Sweep hovers — `--hover-progress`, `SweepIcon`, `hoverStyles.ts`
+
+- `src/app/globals.css` registers `@property --hover-progress { syntax: '<number>';
+  inherits: true; initial-value: 0 }` so the custom property can be transitioned.
+- `iconSweepStyles` (on `circularControlStyles` → feed `PlayButton`/`AlbumLink`, and the
+  `PlayerBar` controls): `--hover-progress: 0` with a 480 ms ease transition (light mode:
+  200 ms `steps(6, end)`); `:hover:not(:disabled), :focus-visible` → `1` + accent border;
+  light mode adds a 1 px-per-4 px scanline `repeating-linear-gradient` background and the
+  `trackingEcho` keyframes on the svg. Reduced motion: no transition, no animation.
+- `SweepIcon` renders its children twice: a plain `<g>` and a second `<g>` colored
+  `theme.colors.accent` clipped by a `<clipPath>` whose `<rect>` has
+  `transform: scaleX(var(--hover-progress, 0)); transform-origin: 0 0`. The parent's
+  hover drives the property; the accent copy wipes in left to right. `PlaybackIcon`,
+  `DownloadButton`, `PlayerBar` prev/next, and `AlbumRow`'s chevron and open link use it.
+  Safari may not apply the transform inside the clip path.
+- `GlobalTheme` adds `button svg, a svg { filter: drop-shadow(0 0 3px rgba(accent,
+  calc(0.08|0 + var(--hover-progress) · 0.14))) }`, so the glow strengthens with the same
+  property app-wide, and `body` carries a faint accent `text-shadow` in dark mode.
+- `textSweepStyles` (`Link`, `AppShell` nav links, `Pagination`, `ArtistCard`): a two-stop
+  `linear-gradient(accent 45%, text 55%)` sized 240 % and clipped to text with
+  `color: transparent`; hover slides `background-position` from `100% 0` to `0% 0`
+  (`textHoverState`, which also exports for custom targets). Light mode uses a hard 50/50
+  stop and stepped transitions. **`@media (forced-colors: active) { color: LinkText;
+  background-image: none; filter: none }` is required** — without it the transparent text
+  is invisible in Windows High Contrast. Already present (lines 64–68); keep it when editing.
+- `trackingEcho(accent, text)` builds its keyframes from theme colors through `withAlpha`;
+  styled-components hashes keyframes by content, so the per-render call reuses one name.
+
+## Day/night roll — View Transition on toggle
+
+- `ThemeModeProvider.toggle()` (lines 86–101): if `document.startViewTransition` is
+  missing or reduced motion is on, update immediately. Otherwise set
+  `html[data-theme-reveal]` to `night` or `day`, then
+  `document.startViewTransition(() => flushSync(update))`; `transition.ready.catch(() => {})`
+  swallows the "skipped" rejection.
+- `GlobalTheme` turns off the default crossfade (`::view-transition-old/new(root)
+  { animation: none }`), stacks new above old, and rolls the new root in with
+  `clip-path: inset(...)` — `night-roll` 1300 ms from the top, `day-roll` 1100 ms from the
+  bottom, both `cubic-bezier(0.22, 1, 0.36, 1)`. Reduced motion: `animation: none !important`.
+- The CRT canvas, text and icons are part of the snapshot, so the roll reveals the real
+  themed page. The toggle button lives in `AppShell` (`useThemeMode`). Everything else
+  about modes (cookie, `entrance` routes, `amberTheme`) is [[component-library]] territory.
+
+## Color helpers and tokens
+
+- `src/lib/theme/color.ts`: `hexToRgb('#rgb' | '#rrggbb')`, `rgbTriplet(hex)` → `'r, g, b'`
+  for canvas strings that add their own alpha, `withAlpha(hex, 0..1)` → `rgba(...)`.
+  Non-hex input passes through unchanged, so a token that is already `rgba` is safe.
+- `tokens.ts` `effects.light = { ink: '#646464', vignette: '#505050', particle: '#b8b8b8' }`,
+  `effects.dark = { ink: accent, vignette: '#505050', particle: accent, panel: raised, shadow: '#000000' }` (plus `panel: '#dcdcdc'`, `shadow: '#111111'` in light); exposed as
+  `theme.effects` (typed in `AppTheme`). Add a new effect color here, per mode, rather
+  than in a component.

@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useMemo,
 } from "react";
 import { getTrackStreamUrl, type UrlResult } from "@/lib/storage/actions";
 import { continueAfterRelease, loadFeedPage, type QueuePage } from "@/lib/feed/actions";
@@ -23,6 +24,8 @@ import {
   type QueueState,
 } from "./queue";
 import { useMediaSession } from "./useMediaSession";
+import { AudioMeterContext, AudioWaveformContext, useAudioMeterSource } from './audioMeter';
+import { usePeakReaders, usePeaks } from './peaks';
 
 export { toPlayerTrack, type PlayerTrack, type QueueSource } from "./queue";
 
@@ -50,8 +53,6 @@ type PlayerContextValue = {
   currentTrack: PlayerTrack | null;
   source: QueueSource;
   isPlaying: boolean;
-  currentTime: number;
-  duration: number;
   status: Status;
   playQueue: (tracks: PlayerTrack[], startIndex?: number, source?: QueueSource) => void;
   toggle: () => void;
@@ -68,8 +69,30 @@ export function usePlayer(): PlayerContextValue {
   return ctx;
 }
 
+// Position/duration tick ~4x/s during playback, so they live in their own
+// context: only the scrubber (PlayerBar) re-renders on each tick, not every
+// play button on the page.
+type PlayerTimeValue = { currentTime: number; duration: number };
+const PlayerTimeContext = createContext<PlayerTimeValue | null>(null);
+
+export function usePlayerTime(): PlayerTimeValue {
+  const ctx = useContext(PlayerTimeContext);
+  if (!ctx) throw new Error("usePlayerTime must be used within a PlayerProvider");
+  return ctx;
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Desktop: live Web Audio analyser, which needs CORS-mode media. Touch
+  // devices load the element plainly so iOS keeps playing in the background,
+  // and draw from stored peaks instead (below).
+  const live = useAudioMeterSource(audioRef);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (live.supported) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossorigin');
+  }, [live.supported]);
   const [queueState, setQueueState] = useState<QueueState>(EMPTY_QUEUE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -93,6 +116,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const currentTrack = queueState.tracks[queueState.index] ?? null;
   const nextTrack = queueState.tracks[queueState.index + 1] ?? null;
+  // Touch devices draw from the track's stored loudness (desktop never fetches
+  // it). The peaks request waits until this track is actually playing (the
+  // element's 'playing' event): Next runs client server actions one at a time,
+  // so asking earlier would queue it ahead of getTrackStreamUrl, and a quick
+  // skip would leave a request for a track already gone. The dots read
+  // audio.currentTime every frame, so a late load is never out of sync.
+  const [audioStartedId, setAudioStartedId] = useState<string | null>(null);
+  const peakTrackId =
+    !live.supported && audioStartedId !== null && audioStartedId === currentTrack?.id ? audioStartedId : undefined;
+  const peakReaders = usePeakReaders(audioRef, usePeaks(peakTrackId));
+  const readLevel = live.supported ? live.readLevel : peakReaders.readLevel;
+  const readWaveform = live.supported ? live.readWaveform : peakReaders.readWaveform;
+  const enableMeter = live.enable;
 
   // Point the single <audio> element at a signed URL and start it. `isCurrent`
   // says whether the result still belongs to the track the player is on.
@@ -233,22 +269,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(
     (tracks: PlayerTrack[], startIndex = 0, source: QueueSource = NO_SOURCE) => {
+      enableMeter();
       genRef.current += 1;
       extendingRef.current = null;
       startedRef.current = null;
       prefetchRef.current = { length: -1, attempts: 0 };
       commit(startQueue(tracks, startIndex, source));
     },
-    [commit],
+    [commit, enableMeter],
   );
 
   const play = useCallback(() => {
+    enableMeter();
     const audio = audioRef.current;
     // No-op while errored: there is no valid loaded track to play, and the
     // element's src has been cleared, so play must not resume stale audio.
     if (!audio || !currentTrack || status === "error") return;
     if (audio.paused) void audio.play().catch(() => setIsPlaying(false));
-  }, [currentTrack, status]);
+  }, [currentTrack, status, enableMeter]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -278,6 +316,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(true);
       setStatus("playing");
     };
+    const onPlaying = () => setAudioStartedId(queueRef.current.tracks[queueRef.current.index]?.id ?? null);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => {
       setIsPlaying(false);
@@ -290,6 +329,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
@@ -297,6 +337,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
@@ -306,6 +347,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Load + play whenever the selected track changes (unless moveTo already did).
   useEffect(() => {
     if (!currentTrack) return;
+    // A different track: its peaks wait for its own 'playing' event (going back
+    // to the last track that played must not reuse that stale "started" mark).
+    setAudioStartedId((id) => (id === currentTrack.id ? id : null));
     // Always consume the marker: if moveTo's track was superseded before this
     // effect ran, a stale marker must not make a later load of it get skipped.
     const alreadyStarted = startedRef.current === currentTrack.id;
@@ -377,26 +421,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useMediaSession(audioRef, currentTrack, isPlaying, { play, pause, next, prev, seek });
 
-  const value: PlayerContextValue = {
-    queue: queueState.tracks,
-    currentIndex: queueState.index,
-    currentTrack,
-    source: queueState.source,
-    isPlaying,
-    currentTime,
-    duration,
-    status,
-    playQueue,
-    toggle,
-    next,
-    prev,
-    seek,
-  };
+  // Memoized so a time tick (which re-renders this provider) doesn't hand
+  // every consumer a new object.
+  const value = useMemo<PlayerContextValue>(
+    () => ({
+      queue: queueState.tracks,
+      currentIndex: queueState.index,
+      currentTrack,
+      source: queueState.source,
+      isPlaying,
+      status,
+      playQueue,
+      toggle,
+      next,
+      prev,
+      seek,
+    }),
+    [queueState, currentTrack, isPlaying, status, playQueue, toggle, next, prev, seek],
+  );
+  const time = useMemo<PlayerTimeValue>(() => ({ currentTime, duration }), [currentTime, duration]);
 
   return (
     <PlayerContext.Provider value={value}>
-      {children}
+      <PlayerTimeContext.Provider value={time}>
+        <AudioMeterContext.Provider value={readLevel}>
+          <AudioWaveformContext.Provider value={readWaveform}>{children}</AudioWaveformContext.Provider>
+        </AudioMeterContext.Provider>
+      </PlayerTimeContext.Provider>
       {/* Single element for the whole app; hidden — controls live in PlayerBar. */}
+      {/* crossOrigin is set in an effect, desktop only (see useAudioMeterSource):
+          it lets Web Audio read the signal for the waveform/particles, and the R2
+          buckets allow GET/HEAD from each site origin (infra/r2/) for that.
+          Touch devices keep a plain element so playback survives backgrounding. */}
       <audio ref={audioRef} preload="metadata" />
     </PlayerContext.Provider>
   );

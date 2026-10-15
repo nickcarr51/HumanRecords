@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import styled from 'styled-components';
 import { initials } from '@/lib/initials';
+import { textSweepStyles, textHoverState } from '@/components/field/hoverStyles';
+import { GlitchArt } from '@/components/GlitchArt/GlitchArt';
 
 // Re-exported so existing consumers importing `initials` from the component
 // keep working; the implementation lives in the server-safe '@/lib/initials'.
@@ -25,8 +27,12 @@ const Row = styled(Link)`
   text-decoration: none;
   color: inherit;
   transition: color ${({ theme }) => theme.motion.base} ${({ theme }) => theme.motion.ease};
-  &:hover .artist-name {
-    color: ${({ theme }) => theme.colors.accent};
+  &:hover .artist-name,
+  &:focus-visible .artist-name {
+    ${textHoverState}
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:hover .artist-name, &:focus-visible .artist-name { animation: none; }
   }
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accent};
@@ -34,7 +40,7 @@ const Row = styled(Link)`
   }
 `;
 
-const Thumb = styled.img`
+const Thumb = styled(GlitchArt)`
   width: 48px;
   height: 48px;
   object-fit: cover;
@@ -55,10 +61,10 @@ const Tile = styled.span`
 `;
 
 const Name = styled.span.attrs({ className: 'artist-name' })`
+  ${textSweepStyles}
   font-family: ${({ theme }) => theme.fonts.display};
   font-weight: ${({ theme }) => theme.fontWeights.semibold};
   font-size: ${({ theme }) => theme.fontSizes.lg};
-  color: ${({ theme }) => theme.colors.text};
 `;
 
 const Meta = styled.span`

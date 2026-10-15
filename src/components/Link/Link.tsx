@@ -1,14 +1,13 @@
 'use client';
 
 import styled from 'styled-components';
+import { textSweepStyles } from '@/components/field/hoverStyles';
 
 export const Link = styled.a`
-  color: ${({ theme }) => theme.colors.accent};
   font-family: ${({ theme }) => theme.fonts.mono};
   text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color ${({ theme }) => theme.motion.base}
-    ${({ theme }) => theme.motion.ease};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.text};
+  ${textSweepStyles}
   &:hover {
     border-bottom-color: ${({ theme }) => theme.colors.accent};
   }

@@ -33,9 +33,26 @@ can't alter it. `region: "auto"` is R2's region.
 | `signStreamUrl(key)` | GET | `STREAM_TTL_SECONDS` | 7200 (2h) | Must outlast the longest track so seeking (new range requests) keeps working. |
 | `signDownloadUrl(key, filename)` | GET | `DOWNLOAD_TTL_SECONDS` | 300 (5m) | One-shot grab. |
 | `signImageUrl(key \| null)` | GET | `IMAGE_TTL_SECONDS` | 3600 (1h) | Outlasts a page session. Returns `null` for a null key (art columns are nullable). |
-| `signUploadUrl(key, contentType)` | PUT | `UPLOAD_TTL_SECONDS` | 900 (15m) | Enough for a 50 MB file on a slow link. |
+| `signUploadUrl(key, contentType)` | PUT | `UPLOAD_TTL_SECONDS` | 900 (15m) | Enough for a 50 MB file on a slow link. Also signs the `peaks/<id>.bin` PUT (`PEAKS_CONTENT_TYPE`, `application/octet-stream`). |
+
+`getTrackPeaksUrl` (storage actions) signs `peaks/<id>.bin` with `signStreamUrl`; `getPeaksJob`
+(`src/lib/admin/peaks-actions.ts`, label members only) mints a fresh `signStreamUrl(audio_url)`
+GET plus `signUploadUrl(peaksKey, PEAKS_CONTENT_TYPE)` PUT per track so the 15-minute PUT can't
+expire mid-run; `createUploadUrls` returns a `peaksUrl` beside each MP3 `url`. As with any
+signed PUT, the browser must send exactly the signed `Content-Type`.
 
 All GET signers share the private `signObjectUrl(key, { expiresIn, downloadFilename? })`.
+
+Signing says nothing about CORS. A stream URL is consumed by an `<audio>`: plain on touch devices (no
+`crossOrigin`, needs no CORS), `crossOrigin="anonymous"` on desktop (needs the `GET` rule); a stream-signed `peaks/<id>.bin` URL is consumed by
+`fetch`, and the admin MP3 URL by `fetch`, so the **bucket** must answer with
+`Access-Control-Allow-Origin` for the site origin (`GET`/`HEAD` in `infra/r2/cors.<env>.json`);
+a download URL is consumed by navigation and an image URL by `<img>`, neither of which needs
+CORS. A correctly signed URL that opens in a new tab but fails in a `fetch` is a CORS problem,
+not a signing one — see [object-keys.md](object-keys.md#cors).
+
+`signImageUrl` is the intended way to render `*_art_url` keys (they are keys, not URLs); it has
+no caller yet because the album page hides artwork until image upload ships.
 
 ### Download filename (RFC 6266)
 
@@ -69,6 +86,16 @@ and the downloaded MP3 was byte-identical to the upload (SHA-256), same bitrate/
 `aws: { signQuery: true, allHeaders: true }`. aws4fetch skips `Content-Type` by default;
 `allHeaders` includes it in the signature. Consequence: the browser **must** send exactly that
 Content-Type (`audio/mpeg`) or R2 returns 403 `SignatureDoesNotMatch`.
+
+### `SignatureDoesNotMatch` in general
+
+R2 recomputes the signature over the method, path, every query param present at signing time,
+and (for uploads) the signed headers. So a 403 `SignatureDoesNotMatch` means one of: the PUT sent
+a different `Content-Type` than was signed; a signed URL was edited after signing (adding or
+re-ordering a query param, re-encoding the key); the `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`
+pair belongs to a different bucket token than `R2_BUCKET_NAME`; or the server clock is far off.
+Re-mint the URL from the action; never patch one by hand. Browser CORS failures look different
+(no status reached the page, `MediaError`/preflight error in the console).
 
 ## `headObject(key)`
 

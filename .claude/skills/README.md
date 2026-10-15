@@ -21,8 +21,12 @@ Claude Code skills specific to Human Services, one directory per major feature.
 
 Foundational (no dependencies):
 
-- **component-library** — theme tokens, styled-components SSR registry, the `src/components`
-  primitives, `*.styles.ts` conventions, `/style-guide`.
+- **component-library** — theme tokens (day gray / night amber), `ThemeModeProvider`, the
+  styled-components SSR registry, the `src/components` primitives, `*.styles.ts` conventions,
+  hover/sweep mixins, `/style-guide`.
+- **visual-effects** — the ambient layer: CRT scanline canvas, glitch art, pixel particles,
+  audio-reactive waveform/button drawing (they read the meter hooks; the signal source is
+  **waveform**), and the checklist for adding an effect.
 - **catalog-schema** — Supabase migrations, tables + RLS, SQL functions, seed, the three
   client factories, generated types, local workflow + data tests.
 
@@ -40,6 +44,10 @@ Features:
 - **timeline-player** — the `/feed` listener timeline, the persistent music player, the
   album page, and the feed/album data. (First skill; template for the rest.)
 - **admin-upload** — releases model, label-member admin portal, and the single/album upload flow.
+- **waveform** — the player waveform end to end: live Web Audio analyser on desktop, stored
+  `peaks/<id>.bin` on touch (iOS background playback), peaks written at upload and by Analyze
+  all, the R2 CORS rule, troubleshooting by device. Cross-cutting: builds on visual-effects,
+  media-storage, timeline-player and admin-upload.
 - **invites** — `/admin/users`, single-use invite links (`/login?email=&invite=`), server-side
   redeem → session, role editing, `invites` table.
 - **artists-read** — `/artists` browse/search/detail; present but retired (redirected to `/feed`).
