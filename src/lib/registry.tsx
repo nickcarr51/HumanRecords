@@ -7,7 +7,7 @@ import { ThemeModeProvider } from '@/lib/theme/ThemeModeProvider';
 
 export default function StyledComponentsRegistry({
   children,
-  initialDark = false,
+  initialDark = true,
 }: {
   children: React.ReactNode;
   /** Night-mode cookie as read by the server; see ThemeModeProvider. */

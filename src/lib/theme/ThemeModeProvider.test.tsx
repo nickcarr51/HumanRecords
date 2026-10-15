@@ -37,14 +37,20 @@ describe('ThemeModeProvider', () => {
     view.rerender(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     expect(screen.getByRole('button', { name: 'light' })).toBeInTheDocument();
   });
-  it('switches the theme and persists the choice, then restores gray mode', () => {
+  it('defaults to amber with no saved preference', () => {
     render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
-    fireEvent.click(screen.getByRole('button', { name: 'light' }));
     expect(screen.getByRole('button', { name: 'dark' })).toHaveAttribute('aria-pressed', 'true');
-    expect(cookieValue()).toBe('night');
+    expect(cookieValue()).toBeNull();
+  });
+
+  it('switches the theme and persists the choice, then restores amber mode', () => {
+    render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'dark' }));
     expect(screen.getByRole('button', { name: 'light' })).toHaveAttribute('aria-pressed', 'false');
     expect(cookieValue()).toBe('day');
+    fireEvent.click(screen.getByRole('button', { name: 'light' }));
+    expect(screen.getByRole('button', { name: 'dark' })).toHaveAttribute('aria-pressed', 'true');
+    expect(cookieValue()).toBe('night');
   });
 
   it('restores a saved amber preference', () => {
@@ -54,8 +60,8 @@ describe('ThemeModeProvider', () => {
   });
 
   it('server-renders the cookie-seeded mode so night users get no gray flash', () => {
-    expect(renderToString(<ThemeModeProvider initialDark><Toggle /></ThemeModeProvider>)).toContain('>dark<');
-    expect(renderToString(<ThemeModeProvider><Toggle /></ThemeModeProvider>)).toContain('>light<');
+    expect(renderToString(<ThemeModeProvider><Toggle /></ThemeModeProvider>)).toContain('>dark<');
+    expect(renderToString(<ThemeModeProvider initialDark={false}><Toggle /></ThemeModeProvider>)).toContain('>light<');
   });
 
   it('updates the theme within a viewport transition when available', () => {
@@ -65,6 +71,7 @@ describe('ThemeModeProvider', () => {
     });
     Object.defineProperty(document, 'startViewTransition', { configurable: true, writable: true, value: transition });
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    setCookie('day');
     render(<ThemeModeProvider><Toggle /></ThemeModeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'light' }));
     expect(transition).toHaveBeenCalledOnce();
