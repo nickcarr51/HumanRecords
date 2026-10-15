@@ -13,7 +13,7 @@ the server-read cookie so the first paint is in the right **mode**, not just sty
 
 ## How it works
 
-`StyledComponentsRegistry({ children, initialDark = false })` is a `'use client'` component
+`StyledComponentsRegistry({ children, initialDark = true })` is a `'use client'` component
 wrapping all `<body>` children in the root layout.
 
 - **Server render:** a `ServerStyleSheet` is created once per request (`useState(() => new
