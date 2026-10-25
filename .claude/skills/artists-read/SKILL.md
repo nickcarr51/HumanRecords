@@ -10,10 +10,10 @@ an artist page at `/artists/[id]` showing bio and credited tracks. Built 2026-09
 **Retired from the listener MVP**: the code, tests, and data layer are intact, but signed-in
 users who visit `/artists` or `/artists/*` are redirected to `/feed` and there is no nav link.
 
-**Still live elsewhere:** `/admin/artists` (see [[admin-upload]]) imports `SearchInput` and
-`Pagination` from `src/app/(app)/artists/`. `Pagination`/`pageHref` take an optional
-`basePath` (default `/artists`) for that reuse. Don't delete or move these files without
-updating that page; worktree 2 plans to move them into `src/components/`.
+**Still live elsewhere:** `/admin/artists` (see [[admin-upload]]) and `/feed` import
+`SearchInput` and `Pagination` from `src/components/SearchInput/` and `src/components/Pagination/`
+(moved there from `src/app/(app)/artists/`). `pageHref(basePath, query, page)` takes the base path
+for that reuse. Don't delete or move these files without updating those pages.
 
 ## The one thing to understand first
 
@@ -21,8 +21,9 @@ updating that page; worktree 2 plans to move them into `src/components/`.
 signed-in users on `/artists*` to `/feed` (`src/lib/auth/route-guard.ts`). Nothing else
 disables it — the pages still compile, build, and pass tests. Reviving it means removing that
 rule (and its test), adding a nav link in `AppShell`, and fixing the gaps listed below. Parts
-of the slice are live elsewhere: `escapeLike` is used by the admin artist search, and
-`initials` / `ArtistCard` are shared.
+of the slice are live elsewhere: `escapeLike` is used by the feed search and the admin artist
+searches, and `initials` / `ArtistCard` are shared. Its data functions read more than one table
+through supabase-js, so a revival moves them to Drizzle first (slice 2, [[db-access]]).
 
 ## Pieces
 

@@ -1,7 +1,9 @@
 # Reference: Artists data layer (`src/lib/supabase/artists.ts`)
 
 Follows the data-function convention: `SupabaseClient<Database>` is the first argument; the
-caller creates the client ([[catalog-schema]] `References/clients-and-types.md`).
+caller creates the client ([[catalog-schema]] `References/clients-and-types.md`). Both reads still
+use supabase-js embeds across tables; under the one-table rule they move to Drizzle (`asUser`) in
+slice 2 ([[db-access]] `References/slices.md`). Nothing live calls them today.
 
 ## Types
 
@@ -33,8 +35,10 @@ ArtistDetail   = { id, name, bio: string | null, photoUrl: string | null, tracks
 
 Backslash-escapes `\`, `%`, `_` so user input is matched literally in `LIKE`/`ILIKE`
 (backslash is Postgres' default escape). Without it, searching `%` matches every artist.
-**Also imported by `src/lib/admin/actions.ts` (`searchArtists`)** — changing it affects the
-admin upload combobox.
+**Also imported by `src/lib/admin/actions.ts` (`searchArtists`), `src/lib/admin/artists.ts`
+(the `/admin/artists` search) and `src/lib/supabase/feed-search.ts` (the `/feed` search,
+`searchMatches`)** — changing it affects the admin upload combobox, the artists admin and the
+feed search.
 
 ## `getArtist(supabase, id)` → `ArtistDetail | null`
 

@@ -1,13 +1,15 @@
 ---
 name: catalog-schema
-description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), table, column, RLS policy, grant, trigger, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`, `replace_track_audio`, `update_release`, `keep_created_at`, `keep_catalog_number`), `archived_at`, `catalog_number` / HS### / HSS### catalog numbers, `r2_cleanup_queue`, `supabase/seed.sql`, `supabase/config.toml`, regenerating `database.types.ts`, the browser/server/service clients (`src/lib/supabase/{client,server,service}.ts`), or a `*.data.test.ts` / schema test (`test-helpers.ts`, `release-admin-fixtures.ts`). Also when a query silently returns zero rows, a column read errors with permission denied, "column catalog_number does not exist" (42703), or a data test refuses to run against a non-local URL.
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), table, column, RLS policy, grant, trigger, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`, `replace_track_audio`, `update_release`, `keep_created_at`, `keep_catalog_number`), `archived_at`, `catalog_number` / HS### / HSS### catalog numbers, `r2_cleanup_queue`, `supabase/seed.sql`, `supabase/config.toml`, regenerating `database.types.ts`, the browser/server/service clients (`src/lib/supabase/{client,server,service}.ts`), which tables a Drizzle read touches and the one-table (supabase-js) / many-table (Drizzle) rule, re-pulling the Drizzle schema after a migration (`yarn db:pull`, `src/lib/db/generated/schema.ts`), the `postgres` login role and `asUser`/`asSystem` in the permission model, or a `*.data.test.ts` / schema test (`test-helpers.ts`, `release-admin-fixtures.ts`, the local `DATABASE_URL`). Also when a query silently returns zero rows, a column read errors with permission denied, "column catalog_number does not exist" or a `DatabaseError` with code 42703, or a data test refuses to run against a non-local URL (`NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`). The Drizzle layer itself (`src/lib/db`, `src/lib/services`) is the `db-access` skill.
 ---
 
 # Catalog Schema + Supabase Data Layer
 
 The Postgres schema (users, artists, albums, tracks, their link tables, downloads, releases),
 its Row Level Security model, the three Supabase client factories, the local Supabase
-workflow, and the generated TypeScript types. Every other feature reads through this.
+workflow, and the generated TypeScript types (Supabase's and Drizzle's). Every other feature reads
+through this. Reads and writes that touch more than one table go through Drizzle instead of
+supabase-js (since slice 1, 2026-10): see [[db-access]].
 
 ## The one thing to understand first
 
@@ -51,13 +53,16 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | Optional gitignored real-account seed (template: `supabase/seed-local.example.sql`) | `supabase/seed.local.sql` (`sql_paths` globs `./seed.local*.sql`) |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
 | Generated types (`Database`) | `src/lib/supabase/database.types.ts` |
+| Drizzle schema pull (local stack only) → generated table schema | `drizzle.config.ts`, `yarn db:pull` → `src/lib/db/generated/schema.ts` (+ hand-written `relations.ts`, `auth-schema.ts`); see [[db-access]] |
+| Drizzle connection, `asUser`/`asSystem`, services | `src/lib/db/*`, `src/lib/services/*` ([[db-access]]) |
 | Browser client | `src/lib/supabase/client.ts` |
 | Server client (cookies; RSC, route handlers, actions) | `src/lib/supabase/server.ts` |
 | Service-role client (bypasses RLS, `server-only`) | `src/lib/supabase/service.ts` |
 | Session refresh + route guard per request | `src/lib/supabase/middleware.ts` (see [[auth]]) |
-| Test helpers (local-only guard, OTP test users) | `src/lib/supabase/test-helpers.ts` |
+| Test helpers (local-only guard for `NEXT_PUBLIC_SUPABASE_URL` and `DATABASE_URL`, OTP test users) | `src/lib/supabase/test-helpers.ts` |
 | Schema/RLS tests | `src/lib/supabase/{users,artists,catalog,catalog-relations,releases-schema.data,publish-release.data,artists-admin-writes.data}.test.ts` |
 | v1 schema tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts` (+ `invites.data.test.ts` covers `banned_until`) |
+| Drizzle data-layer tests (`db-access`, health, viewer, policy, parity, row-cap, album) | `src/lib/db/*.data.test.ts`, `src/lib/services/*.data.test.ts`, `src/lib/supabase/{feed-drizzle.parity,feed-row-cap,albums.drizzle}.data.test.ts`, `src/lib/admin/artists-links.data.test.ts` ([[db-access]] `References/testing.md`) |
 | Release-admin + catalog-number tests (tagged fixtures) | `src/lib/supabase/{archive-release,archive-track,add-track-replace-audio,update-release,catalog-numbers}.data.test.ts` via `release-admin-fixtures.ts` |
 | Catalog-number formatting (`HS###` / `HSS###`) | `src/components/CatalogId/CatalogId.tsx` (+ `CatalogLine.tsx`); the DB stores only the integer |
 | Unit vs DB test projects | `vitest.config.mts` (`unit` parallel, `db` serial; `dbTests` list) |
@@ -74,8 +79,9 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
   `move_release`, `search_feed`, the release-admin functions,
   `releases_default_sort_at`/`keep_created_at`/`keep_catalog_number` (signatures, grants, callers).
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
-  dependency-injection convention for data functions, regenerating `database.types.ts`, and
-  what the generated types look like for an identity column (`catalog_number?: never`).
+  dependency-injection convention for data functions, regenerating `database.types.ts` (and
+  `yarn db:pull`), what the generated types look like for an identity column
+  (`catalog_number?: never`), and a short Drizzle summary with its callers.
 - [local-workflow.md](References/local-workflow.md) — `supabase start`/`db reset`, seed
   accounts + `seed.local.sql`, Mailpit, adding a migration, hosted rollout (via `deploy.yml`
   only), the data-test conventions (`test-helpers.ts`, `release-admin-fixtures.ts`), running one
@@ -102,16 +108,18 @@ Nothing — this is foundational. Feature skills that build on it: [[auth]] (use
 role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timeline-player]]
 (`getFeed`/`getAlbum`), [[admin-upload]] (`releases`, `publish_release`), [[invites]] (`invites`, admin user functions), [[artists-read]], [[content-lifecycle]] (archive, `r2_cleanup_queue`, ordering, artist delete),
 [[release-ops]] (how migrations
-reach hosted databases).
+reach hosted databases), [[db-access]] (Drizzle reads and writes over these tables).
 
-## Known deferrals (as of 2026-10-24)
+## Known deferrals (as of 2026-10-25)
 
 - Soft delete exists in the schema (`archived_at`); the release admin UI for it is built
   ([[content-lifecycle]]).
 - `play_count` has an RPC but nothing in the app calls it yet.
 - Catalog numbers are display-only: nothing searches or sorts by `catalog_number` yet, and the
   admin UI does not show them.
-- Drizzle since slice 1 (2026-10): one table → supabase-js, more → Drizzle; see [clients-and-types.md](References/clients-and-types.md).
+- Drizzle since slice 1 (2026-10): one table → supabase-js, more → Drizzle. The SQL functions
+  and supabase-js reads still to move are mapped to slices 2-5 ([[db-access]]
+  `References/slices.md`). `search_feed` and `admin_list_users` have no app callers.
 
 A code guide (migration-by-migration read, with why each security fix exists) is in
 `Walkthrough/walkthrough.md` (gitignored).

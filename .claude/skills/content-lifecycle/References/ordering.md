@@ -42,7 +42,9 @@ Concurrent opposite moves can deadlock (`40P01`); callers should show a "try aga
 
 ## Search and ordering
 
-`search_feed` returns plain `releases` rows and doesn't order them. The caller chains the same
-`order`/`range` as `getFeed`. PostgREST orders an RPC result only by columns in the select
-projection, which is why `RELEASE_SELECT` includes `pinned, sort_at`. An empty query matches
-everything, so callers skip the RPC when `q` is empty.
+Search shares the feed's single query: `getFeed` adds `searchMatches(tx, q)`
+(`src/lib/supabase/feed-search.ts`) to its filter and keeps the same
+`pinned desc, sort_at desc, id desc` order and count, so search results are always in feed order.
+A blank `q` adds no filter. (Before Drizzle slice 1 the `search_feed` SQL function returned
+unordered rows and `getFeed` chained the order onto it; that function still exists with no app
+callers.)

@@ -1,12 +1,13 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), the invite-users script, or artist management at `/admin/artists`. (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), the invite-users script, or artist management at `/admin/artists` (its linked-user lists come from the Drizzle `listUsers` service via `getViewer`). (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
 
 A **releases** model (a release is either a single → one track, or an album → one album of
-ordered tracks) that the `/feed` timeline now reads in one query, plus a label-member-only
+ordered tracks) that the `/feed` timeline reads (one Drizzle rows query plus a count, in one
+transaction; [[timeline-player]]), plus a label-member-only
 **admin portal** (`/admin` → `/admin/upload`) where a label member publishes a single or an
 album: MP3s go to R2, catalog rows go to Supabase. Publishing is create-only; managing published releases (pin, reorder, archive/restore, edit, replace MP3,
 add/remove tracks) lives at `/admin/releases` (branch `feature/admin-release`, 2026-10-10; schema side:
@@ -60,6 +61,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Release admin UI | `src/components/AdminReleases/*` (`ReleasesTable`, `ArchiveControl`, `ConfirmModal`, `useAdminAction`, `uploadOne` (also calls `storePeaks`), `AnalyzeWaveforms`, `edit-reducer` incl. `draftKey`, `TrackEditor`, `ReplaceAudio`, `RemoveTrack`, `RemovedTracks`, `AddTrackForm`, `EditReleaseForm`) |
 | Release admin pages | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx` |
 | Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
+| Artist reads: `listAdminArtists`, `getAdminArtist`, `getCreditCounts`, `loadLinkTargets` (artists via supabase-js; linked users via `listUsers` / `getViewer`, [[db-access]]) | `src/lib/admin/artists.ts` |
 | Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
 | Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
 | Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
@@ -120,8 +122,10 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).
-- **ORM**: none. Edit/delete now exists as SQL functions + thin server actions; revisit (likely Drizzle) only if more multi-table writes appear;
-  `src/lib/admin/` is the seam.
+- **ORM**: Drizzle since slice 1 (2026-10), reads only so far ([[db-access]]). The admin writes are
+  still SQL functions behind thin server actions; they move into TypeScript in slices 2-5, and the
+  multi-table admin reads (`src/lib/admin/artists.ts` in slice 2, `src/lib/admin/releases.ts` in
+  slice 4) move to Drizzle ([[db-access]] `References/slices.md`).
 - **Production accounts** are created by hand; `scripts/invite-users.mts` is for develop.
 - **R2 CORS** must be applied in Cloudflare before any real browser upload works.
 - **Upload bar sits at 100% during the peaks decode (deferred, owner 2026-10-14):** `uploadDone` fires only after `storePeaks` (decode + PUT), with no "analyzing…" text, and the lane waits on the page-wide decode queue. Details and possible fixes: [[waveform]] Known gaps.

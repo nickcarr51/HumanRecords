@@ -8,13 +8,13 @@ All tables are in `public`, have RLS enabled, and use `uuid` ids (`gen_random_uu
 | Table | Columns | Notes |
 |---|---|---|
 | `users` | `id` (PK → `auth.users.id`, cascade), `name` (nullable), `role user_role default 'listener'`, `created_at` | One row per auth user, created by the `handle_new_user` trigger. Email is **not** here — it stays in `auth.users`. Column grant to `authenticated`: `id, name, created_at` (not `role`). |
-| `invites` | `user_id` (PK → `auth.users`, cascade), `token text unique` (plaintext, null once used), `used_at`, `created_by`, `created_at`, `updated_at` | One row per user. **Service-role only**: RLS on, no policies, no grants. See [[invites]]. |
+| `invites` | `user_id` (PK → `auth.users`, cascade), `token text unique` (plaintext, null once used), `used_at`, `created_by`, `created_at`, `updated_at` | One row per user. RLS on, no policies, no grants: only the service role, definer functions, or `asSystem` after `authorize()` (`listUsers` reads it). See [[invites]]. |
 | `artists` | `id`, `name not null`, `bio`, `profile_photo_url`, `user_id unique → users.id on delete set null`, `created_at` | `user_id` links an artist to a member account (nullable; at most one artist per account). Unique index `artists_name_ci_key` on `lower(trim(name))` — one artist per name, case/space-insensitive. |
 | `albums` | `id`, `catalog_number int not null generated always as identity unique`, `title not null`, `album_art_url`, `created_at` | `catalog_number` is the permanent `HS###` number (see below). `created_at` is locked (see below). |
 | `tracks` | `id`, `catalog_number int not null generated always as identity unique`, `title not null`, `track_art_url`, `audio_url not null`, `play_count int default 0`, `archived_at`, `created_at` | `catalog_number` is the permanent `HSS###` number (see below). `archived_at` set ⇒ soft-deleted track; hidden from listeners by RLS. `created_at` locked. |
 | `downloads` | `user_id → users`, `track_id → tracks`, `downloaded_at`; PK `(user_id, track_id)` | One row per user+track (repeat downloads ignored). |
 | `releases` | `id`, `kind release_kind`, `track_id unique → tracks`, `album_id unique → albums`, `created_at` | The timeline unit. Check constraint: `single` ⇒ `track_id` set + `album_id` null; `album` ⇒ the reverse. Index on `created_at desc`. Cascades on target delete. Feed columns: `pinned boolean default false`, `sort_at timestamptz not null` (movable feed position), `archived_at` (soft delete). |
-| `r2_cleanup_queue` | `id`, `object_key`, `reason` (`archived`/`replaced`), `source_table` (`tracks`/`albums`/`artists`), `source_id`, `queued_at`, `cleaned_at` | Keys that may be deletable from R2 later. **Service-role only**: RLS on, no policies, privileges revoked. See [[content-lifecycle]]. |
+| `r2_cleanup_queue` | `id`, `object_key`, `reason` (`archived`/`replaced`), `source_table` (`tracks`/`albums`/`artists`), `source_id`, `queued_at`, `cleaned_at` | Keys that may be deletable from R2 later. RLS on, no policies, privileges revoked: only the service role, definer functions, or `asSystem` (no app code reads it that way yet). See [[content-lifecycle]]. |
 
 Enums: `user_role = listener | artist | label_member`; `release_kind = single | album`.
 
@@ -28,8 +28,8 @@ Enums: `user_role = listener | artist | label_member`; `release_kind = single | 
 
 `position` (integer, `not null`) was added by the releases migration and backfilled from
 title/name order. It is **not** unique-constrained — the writer (`publish_release`) assigns
-1..n. Order in JS with `byPosition` (`src/lib/supabase/artist-names.ts`) because nested
-PostgREST embeds can't be ordered by a link-table column.
+1..n. Order in JS with `byPosition` (`src/lib/supabase/artist-names.ts`): nested PostgREST embeds
+can't be ordered by a link-table column, and the Drizzle reads reuse it for the same rule.
 
 All FKs cascade on delete, except `artists.user_id` → set null and the **artist side** of `track_artists`/`album_artists`, which is `restrict` (an artist still credited cannot be deleted; SQLSTATE `23503`). Deleting a track or album still cascades its credit rows.
 
@@ -110,9 +110,15 @@ Only rows with a `releases` row. An album's tracks have no release of their own,
 never appear as separate feed items. Archived releases are excluded, as are archived album tracks and archived single tracks (a single whose track is archived is dropped). An album with zero live tracks (all archived, or none) is also dropped by `toFeedItem`; a dropped item makes that page come back short, so admin actions must keep data consistent (archiving an album's last live track archives the release). Pre-existing hosted rows were backfilled: every album
 got an `album` release; every track not on an album got a `single` release.
 
-## Querying with embeds
+## Querying across tables
 
-PostgREST resource embedding follows FKs:
+More than one table → Drizzle ([[db-access]]). Its relational queries follow the hand-written
+`src/lib/db/relations.ts`: `releases.track` / `album`, `tracks.releases` / `trackAlbums` /
+`trackArtists`, `albums.releases` / `trackAlbums` / `albumArtists`, `artists.trackArtists` /
+`albumArtists`, and on the link tables `track`, `album`, `artist` (singular). Example:
+`tx.query.albums.findFirst({ with: { trackAlbums: { with: { track: … } } } })` (`getAlbum`).
+
+The supabase-js reads not moved yet use PostgREST resource embedding, which follows FKs:
 `releases → track:tracks(…)`, `album:albums(… track_albums(position, tracks(…)))`,
 `… track_artists(position, artists(name))`. Generated types describe nested embeds loosely,
 so call sites cast with `as unknown as <Shape>` — keep the cast narrow and local.

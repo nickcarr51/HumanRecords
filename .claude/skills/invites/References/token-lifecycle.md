@@ -5,11 +5,14 @@
 `public.invites`: `user_id` (PK → `auth.users`, cascade; **one row per user**), `token text
 unique` (nullable), `used_at timestamptz` (nullable), `created_by → auth.users` (set null),
 `created_at`, `updated_at`. RLS on, **no policies**, all privileges revoked from `anon` and
-`authenticated`: only the service role (`createServiceClient`) and definer functions touch it.
+`authenticated`: only the service role (`createServiceClient`), definer functions, and Drizzle's
+`asSystem` after `authorize()` (the `listUsers` service, [[db-access]]) touch it.
 
 The token is **plaintext** (32 random bytes, base64url, 43 chars; `INVITE_TOKEN_RE`) so the admin
 page can re-show the URL any time. The no-grants rule is what protects it: a signed-in user
-can't read anyone's token. `admin_list_users()` (label members only) is the one reader.
+can't read anyone's token. `listUsers` (`src/lib/services/users.ts`, label members only) is the one
+place that lists tokens to show them (`admin_list_users()`, which did the same, has no app callers
+now); the store functions below look a token up only to check or claim it.
 
 ## States
 

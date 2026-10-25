@@ -12,6 +12,9 @@ here so future work doesn't contradict it.
 - yarn (not npm/pnpm)
 - styled-components only (no Tailwind, no CSS Modules) — SSR registry in
   `src/lib/registry.tsx`, wired into `src/app/layout.tsx`
+- Drizzle ORM over postgres.js (the `postgres` driver) for any read or write that touches more
+  than one table (`src/lib/db`, `src/lib/services`, `DATABASE_URL`); supabase-js for one table.
+  See the `db-access` skill.
 - Vitest + React Testing Library for tests, colocated as `*.test.tsx`
 - Node 22 (see `.nvmrc`)
 
@@ -53,8 +56,14 @@ here so future work doesn't contradict it.
   and psql against `*.supabase.co` reach real data. A PreToolUse hook
   (`.claude/hooks/guard-db.sh`, wired in `.claude/settings.json`) forces a
   permission prompt on these, on R2 deletes (`aws s3 rm|rb|mv`, `sync --delete`,
-  `rclone delete|purge`, `wrangler r2` deletes), and on any command naming the prod
+  `rclone delete|purge`, `wrangler r2` deletes), on `drizzle-kit push|migrate|drop|up`,
+  on `drizzle-kit` with a hosted host, on any command carrying a hosted Supabase database
+  URL (e.g. `DATABASE_URL=<hosted> yarn test`), and on any command naming the prod
   media bucket, the backups bucket, or the prod Supabase project ref.
+- **`DATABASE_URL` in `.env.local` must be the local stack**
+  (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`): the app and the data tests
+  connect straight to it, and the hook can't see inside that file. After a migration, also
+  run `yarn db:pull` (local only) to refresh `src/lib/db/generated/schema.ts`.
 - **Hosted migrations run only via GitHub Actions (`deploy.yml`)**, never from a
   laptop. Never `--include-seed` against a hosted database; seed is local-only.
 - **Local:** apply new migrations with `yarn supabase migration up` — it runs

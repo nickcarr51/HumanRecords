@@ -30,9 +30,12 @@ check exists at four layers because each one alone has a hole.
      member is refused even while their access token is still valid. The upload and release actions don't do this yet. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
-   `admin_list_users` and `admin_set_user_role` re-check the same way. Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is
-   refused. `releases` has no write policies, and `resolve_artist_refs` isn't executable
-   through the API.
+   `admin_set_user_role` (and every other admin SQL function) re-checks the same way. The user list
+   is the exception: since Drizzle slice 1 it is read by `listUsers`, which checks the role in our
+   code (`authorize(viewer, "users.list")`, `src/lib/services/policy.ts`) and then reads with RLS
+   skipped (`asSystem`), so this layer doesn't apply to it ([[db-access]]). Even a direct PostgREST
+   call (`/rest/v1/rpc/publish_release` with a listener's JWT) is refused. `releases` has no write
+   policies, and `resolve_artist_refs` isn't executable through the API.
 
 ## `current_user_role()` and `getCurrentRole()`
 

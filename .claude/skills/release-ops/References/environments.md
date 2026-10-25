@@ -26,7 +26,7 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL` | local stack | dev project | prod project |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | local | dev | prod |
 | `SUPABASE_SECRET_KEY` | local | dev | prod |
-| `DATABASE_URL` (server-only; transaction pooler, port 6543; add before the deploy) | local stack (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`) | dev pooler URL | prod pooler URL |
+| `DATABASE_URL` (server-only; the Supabase **transaction pooler** URL, port 6543; add before the deploy) | local stack (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`) | dev project's transaction pooler URL | prod project's transaction pooler URL |
 | `R2_ACCOUNT_ID`, `R2_ENDPOINT` | same | same | same |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | local token | dev token | prod token |
 | `R2_BUCKET_NAME` | `humanrecords-media-local` | `humanrecords-media-dev` | `humanrecords-media-prod` |
@@ -36,10 +36,16 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 | `NEXT_PUBLIC_SENTRY_DSN` | blank | DSN | DSN |
 | `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | blank | set (source maps at build) | set |
 
-`DATABASE_URL`: every host except `127.0.0.1`/`localhost` gets verified TLS using the embedded
-Supabase Root 2021 CA (`src/lib/db/supabase-ca.ts`, expires 2031-04-26; `connectionOptions` in
-`src/lib/db/client.ts`), with nothing to configure per environment, so the dashboard's pooler
-string works as-is.
+`DATABASE_URL` is the direct Postgres connection the app's Drizzle reads use ([[db-access]]).
+Hosted, it goes through Supabase's connection pooler (Supavisor) in "transaction" mode (port 6543),
+which shares server connections between transactions; the dashboard's "Transaction pooler"
+connection string, with the database password, is the value. Every host except
+`127.0.0.1`/`localhost` gets an encrypted connection that also checks the server really is Supabase,
+using Supabase's public root certificate kept in the code (`src/lib/db/supabase-ca.ts`, expires
+2031-04-26; `connectionOptions` in `src/lib/db/client.ts`). Nothing is configured per environment,
+so the dashboard string works as-is; an `sslmode` setting (Postgres's TLS option) in it is not
+needed and can't weaken the check. Missing in an environment → the feed, album and admin user/artist
+pages fail and the deploy's "Site database answers" step goes red.
 
 The prod R2 token lives only in Vercel Production. The backup token lives only in GitHub.
 

@@ -19,8 +19,10 @@ Indexes: `(queued_at) where cleaned_at is null` (pending work) and `(source_tabl
 
 ## Access
 
-Service-role only: RLS on, **no policies**, all privileges revoked from `anon` and
-`authenticated`. Even label members can't read or write it through the user client. App code never writes it
+RLS on, **no policies**, all privileges revoked from `anon` and `authenticated`: only the service
+role, the security-definer functions, or Drizzle's `asSystem` (the `postgres` login skips RLS;
+[[db-access]]) can reach it, and no app code reads it through `asSystem` yet. Even label members
+can't read or write it through the user client. App code never writes it
 directly: the security-definer functions (`archive_release`, `archive_track`, `replace_track_audio`)
 insert rows, and the restore functions delete uncleaned ones
 ([[catalog-schema]] `References/rls-model.md`).

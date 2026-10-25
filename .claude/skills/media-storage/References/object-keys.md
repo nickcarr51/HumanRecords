@@ -49,7 +49,8 @@ object exists); the **browser** gets a 404 fetching the URL and the player shows
 A publish that fails after upload, or a file replaced in the form after uploading, leaves an
 object with no row pointing at it. Accepted for now.
 
-`r2_cleanup_queue` (service-role only) records keys that may later be deletable:
+`r2_cleanup_queue` (no policies or grants: only the service role, definer functions, or Drizzle's
+`asSystem` can reach it) records keys that may later be deletable:
 
 | `reason` | Key comes from | `source_table` |
 |---|---|---|

@@ -1,6 +1,6 @@
 ---
 name: content-lifecycle
-description: Use when archiving, restoring, or removing releases, tracks, or artists (`archive_release`, `restore_release`, `archive_track`, `restore_track`, `add_album_track`, `replace_track_audio`, `update_release`); replacing an uploaded MP3 or image; working with archived_at, r2_cleanup_queue, the artist-delete FK block, move_release / pinned / sort_at ordering, or a future R2 cleanup job. Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
+description: Use when archiving, restoring, or removing releases, tracks, or artists (`archive_release`, `restore_release`, `archive_track`, `restore_track`, `add_album_track`, `replace_track_audio`, `update_release`); replacing an uploaded MP3 or image; working with archived_at, r2_cleanup_queue, the artist-delete FK block, move_release / pinned / sort_at ordering, or a future R2 cleanup job, or the archived filter in the feed search (`searchMatches` in `feed-search.ts`). Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
 ---
 
 # Content Lifecycle (archive, order, cleanup)
@@ -13,14 +13,14 @@ artists can't be deleted while credited. The **schema and read-side guards are b
 
 ## The one thing to understand first
 
-**Nothing is hard-deleted except uncredited artists, and app code never deletes from R2.**
-Releases and tracks get `archived_at`; a hard delete would cascade away `downloads` history,
-and the prod bucket is delete-locked anyway. `archived_at` plus `r2_cleanup_queue` are the
-record of what is gone and which files might be removed later. Archived rows are hidden from
-listeners by RLS but **label members can still read them**, so every listener-facing path
-(`getFeed`, `getAlbum`, `getTrackStreamUrl`, `getTrackDownloadUrl`, `search_feed`) also
-filters `archived_at` explicitly. Ordering is separate from age: `created_at` is the locked
-upload date, `sort_at` is the movable feed position (`move_release` swaps it).
+**Nothing is hard-deleted except uncredited artists, and app code never deletes from R2.** Releases
+and tracks get `archived_at`; a hard delete would cascade away `downloads` history, and the prod
+bucket is delete-locked anyway. `archived_at` plus `r2_cleanup_queue` are the record of what is gone
+and which files might be removed later. Archived rows are hidden from listeners by RLS but **label
+members can still read them**, so every listener-facing path (`getFeed` and its search filter
+`searchMatches`, `getAlbum`, `getTrackStreamUrl`, `getTrackDownloadUrl`) also filters `archived_at`
+explicitly. Ordering is separate from age: `created_at` is the locked upload date, `sort_at` is the
+movable feed position (`move_release` swaps it).
 
 ## Pieces
 
@@ -28,7 +28,7 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 |---|---|
 | `pinned`, `sort_at`, `archived_at`, `keep_created_at`, live-only read policies | `supabase/migrations/20261010120000_feed_order_and_archive.sql` |
 | `move_release` | `…20261010120100_move_release.sql` |
-| `search_feed` (archived excluded) | `…20261010120200_search_feed.sql` |
+| `search_feed` (archived excluded; no app callers since Drizzle slice 1) | `…20261010120200_search_feed.sql` |
 | `r2_cleanup_queue` | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
 | `release_for_track` (internal), `archive_release`, `restore_release` | `…20261010140000_archive_restore_release.sql` |
@@ -37,9 +37,10 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 | `update_release` | `…20261010140300_update_release.sql` |
 | `catalog_number` identity + `keep_catalog_number` (archive/restore/delete never reuse or change a number) | `…20261011170000_catalog_numbers.sql` ([[catalog-schema]]) |
 | Feed order + archived filter, `feedPageSize()` | `src/lib/supabase/feed.ts` (`getFeed`) |
+| Feed search (archived tracks never match) | `src/lib/supabase/feed-search.ts` (`searchMatches`) |
 | `null` for archived albums, archived tracks skipped | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Stream/download refuse archived tracks | `src/lib/storage/actions.ts` |
-| Tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `{archive-release,archive-track,add-track-replace-audio,update-release}.data.test.ts`, `src/lib/storage/actions.test.ts` |
+| Tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `feed-drizzle.parity.data.test.ts`, `{archive-release,archive-track,add-track-replace-audio,update-release}.data.test.ts`, `src/lib/storage/actions.test.ts` |
 
 ## References
 
@@ -58,13 +59,13 @@ upload date, `sort_at` is the movable feed position (`move_release` swaps it).
 - [[media-storage]] — R2 keys, the prod bucket lock, the stream/download actions.
 
 Used by: [[admin-upload]] (the release admin UI), [[invites]] (user deactivation is a
-reversible auth ban, `admin_list_users.banned_until`, not a delete), [[timeline-player]]
+reversible auth ban, read as `banned_until` by `listUsers`, not a delete), [[timeline-player]]
 (feed order and archived filtering).
 
 ## Known deferrals (as of 2026-10-10)
 
 - **Admin UI** for pin/reorder/archive/restore/edit/replace/add-remove track is built
   (`src/lib/admin/release-actions.ts`, `/admin/releases`; [[admin-upload]]); artist admin is
-  `/admin/artists`. `search_feed` is called by `getFeed` when `q` is set (`/feed?q=`); the
-  admin pages don't call it.
+  `/admin/artists`. The feed search (`/feed?q=`) is `searchMatches` inside `getFeed`; the
+  `search_feed` SQL function has no app callers since Drizzle slice 1.
 - **The cleanup job itself** is not built; nothing deletes from R2.

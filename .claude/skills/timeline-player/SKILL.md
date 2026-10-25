@@ -1,6 +1,6 @@
 ---
 name: timeline-player
-description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), where the waveform plugs into the player (`PixelWaveform`, `PlaybackButton` particles, the meter contexts; the waveform end to end is the `waveform` skill), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, or album art is missing from the album page. Covers playback of presigned R2 URLs (CORS-mode `<audio>` on desktop for the live meter, plain `<audio>` on touch), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
+description: Use when working on the listener timeline (`/feed`), the persistent music player (`PlayerProvider` / `usePlayer` / `usePlayerTime` / `PlayerBar`), where the waveform plugs into the player (`PixelWaveform`, `PlaybackButton` particles, the meter contexts; the waveform end to end is the `waveform` skill), the album page (`/albums/[id]`), the feed/album data layer (`getFeed` / `getAlbum`, `catalogNumber`; Drizzle reads through `asUser` with `searchMatches` in `feed-search.ts`, `TRACK_WITH` / `ARTIST_NAMES` / `toFeedTrack` in `catalog-selects.ts`, `artistNamesOf`, `MAX_ROWS`, `UNAUTHENTICATED` when signed out), the feed rows (`AlbumRow` "Pack", `SingleTrackRow` "Single", `PixelAccordion`, `CatalogLine` HS###/HSS###), per-track downloads on those pages (`DownloadButton`, `DownloadsProvider`/`useDownloads`, `getMyDownloadedTrackIds`), or the auth redirects that land signed-in users on `/feed`. Also when play buttons re-render during playback, or album art is missing from the album page. Covers playback of presigned R2 URLs (CORS-mode `<audio>` on desktop for the live meter, plain `<audio>` on touch), how playback persists across navigation, how the feed (pinned first, then `sort_at`, archived hidden) is assembled, and how these routes are guarded.
 ---
 
 # Timeline + Persistent Player
@@ -61,9 +61,11 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 | Next-page server actions | `src/lib/feed/actions.ts` (`loadFeedPage`, `continueAfterRelease`) |
 | Follow-the-music on /feed | `src/components/Feed/FollowPlayingPage.tsx` |
 | Feed search box + pager | `src/components/{SearchInput,Pagination}/` (shared with [[artists-read]]); `src/app/(app)/feed/{page.tsx,params.ts}` |
-| Feed data (pinned + `sort_at` order, archived hidden, `catalogNumber`) | `src/lib/supabase/feed.ts` (`getFeed`) |
-| Album detail data | `src/lib/supabase/albums.ts` (`getAlbum`) |
-| Shared artist-name flattener | `src/lib/supabase/artist-names.ts` |
+| Feed data (pinned + `sort_at` order, archived hidden, `catalogNumber`; Drizzle via `asUser`) | `src/lib/supabase/feed.ts` (`getFeed`) |
+| Feed search filter (same matches as the old `search_feed` SQL function) | `src/lib/supabase/feed-search.ts` (`searchMatches`) |
+| Album detail data (Drizzle via `asUser`) | `src/lib/supabase/albums.ts` (`getAlbum`) |
+| Shared Drizzle query shapes for feed and album (`ARTIST_NAMES`, `TRACK_WITH`, `DbTrack`, `toFeedTrack`) | `src/lib/supabase/catalog-selects.ts` |
+| Shared artist-name flatteners (`artistNamesOf` for Drizzle rows, `namesFrom` for supabase-js embeds) | `src/lib/supabase/artist-names.ts` |
 | Catalog id stamp (`HS###` album / `HSS###` track) + row line | `src/components/CatalogId/{CatalogId,CatalogLine}.tsx` |
 | Timeline page | `src/app/(app)/feed/page.tsx` |
 | Album page (artwork hidden for now) | `src/app/(app)/albums/[id]/{page.tsx,album-page.styles.ts}` |
@@ -85,11 +87,12 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
   (`audioMeter.ts`, `peaks.ts`, `PixelWaveform`, `PlaybackButton`), queue sources and paging (a search
   queue that runs out continues into the main feed after its last release; the view stays on
   the search), pre-signing, Media Session, and `FollowPlayingPage`.
-- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (`releases`
-  or `search_feed` via `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
-  `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`, and `getAlbum` (tracks in `position`
-  order); the required `catalogNumber` on every shape; position ordering and the "Various Artists" label.
-  Also how both pages seed downloaded state (`getMyDownloadedTrackIds` + `DownloadsProvider`).
+- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one Drizzle read of
+  `releases` with an optional `searchMatches` filter for `q`, `pinned desc, sort_at desc`, archived
+  hidden, exact-count pagination, `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`,
+  and `getAlbum` (tracks in `position` order); the required `catalogNumber` on every shape; position
+  ordering and the "Various Artists" label. Also how both pages seed downloaded state
+  (`getMyDownloadedTrackIds` + `DownloadsProvider`).
 - [routing-and-auth.md](References/routing-and-auth.md) — the `(app)` route group, `/feed`
   as the authenticated home, `/albums/[id]` (artwork hidden), the auth retarget, retired `/artists`, the
   global 404 bounce, the error boundary, and the feed row components ("Pack"/"Single" labels,
@@ -109,6 +112,8 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 - [[catalog-schema]] — `getFeed`/`getAlbum` read `releases`/`albums`/`tracks`/
   `track_albums`/`track_artists`/`album_artists` (including `catalog_number`) and rely on the
   "authenticated" RLS policies.
+- [[db-access]] — both reads run through Drizzle's `asUser` (as the signed-in user, so those RLS
+  policies apply); errors come back as `DomainError` / `DatabaseError`.
 - [[content-lifecycle]] — owns `archived_at`, `pinned`/`sort_at` and `move_release`, which decide what the feed shows and in what order.
 - [[admin-upload]] — owns the `releases` table, `position` columns, and the publish path
   that creates what the feed shows.

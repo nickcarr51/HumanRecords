@@ -14,11 +14,15 @@ Retired when the listener timeline became the home (`/feed`, PR #7).
 
 | Piece | Live consumer |
 |---|---|
-| `escapeLike` | `src/lib/admin/actions.ts` → `searchArtists` (upload form's artist combobox) |
+| `escapeLike` | `src/lib/admin/actions.ts` → `searchArtists` (upload form's artist combobox); `src/lib/admin/artists.ts` (`/admin/artists` search); `src/lib/supabase/feed-search.ts` (`/feed` search) |
 | `initials` (`src/lib/initials.ts`) | `ArtistCard`; the detail page |
 | `ArtistCard` | Only the artists page today, but barrel-exported from `@/components` |
 
 ## Revival checklist
+
+Under the one-table rule, `getArtists` / `getArtist` read more than one table, so a rewrite of
+them goes through Drizzle (`asUser`, [[db-access]]; assigned to slice 2), not more supabase-js
+embeds. Steps 4, 5 and 8 below describe what those reads must return, whichever way they are built.
 
 1. Remove the `/artists` rule from `authRedirectPath` and update `route-guard.test.ts` (keep
    `/artists` in `PROTECTED_PREFIXES`).
@@ -28,7 +32,8 @@ Retired when the listener timeline became the home (`/feed`, PR #7).
    never in `ArtistCard` ([[media-storage]]).
 4. Wire the detail page's play slot to the player: convert tracks with `toPlayerTrack` and call
    `playQueue` from a client row component, like `AlbumTracks` ([[timeline-player]]). The
-   detail query would need `track_artists(position, artists(name))` per track for artist names.
+   detail query would need each track's credited artist names in `position` order (the Drizzle
+   `TRACK_WITH` shape in `src/lib/supabase/catalog-selects.ts` already returns them).
 5. Decide track order (title today) and whether to show only released tracks (join through
    `releases` / `track_albums`) — `trackCount` currently counts every credited track.
 6. Optionally link artist names in the feed and album pages to `/artists/{id}`.

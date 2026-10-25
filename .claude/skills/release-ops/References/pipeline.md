@@ -5,7 +5,7 @@
 | Job | What it does |
 |---|---|
 | `app` | `yarn install --frozen-lockfile`, `yarn lint`, `yarn typecheck`, `yarn build` (dummy env) |
-| `test` | `supabase start` (minimal services), env from `supabase status`, full `yarn test` incl. DB-dependent files; sets `DATABASE_URL` from `DB_URL`; no `seed.local.sql` in CI |
+| `test` | `supabase start` (minimal services), env from `supabase status`, full `yarn test` incl. DB-dependent files; sets `DATABASE_URL` to the CI job's own local stack (the `DB_URL` that `supabase status -o env` prints, not the GitHub environment secret of the same name); no `seed.local.sql` in CI |
 | `migrations` | `scripts/check-migrations.mts origin/<base>`: fails modified/renamed/deleted migrations, a new migration not newer than the base's newest, and `--include-seed` in any workflow |
 | `types` | regenerates `database.types.ts` from the local stack and diffs against the committed file; also runs `yarn db:pull` and diffs `src/lib/db/generated/schema.ts` |
 | `main-source` | PRs into `main` must come from `develop` |
@@ -16,9 +16,9 @@ deletion). CI uses fake R2 values; no test reaches a real bucket.
 ## `deploy.yml` (push to `develop` / `main`)
 
 ```
-develop: plan (env develop) -> release (env develop): db push, Vercel develop hook
+develop: plan (env develop) -> release (env develop): db push, Vercel develop hook, health poll
 main:    plan (env production-preflight) -> backup (backup.yml) ->
-         release (env production-release, Approve click): db push, Vercel prod hook
+         release (env production-release, Approve click): db push, Vercel prod hook, health poll
 ```
 
 - `plan` runs `supabase db push --dry-run` and writes the pending list to the job summary, so
@@ -26,6 +26,12 @@ main:    plan (env production-preflight) -> backup (backup.yml) ->
   single approval comes after the dry run, on `release`.
 - The `release` deploy step calls the Vercel hook only if its commit is still the branch tip; a
   newer queued run migrates and deploys instead (the hook builds the tip, so migrations must run first).
+- Then **"Site database answers"** polls `<site>/api/health/db` every 15s for up to 5 minutes
+  (site from the `PROD_SITE_URL` / `DEV_SITE_URL` repository variables) and fails the run unless
+  it gets a 200 ([[db-access]] `References/errors-and-health.md`). It can't tell whether the new
+  deployment or the previous one answered, and it also runs when the hook step skipped the deploy.
+  A deploy to an environment whose Vercel project has no `DATABASE_URL` fails here, so add the
+  variable first.
 - Any failure stops later jobs. `concurrency: deploy-<branch>`, no cancel-in-progress.
 - All workflows set `defaults.run.shell: bash` (so pipes fail on error).
 
@@ -67,6 +73,10 @@ deployments -> Approve. Reject to stop; nothing has changed yet.
 - `release` fails mid-push: the Vercel hook did not run, so old code is still live. Fix forward
   with a new migration (never edit an applied one) and merge again.
 - A CI `migrations` failure is a rule violation, not flakiness.
+- "Site database answers" fails (deploy or daily health): the app can't reach its database.
+  Check the server log line `Database health check failed: <check>` in Vercel: `query` =
+  `DATABASE_URL` missing/wrong, TLS or the pooler; `bypassesRls` / `readsAuthUsers` /
+  `switchesToAuthenticated` = the hosted login role lost a permission the app relies on.
 
 ## Backdated-migration false alarm
 

@@ -28,11 +28,16 @@ for new functions as long as `''` functions schema-qualify every reference.
 
 - Migration `20261002120100_create_invites.sql`. Definer, `stable`. Raises `42501` unless
   `current_user_role() = 'label_member'`.
-- Returns `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`, newest first.
-  `banned_until` (from `auth.users`) was added in `20261010120500` (drop + recreate, since the return type changed; the deployed code ignores the extra column). Nothing renders it yet; the user-admin branch will.
+- Returns `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`, newest
+  first. `banned_until` (from `auth.users`) was added in `20261010120500` (drop + recreate, since
+  the return type changed). The app reads it today through `listUsers`, and `toAdminUserRow`
+  derives the user list's "deactivated" state from it ([[invites]]).
   Generated types mark `name`/`invite_token`/`invite_used_at` non-null though they can be null.
-- Grants: revoked from `public`/`anon`, granted to `authenticated`. Former caller (before Drizzle slice 1): [[invites]].
-- No app callers since Drizzle slice 1 (`listUsers` in `services/users.ts`); kept in the DB until a later cleanup migration.
+- Grants: revoked from `public`/`anon`, granted to `authenticated`. Former caller (before Drizzle
+  slice 1): [[invites]].
+- No app callers since Drizzle slice 1 (`listUsers` in `services/users.ts`, same columns and
+  order, [[db-access]]); kept in the DB until a later cleanup migration. The parity test
+  `users.parity.data.test.ts` and `invites.data.test.ts` still call it.
 
 ## `admin_set_user_role(target uuid, new_role user_role)` → void
 
@@ -51,7 +56,9 @@ for new functions as long as `''` functions schema-qualify every reference.
 - Migration: `20260929120000_create_releases.sql`. `stable`.
 - Returns the caller's own role (`where id = auth.uid()`), `null` if no row / signed out.
 - Exists because `users.role` is hidden by column grants. Executable by `authenticated` only.
-- App wrapper: `getCurrentRole()` in `src/lib/auth/role.ts` ([[auth]]).
+- App wrappers: `getCurrentRole()` in `src/lib/auth/role.ts` (supabase-js RPC, [[auth]]) and
+  `getViewer()` in `src/lib/services/viewer.ts` (the same function, selected through Drizzle's
+  `asUser`, [[db-access]]).
 
 ## `resolve_artist_refs(refs jsonb)` → `uuid[]`
 
@@ -111,12 +118,15 @@ for new functions as long as `''` functions schema-qualify every reference.
 - Case-insensitive substring match on track titles, album titles and credited artist names (an album
   also matches through its live tracks); `%`, `_` and `\` in `q` are escaped, so `100%` is literal.
   Excludes archived releases and archived tracks.
-- **An empty `q` matches everything**, so callers skip the RPC for an empty query.
-- Returns plain `releases` rows so the caller chains the same embedded select, order and `range` as
-  `getFeed`. PostgREST orders an RPC result only by columns in the select projection, so the select
-  must include `pinned, sort_at` (as `RELEASE_SELECT` does).
-- Former caller (before Drizzle slice 1): `getFeed` in `src/lib/supabase/feed.ts` (the `/feed` search box), via the shared order helper.
-- No app callers since Drizzle slice 1 (`searchMatches` in `feed-search.ts`); kept in the DB until a later cleanup migration.
+- **An empty `q` matches everything**; a caller would skip the function for an empty query.
+- Returns plain `releases` rows, unordered. (Before slice 1, `getFeed` chained its embedded select,
+  order and range onto the call; PostgREST orders a function result only by columns in the select,
+  so that select had to include `pinned, sort_at`.)
+- Former caller (before Drizzle slice 1): `getFeed` in `src/lib/supabase/feed.ts` (the `/feed`
+  search box).
+- No app callers since Drizzle slice 1: `searchMatches` (`src/lib/supabase/feed-search.ts`) is the
+  same match, built in Drizzle ([[db-access]]). Kept in the DB until a later cleanup migration;
+  `search-feed.data.test.ts` and the parity test `feed-drizzle.parity.data.test.ts` still call it.
 
 ## Triggers `releases_default_sort_at()`, `keep_created_at()` and `keep_catalog_number()`
 

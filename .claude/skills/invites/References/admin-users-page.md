@@ -3,8 +3,13 @@
 ## Page (`src/app/(app)/admin/users/page.tsx`)
 
 `await requireLabelMember()` first (layouts don't re-run on client navigation), then
-`listAdminUsers(await createClient(), process.env.SITE_URL)` → `admin_list_users()` through the
-**cookie** client, so Postgres checks the caller. A load failure renders an `Alert` (a missing
+`listAdminUsers(await createClient(), process.env.SITE_URL)`. That passes the **cookie** client to
+`getViewer` (the caller's verified id, and their role read from `current_user_role()` through
+Drizzle's `asUser`), then `listUsers(viewer)` (`src/lib/services/users.ts`): `authorize(viewer,
+"users.list")` lets only label members through, and the query then runs with `asSystem` (admin
+access, RLS skipped), because `auth.users` and `invites` aren't readable under RLS
+([[db-access]]). Two transactions per load. The role check for the list is therefore in our code,
+not in Postgres. A load failure renders an `Alert` (a missing
 `SITE_URL` gets its own message). `/admin` has a **Users** `ActionCard` linking here.
 
 ## Actions (`src/lib/admin/users-actions.ts`, `"use server"`)
@@ -30,12 +35,15 @@ and `revalidatePath('/admin/users')` on success.
 Both functions are `security definer`, `set search_path = public`, execute revoked from
 `public`/`anon`, granted to `authenticated`.
 - `admin_list_users()` → `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`
-  (users ⟕ auth.users ⟕ invites, newest first). `banned_until` was added in `20261010120500` for
-  deactivation (a reversible Supabase auth ban); **no UI reads it yet** — it comes with the artist/user admin branch. Raises `42501` unless `label_member`.
+  (users ⟕ auth.users ⟕ invites, newest first). Raises `42501` unless `label_member`. No app
+  callers since Drizzle slice 1: `listUsers` returns the same columns in the same order (proved by
+  `users.parity.data.test.ts`). `banned_until` (added in `20261010120500`) is what
+  `toAdminUserRow` turns into `deactivated` (a ban that hasn't expired yet).
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
   `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only.
 
-So role and self-guard checks exist in the action **and** in Postgres.
+So for `setUserRole`, the role and self-guard checks exist in the action **and** in Postgres. For
+the list, the role check is `authorize()` in the users service.
 
 ## UI (`src/components/AdminUsers/`)
 
