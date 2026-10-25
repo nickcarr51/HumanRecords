@@ -15,8 +15,9 @@ let db: Db | undefined;
 
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
-// Parsed once. Node's URL error carries the whole input (password included) in
-// its `input` property, so it is replaced, with no cause and no URL text.
+// Parsed here to choose TLS; a bad URL is reported without echoing it. Node's
+// URL error carries the whole input (password included) in its `input`
+// property, so it is replaced, with no cause and no URL text.
 function parseUrl(url: string): URL {
   try {
     return new URL(url);
@@ -25,18 +26,21 @@ function parseUrl(url: string): URL {
   }
 }
 
-// The postgres.js options for a DATABASE_URL. Pure, so it is unit-tested.
+// The postgres.js options for a DATABASE_URL. It opens no connection, so the
+// unit tests call it directly.
 export function connectionOptions(url: string) {
   const ssl = LOCAL_HOSTS.has(parseUrl(url).hostname)
     ? false
     : { ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true };
   return {
-    // Required by Supavisor's transaction mode, which can't keep prepared
-    // statements across pooled connections.
+    // Supabase's shared connection pool (port 6543) may run each transaction
+    // on a different server connection, so postgres.js must not save a query
+    // on one connection to reuse it later.
     prepare: false,
     max: 5,
-    // Serverless: release idle connections after 20s, and fail fast (10s)
-    // instead of hanging a request when the pooler can't be reached.
+    // Vercel runs the app as short-lived functions: release idle connections
+    // after 20s, and fail fast (10s) instead of hanging a request when the
+    // connection pool can't be reached.
     idle_timeout: 20,
     connect_timeout: 10,
     // Verified TLS for hosted databases: the connection is encrypted AND the
@@ -54,8 +58,8 @@ export function createDb(client: postgres.Sql): Db {
   return drizzle(client, { schema: fullSchema });
 }
 
-// Lazy: the build and every page that doesn't use the database work without
-// DATABASE_URL.
+// Created on the first call, not when the module loads, so the build and
+// every page that doesn't use the database work without DATABASE_URL.
 export function getDb(): Db {
   if (db) return db;
   const url = process.env.DATABASE_URL;

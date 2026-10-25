@@ -1,18 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { asSystem } from "@/lib/db/system";
 import { authorize } from "./policy";
 import type { JwtClaims, Viewer } from "./viewer";
 import type { Grant } from "./policy";
 
-const viewer = (role: Viewer["role"]): Viewer => ({ userId: "u1", role, claims: { sub: "u1" } as JwtClaims });
+// The role rules run against real signed-in users in policy.data.test.ts.
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("authorize", () => {
-  it("grants users.list to a label member", () => {
-    expect(authorize(viewer("label_member"), "users.list").action).toBe("users.list");
-  });
-
-  it.each(["listener", "artist", null] as const)("forbids users.list for %s", (role) => {
-    expect(() => authorize(viewer(role), "users.list")).toThrow(
+  it("refuses a hand-built Viewer, even a label member", () => {
+    const forged = { userId: "u1", role: "label_member", claims: { sub: "u1" } } as unknown as Viewer;
+    expect(() => authorize(forged, "users.list")).toThrow(
       expect.objectContaining({ name: "DomainError", code: "FORBIDDEN" }),
     );
   });
@@ -20,14 +21,20 @@ describe("authorize", () => {
   it("asSystem only accepts a Grant made by authorize (checked by yarn typecheck)", () => {
     const forge = () =>
       // @ts-expect-error a hand-built object is not a Grant
-      asSystem({ action: "users.list" }, async () => 1);
+      asSystem({ action: "users.list" }, "users.list", async () => 1);
     expect(typeof forge).toBe("function"); // never invoked: this is a compile-time test
   });
 
-  it("asSystem rejects a forged grant at runtime", async () => {
-    await expect(asSystem({ action: "users.list" } as unknown as Grant, async () => 1)).rejects.toMatchObject({
+  it("asSystem rejects a forged grant at runtime, before any database access", async () => {
+    // With no DATABASE_URL, any database access would fail with "Missing
+    // DATABASE_URL" instead of FORBIDDEN.
+    vi.stubEnv("DATABASE_URL", "");
+    const fn = vi.fn(async () => 1);
+    await expect(asSystem({ action: "users.list" } as unknown as Grant, "users.list", fn)).rejects.toMatchObject({
+      name: "DomainError",
       code: "FORBIDDEN",
     });
+    expect(fn).not.toHaveBeenCalled();
   });
 
   it("a hand-built claims object is not JwtClaims (checked by yarn typecheck)", () => {

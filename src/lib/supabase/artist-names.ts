@@ -9,6 +9,7 @@ export type ArtistNameRel = Array<{
 
 // PostgREST can't order nested embeds by a column of the link table without
 // per-embed modifiers, so link rows carry `position` and are ordered here.
+// The Drizzle reads reuse it for the same ordering rule.
 export function byPosition<T extends { position?: number | null }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
@@ -20,9 +21,9 @@ export function namesFrom(rel: ArtistNameRel): string[] {
   return Array.from(new Set(names));
 }
 
-// Drizzle relational rows: `{ position, artist: { name } }` (singular
-// `artist`, unlike PostgREST's `artists` embed). Same rules as namesFrom:
-// position order, missing artists dropped, duplicates removed.
+// Link rows from Drizzle's nested reads: `{ position, artist: { name } }`
+// (singular `artist`, unlike PostgREST's `artists` embed). Same rules as
+// namesFrom: position order, missing artists dropped, duplicates removed.
 export type ArtistLink = { position?: number | null; artist: { name: string } | null };
 
 export function artistNamesOf(links: ArtistLink[]): string[] {

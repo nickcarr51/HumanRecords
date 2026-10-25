@@ -12,8 +12,9 @@ let client: SupabaseClient;
 let labelClient: SupabaseClient;
 let singleRelease: string;
 
-// Delete in FK-safe order. Track and album deletes cascade their link rows;
-// artists go last because credit FKs are `restrict` (20261010120400).
+// Delete in an order the database allows: deleting a track or an album also
+// deletes its link rows, and artists go last because the database refuses to
+// delete an artist that a credit still points at (20261010120400).
 const created = { releases: [] as string[], tracks: [] as string[], albums: [] as string[], artists: [] as string[] };
 async function row(table: keyof typeof created, values: Record<string, unknown>) {
   const { data, error } = await admin.from(table).insert(values).select("id").single();
@@ -61,8 +62,8 @@ beforeAll(async () => {
   labelClient = await labelUser.signIn();
 });
 
-// Users are guarded so a failed beforeAll doesn't make cleanup throw; a failed
-// fixture delete still fails the run after the users are removed.
+// Users are guarded so a failed beforeAll doesn't make cleanup throw; if
+// deleting a test row fails, the run still fails after the users are removed.
 afterAll(async () => {
   try {
     for (const table of ["releases", "tracks", "albums", "artists"] as const) {
@@ -77,18 +78,36 @@ afterAll(async () => {
   }
 });
 
+type RpcRow = {
+  kind: string;
+  album_id: string;
+  track_id: string;
+  track: { archived_at: string | null } | null;
+  album: { track_albums: Array<{ tracks: { archived_at: string | null } | null }> } | null;
+};
+
+// The old getFeed ran search_feed, then dropped (in toFeedItem) a single whose
+// track is archived or hidden, an album with no live tracks, and a release
+// whose track or album is hidden. The new getFeed drops the same rows. So the
+// same drop is applied here to search_feed's rows: that keeps every case,
+// including % and _ (which match across the whole local catalog), a true
+// comparison of the old getFeed with the new one.
+function shownByOldFeed(r: RpcRow): boolean {
+  if (r.kind === "single") return r.track !== null && !r.track.archived_at;
+  if (r.kind === "album") return r.album !== null && r.album.track_albums.some((ta) => ta.tracks !== null && !ta.tracks.archived_at);
+  return false;
+}
+
 async function rpcIds(c: SupabaseClient, q: string): Promise<string[]> {
   const { data, error } = await c
     .rpc("search_feed", { q })
-    .select("kind, album_id, track_id, pinned, sort_at, id")
+    .select("kind, album_id, track_id, pinned, sort_at, id, track:tracks(archived_at), album:albums(track_albums(tracks(archived_at)))")
     .is("archived_at", null)
     .order("pinned", { ascending: false })
     .order("sort_at", { ascending: false })
     .order("id", { ascending: false });
   if (error) throw error;
-  return (data as Array<{ kind: string; album_id: string; track_id: string }>).map((r) =>
-    r.kind === "album" ? r.album_id : r.track_id,
-  );
+  return (data as unknown as RpcRow[]).filter(shownByOldFeed).map((r) => (r.kind === "album" ? r.album_id : r.track_id));
 }
 
 const SEARCH_CASES = [
@@ -126,8 +145,9 @@ describe("getFeed on Drizzle: parity with search_feed", () => {
   it("a page past the end has no items and correct totals", async () => {
     const { count, error } = await client.from("releases").select("id", { count: "exact", head: true }).is("archived_at", null);
     if (error) throw error;
+    if (count === null) throw new Error("the release count came back empty");
     const page = await getFeed(client, { page: 9999, pageSize: 1 });
-    expect(page).toMatchObject({ items: [], total: count, totalPages: Math.max(1, count!), hasMore: false });
+    expect(page).toMatchObject({ items: [], total: count, totalPages: Math.max(1, count), hasMore: false });
   });
 
   it("rejects a signed-out client with UNAUTHENTICATED", async () => {

@@ -7,6 +7,15 @@ afterEach(() => {
   vi.resetModules();
 });
 
+// True when `text` appears anywhere inside `value`: in any own property,
+// hidden or not, at any depth (cause included).
+function containsText(value: unknown, text: string, seen = new Set<unknown>()): boolean {
+  if (typeof value === "string") return value.includes(text);
+  if (typeof value !== "object" || value === null || seen.has(value)) return false;
+  seen.add(value);
+  return Object.getOwnPropertyNames(value).some((key) => containsText(Reflect.get(value, key), text, seen));
+}
+
 describe("getDb", () => {
   it("throws a clear error when DATABASE_URL is unset", async () => {
     vi.stubEnv("DATABASE_URL", "");
@@ -32,9 +41,8 @@ describe("getDb", () => {
     }
     if (!(caught instanceof Error)) throw new Error("getDb did not throw an Error");
     expect(caught.message).toBe("DATABASE_URL is not a valid URL");
-    for (const key of Object.getOwnPropertyNames(caught)) {
-      expect(String(Reflect.get(caught, key))).not.toContain(password);
-    }
+    expect(caught.cause).toBeUndefined();
+    expect(containsText(caught, password)).toBe(false);
   });
 });
 
@@ -47,15 +55,32 @@ describe("connectionOptions", () => {
     expect(connectionOptions(LOCAL).ssl).toBe(false);
   });
 
+  it("turns TLS off for the local database reached as localhost", async () => {
+    const { connectionOptions } = await import("./client");
+    expect(connectionOptions("postgresql://postgres:postgres@localhost:54322/postgres").ssl).toBe(false);
+  });
+
   it("verifies TLS against the Supabase root CA for a hosted pooler URL", async () => {
     const { connectionOptions } = await import("./client");
     const { SUPABASE_ROOT_CA_2021 } = await import("./supabase-ca");
     expect(connectionOptions(HOSTED).ssl).toEqual({ ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true });
   });
 
-  it.each([LOCAL, HOSTED])("keeps the pooler and serverless options for %s", async (url) => {
+  it.each([LOCAL, HOSTED])("keeps the connection settings (no saved queries, at most 5 connections, timeouts) for %s", async (url) => {
     const { connectionOptions } = await import("./client");
-    expect(connectionOptions(url)).toMatchObject({ prepare: false, idle_timeout: 20, connect_timeout: 10 });
+    expect(connectionOptions(url)).toMatchObject({ prepare: false, max: 5, idle_timeout: 20, connect_timeout: 10 });
+  });
+
+  it("keeps the certificate check when the URL asks for ?sslmode=require", async () => {
+    // sslmode=require on its own would skip the certificate check; our ssl
+    // option must win. getDb builds the client but doesn't connect until the
+    // first query, so this never reaches the network.
+    vi.stubEnv("DATABASE_URL", `${HOSTED}?sslmode=require`);
+    const { getDb } = await import("./client");
+    const { SUPABASE_ROOT_CA_2021 } = await import("./supabase-ca");
+    // Drizzle keeps the postgres.js client as `$client`; our Db type leaves it out.
+    const client = Reflect.get(getDb(), "$client") as { options: { ssl: unknown } };
+    expect(client.options.ssl).toEqual({ ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true });
   });
 });
 

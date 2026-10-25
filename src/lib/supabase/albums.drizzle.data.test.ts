@@ -5,8 +5,9 @@ import { createAdminClient, createAnonClient, createTestUser } from "./test-help
 
 const admin = createAdminClient();
 
-// Delete in FK-safe order. Track and album deletes cascade their link rows;
-// artists go last because credit FKs are `restrict` (20261010120400).
+// Delete in an order the database allows: deleting a track or an album also
+// deletes its link rows, and artists go last because the database refuses to
+// delete an artist that a credit still points at (20261010120400).
 const created = { releases: [] as string[], tracks: [] as string[], albums: [] as string[], artists: [] as string[] };
 afterEach(async () => {
   for (const table of ["releases", "tracks", "albums", "artists"] as const) {
@@ -31,7 +32,7 @@ async function insert(
 }
 
 describe("getAlbum (Drizzle)", () => {
-  it("orders tracks and artists by position, dedupes artists, drops archived tracks", async () => {
+  it("orders tracks and artists by position, drops archived tracks", async () => {
     const tag = `ALBDZ${Date.now()}`;
     const al = await row("albums", { title: `${tag} LP` });
     const a1 = await row("artists", { name: `${tag} First` });

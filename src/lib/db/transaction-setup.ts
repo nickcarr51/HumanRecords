@@ -6,10 +6,12 @@ import type { JwtClaims } from "@/lib/services/viewer";
 // Supabase's docs set an 8s statement_timeout for the `authenticated` role,
 // and the `postgres` role is capped by a 2-minute global timeout. The
 // local stack's `authenticator` role also has lock_timeout = 8s (observed
-// locally, not documented by Supabase). A direct Drizzle connection gets none
-// of these, so asUser and asSystem both set 10s for statement_timeout and
-// lock_timeout per transaction. 10s is the owner's choice (2026-10-24).
-export const QUERY_TIMEOUT = "10s";
+// locally, not documented by Supabase). A direct Drizzle connection logs in as
+// `postgres`, so it doesn't get the authenticated/authenticator 8s settings,
+// only the 2-minute global cap. So asUser and asSystem both set 10s for
+// statement_timeout and lock_timeout per transaction. 10s is the owner's
+// choice (2026-10-24).
+const QUERY_TIMEOUT = "10s";
 
 // Everything a transaction needs before its first query, in ONE statement (one
 // round trip). Every set_config is transaction-local (is_local = true), so

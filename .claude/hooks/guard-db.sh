@@ -33,12 +33,16 @@ elif has '(psql|pg_dump|pg_restore|dropdb)' && has 'supabase\.(co|com)|pooler\.s
 elif has '(aws[^|;&]*[[:space:]]+s3[[:space:]]+(rm|rb|mv)|aws[^|;&]*[[:space:]]+s3[[:space:]]+sync.*--delete|aws[^|;&]*[[:space:]]+s3api[^|;&]*[[:space:]]+delete-(object|objects|bucket)|rclone[^|;&]*[[:space:]]+(delete|deletefile|purge|rmdir|rmdirs)|wrangler[^|;&]*[[:space:]]+r2[^|;&]*[[:space:]]+(object|bucket)[[:space:]]+delete)'; then
   reason="Deletes or moves R2 objects or buckets."
 elif has 'drizzle-kit' && has '(^|[[:space:]])(push|migrate|drop|up)([[:space:]]|$)'; then
-  reason="drizzle-kit push/migrate/drop/up can write schema changes to a database. Supabase migrations are the only schema path."
+  reason="drizzle-kit push/migrate change a database; drop/up rewrite Drizzle migration files. Supabase migrations are the only schema path."
 elif has 'drizzle-kit' && has 'supabase\.(co|com)|pooler\.supabase'; then
   reason="drizzle-kit pointed at a HOSTED Supabase database."
 # Anything naming production resources.
 elif has '(media-prod|humanrecords-backups|gglrarflzvfxhdnjbnvt)'; then
   reason="Command references a PRODUCTION resource (prod media bucket, backups bucket, or prod Supabase project)."
+# Any command carrying a hosted database URL, e.g. `DATABASE_URL=<hosted> yarn dev`
+# or `yarn test`: the app and the tests connect straight to DATABASE_URL.
+elif has 'postgres(ql)?://([^[:space:]@/]*@)?[^[:space:]@/]*(supabase\.(co|com)|pooler\.supabase)'; then
+  reason="Command contains a HOSTED Supabase database URL."
 fi
 
 [ -z "$reason" ] && exit 0

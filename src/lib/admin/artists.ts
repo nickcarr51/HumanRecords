@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { escapeLike } from "@/lib/supabase/artists";
-import { listUsers as listAllUsers } from "@/lib/services/users";
+import { listUsers } from "@/lib/services/users";
 import { getViewer } from "@/lib/services/viewer";
 import {
   ADMIN_ARTISTS_PAGE_SIZE,
@@ -38,8 +38,8 @@ function countOf(rel: unknown): number {
   return (rel as Array<{ count: number }> | null)?.[0]?.count ?? 0;
 }
 
-async function listUsers(db: Db): Promise<LinkedUser[]> {
-  const rows = await listAllUsers(await getViewer(db));
+async function linkedUsersFor(db: Db): Promise<LinkedUser[]> {
+  const rows = await listUsers(await getViewer(db));
   return rows.map((u) => ({ id: u.id, name: u.name, email: u.email }));
 }
 
@@ -72,7 +72,7 @@ export async function listAdminArtists(
       .range(from, from + pageSize - 1),
   );
 
-  const [{ data, error, count }, users] = await Promise.all([builder, listUsers(db)]);
+  const [{ data, error, count }, users] = await Promise.all([builder, linkedUsersFor(db)]);
   if (error) {
     // PostgREST answers a range past the last row with 416 / PGRST103. Return
     // the true total so the caller can clamp to the last real page.
@@ -94,7 +94,7 @@ export async function getAdminArtist(db: Db, id: string): Promise<AdminArtistDet
   if (!UUID_RE.test(id)) return null;
   const [{ data, error }, users] = await Promise.all([
     db.from("artists").select(ROW_SELECT).eq("id", id).maybeSingle(),
-    listUsers(db),
+    linkedUsersFor(db),
   ]);
   if (error) throw error;
   if (!data) return null;
@@ -115,7 +115,7 @@ export async function getCreditCounts(db: Db, id: string): Promise<{ tracks: num
 
 export async function loadLinkTargets(db: Db): Promise<LinkTargets> {
   const [users, { data, error }] = await Promise.all([
-    listUsers(db),
+    linkedUsersFor(db),
     db.from("artists").select("id, name, user_id").not("user_id", "is", null),
   ]);
   if (error) throw error;

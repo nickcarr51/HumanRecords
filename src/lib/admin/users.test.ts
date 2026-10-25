@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { getAdminUser, toAdminUserRow, type AdminListRow } from "./users";
 
-const { listUsers } = vi.hoisted(() => ({ listUsers: vi.fn() }));
+const { listUsers, viewer } = vi.hoisted(() => ({
+  listUsers: vi.fn(),
+  viewer: { userId: "me", role: "label_member", claims: { sub: "me" } },
+}));
 vi.mock("@/lib/services/viewer", () => ({
-  getViewer: async () => ({ userId: "me", role: "label_member", claims: { sub: "me" } }),
+  getViewer: async () => viewer,
 }));
 vi.mock("@/lib/services/users", () => ({ listUsers: (...a: unknown[]) => listUsers(...a) }));
 
@@ -74,6 +77,7 @@ describe("getAdminUser", () => {
   it("returns the matching row", async () => {
     const row = await getAdminUser(db([{ ...base, id: ID }]), SITE, ID);
     expect(row?.id).toBe(ID);
+    expect(listUsers.mock.lastCall?.[0]).toBe(viewer);
   });
   it("returns null for an unknown or malformed id", async () => {
     expect(await getAdminUser(db([{ ...base, id: ID }]), SITE, "22222222-2222-4222-8222-222222222222")).toBeNull();

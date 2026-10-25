@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, count, desc, isNull } from "drizzle-orm";
 import { releases } from "@/lib/db/generated/schema";
+import { MAX_ROWS } from "@/lib/db/max-rows";
 import { pgrstTs } from "@/lib/db/timestamps";
 import { asUser } from "@/lib/db/user";
 import { getClaims } from "@/lib/services/viewer";
@@ -62,7 +63,9 @@ export function feedPageSize(): number {
   return Number.isInteger(n) && n > 0 ? n : DEFAULT_PAGE_SIZE;
 }
 
-// The nested data each feed row needs (same fields as the old RELEASE_SELECT).
+// The nested data each feed row needs. Album tracks use the same TRACK_WITH
+// as singles, so they also fetch trackArtUrl, which the feed doesn't use for
+// them.
 const RELEASE_WITH = {
   track: TRACK_WITH,
   album: {
@@ -141,14 +144,16 @@ export async function getFeed(
 
     // One ordering definition for search and the plain feed:
     // pinned first, then newest sort_at, id as the tiebreak.
-    // The rows and the count are pipelined on the same transaction.
+    // The rows query and the count query run in the same transaction; both
+    // are sent at once instead of waiting for the first to finish.
+    // At most MAX_ROWS rows, as PostgREST capped them; the count stays exact.
     const [rows, [{ total }]] = await Promise.all([
       tx.query.releases.findMany({
         columns: { kind: true },
         extras: { createdAt: pgrstTs(releases.createdAt).as("created_at") },
         where,
         orderBy: [desc(releases.pinned), desc(releases.sortAt), desc(releases.id)],
-        limit: pageSize,
+        limit: Math.min(pageSize, MAX_ROWS),
         offset: from,
         with: RELEASE_WITH,
       }),
@@ -157,8 +162,7 @@ export async function getFeed(
 
     const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    // A page past the end simply comes back empty with the real totals, which
-    // is what the old PGRST103 branch reconstructed.
+    // A page past the end simply comes back empty, with the real totals.
     return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
   });
 }

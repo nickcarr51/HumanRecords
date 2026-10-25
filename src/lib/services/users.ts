@@ -3,6 +3,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authUsers } from "@/lib/db/auth-schema";
 import { invites, users } from "@/lib/db/generated/schema";
+import { MAX_ROWS } from "@/lib/db/max-rows";
 import { asSystem } from "@/lib/db/system";
 import { pgrstTs } from "@/lib/db/timestamps";
 import type { UserRole } from "@/lib/auth/role";
@@ -10,7 +11,8 @@ import { authorize } from "./policy";
 import type { Viewer } from "./viewer";
 
 // Every user with email + ban state (from auth.users) and invite state.
-// Replaces the admin_list_users() SQL function; same columns, same order.
+// Replaces the admin_list_users() SQL function; same columns, same order,
+// and the same 1000-row cap PostgREST applied to it (MAX_ROWS).
 // Uses asSystem (admin access, RLS bypassed, only after authorize() has
 // confirmed permission) because auth.users isn't readable under RLS.
 // Aliased: public.users and auth.users would otherwise both render as
@@ -31,7 +33,7 @@ export type UserRow = {
 
 export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
   const grant = authorize(viewer, "users.list");
-  return asSystem(grant, (tx) =>
+  return asSystem(grant, "users.list", (tx) =>
     tx
       .select({
         id: users.id,
@@ -46,6 +48,7 @@ export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
       .from(users)
       .innerJoin(au, eq(au.id, users.id))
       .leftJoin(invites, eq(invites.userId, users.id))
-      .orderBy(desc(users.createdAt)),
+      .orderBy(desc(users.createdAt))
+      .limit(MAX_ROWS),
   );
 }

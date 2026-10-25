@@ -1,7 +1,8 @@
 import { artistNamesOf, type ArtistLink } from "./artist-names";
 import type { FeedTrack } from "./feed";
 
-// Drizzle relational-query shapes shared by getAlbum and getFeed.
+// The nested rows getAlbum and getFeed ask Drizzle for (the `columns` and
+// `with` options of findFirst/findMany), shared by both.
 export const ARTIST_NAMES = {
   columns: { position: true },
   with: { artist: { columns: { name: true } } },

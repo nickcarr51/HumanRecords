@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
-import { authorize } from "@/lib/services/policy";
+import { DatabaseError, DomainError } from "@/lib/services/errors";
+import { authorize, type Action } from "@/lib/services/policy";
 import { getClaims, getViewer, type JwtClaims } from "@/lib/services/viewer";
-import { createDb } from "./client";
+import { createDb, type Db } from "./client";
 import { asSystem } from "./system";
 import { asUser } from "./user";
 
@@ -53,12 +54,31 @@ afterAll(async () => {
 
 // The bare-connection state asUser and asSystem must leave behind, even after
 // a failure. The 10s timeouts are transaction-local too, so statement_timeout
-// is back to 0.
+// and lock_timeout are back to their defaults (0, no limit).
 async function expectCleanConnection(client: postgres.Sql) {
-  const [row] = await client`select current_user as who, current_setting('request.jwt.claims', true) as claims, current_setting('statement_timeout') as st`;
+  const [row] = await client`select current_user as who, current_setting('request.jwt.claims', true) as claims, current_setting('statement_timeout') as st, current_setting('lock_timeout') as lt`;
   expect(row.who).toBe("postgres");
   expect(row.claims ?? "").toBe("");
   expect(row.st).toBe("0");
+  expect(row.lt).toBe("0");
+}
+
+// True when `text` appears anywhere inside `value`: in any own property,
+// hidden or not, at any depth (cause included). Case-insensitive.
+function containsText(value: unknown, text: string, seen = new Set<unknown>()): boolean {
+  if (typeof value === "string") return value.toLowerCase().includes(text.toLowerCase());
+  if (typeof value !== "object" || value === null || seen.has(value)) return false;
+  seen.add(value);
+  return Object.getOwnPropertyNames(value).some((key) => containsText(Reflect.get(value, key), text, seen));
+}
+
+// A stand-in database that fails the test if anything touches it.
+function untouchableDb(): Db {
+  return new Proxy({} as Db, {
+    get() {
+      throw new Error("the database was used");
+    },
+  });
 }
 
 describe("asUser", () => {
@@ -96,7 +116,7 @@ describe("asUser", () => {
     expect(row).toMatchObject({ st: "10s", lt: "10s" });
   });
 
-  it("leaves no identity on the pooled connection afterwards", async () => {
+  it("leaves no identity on its one dedicated connection afterwards", async () => {
     const client = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
     try {
       await asUser(listenerClaims, (tx) => tx.execute(sql`select 1`), createDb(client));
@@ -123,17 +143,61 @@ describe("asUser", () => {
       await client.end();
     }
   });
+
+  it("a failed query's error has a fixed message and no SQL text anywhere", async () => {
+    const caught = await asUser(listenerClaims, (tx) =>
+      tx.execute(sql`select id from public.no_such_table_wave4 where id = ${"needle-value"}`),
+    ).catch((e: unknown) => e);
+    expect(caught).toBeInstanceOf(DatabaseError);
+    expect(caught).toMatchObject({ name: "DatabaseError", message: "Database query failed", code: "42P01" });
+    expect((caught as Error).cause).toBeUndefined();
+    for (const text of ["select id", "from public", "no_such_table_wave4", "where id"]) {
+      expect(containsText(caught, text)).toBe(false);
+    }
+    // The values sent with the query are kept; the query text isn't.
+    expect((caught as DatabaseError).params).toEqual(["needle-value"]);
+  });
+
+  it("a refused query gives the fixed permission message, not the database's text", async () => {
+    const caught = await asUser(listenerClaims, (tx) => tx.execute(sql`select 1 from auth.users`)).catch(
+      (e: unknown) => e,
+    );
+    expect(caught).toBeInstanceOf(DomainError);
+    expect(caught).toMatchObject({ code: "FORBIDDEN", message: "You don't have permission to do that." });
+    expect(containsText(caught, "auth.users")).toBe(false);
+  });
 });
 
 describe("asSystem", () => {
   it("runs as postgres with the 10s timeouts", async () => {
     const grant = authorize(await getViewer(await label.signIn()), "users.list");
-    const [row] = await asSystem(grant, (tx) =>
+    const [row] = await asSystem(grant, "users.list", (tx) =>
       tx.execute<{ who: string; st: string; lt: string }>(
         sql`select current_user as who, current_setting('statement_timeout') as st, current_setting('lock_timeout') as lt`,
       ),
     );
     expect(row).toMatchObject({ who: "postgres", st: "10s", lt: "10s" });
+  });
+
+  it("leaves no settings on its one dedicated connection afterwards", async () => {
+    const grant = authorize(await getViewer(await label.signIn()), "users.list");
+    const client = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
+    try {
+      await asSystem(grant, "users.list", (tx) => tx.execute(sql`select 1`), createDb(client));
+      await expectCleanConnection(client);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("refuses a real grant used for a different job, before any database access", async () => {
+    const grant = authorize(await getViewer(await label.signIn()), "users.list");
+    const fn = vi.fn(async () => 1);
+    await expect(asSystem(grant, "users.delete" as unknown as Action, fn, untouchableDb())).rejects.toMatchObject({
+      name: "DomainError",
+      code: "FORBIDDEN",
+    });
+    expect(fn).not.toHaveBeenCalled();
   });
 
   it("leaves no settings on the connection after the callback throws", async () => {
@@ -143,6 +207,7 @@ describe("asSystem", () => {
       await expect(
         asSystem(
           grant,
+          "users.list",
           () => {
             throw new Error("boom");
           },

@@ -78,3 +78,24 @@ jobs:
             exit 0
           fi
           curl -fsS -X POST "$VERCEL_DEPLOY_HOOK" > /dev/null
+      # The poll proves the site's database connection works, but it can't
+      # tell whether the new deployment or the previous one answered.
+      - name: Site database answers
+        env:
+          SITE: ${{ github.ref_name == 'main' && vars.PROD_SITE_URL || vars.DEV_SITE_URL }}
+        run: |
+          test -n "$SITE"
+          # Every 15s for up to 5 minutes.
+          deadline=$((SECONDS + 300))
+          while :; do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$SITE/api/health/db" || true)
+            if [ "$status" = "200" ]; then
+              echo "Database health check passed."
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::$SITE/api/health/db did not return 200 within 5 minutes (last status: $status)."
+              exit 1
+            fi
+            sleep 15
+          done
