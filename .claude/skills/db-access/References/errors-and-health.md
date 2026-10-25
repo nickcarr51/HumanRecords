@@ -81,9 +81,8 @@ the first failure:
 It returns `{ ok: true }` or `{ ok: false, failed: <check>, error: <name and code> }`, never the
 error itself. `error` is the failing error's `name` plus its `code`, read from its `cause` when
 that is an object (Drizzle wraps a failed query in an error named just `Error`; a string `cause`
-is ignored). An error the database
-sent back is always reported as `PostgresError`, since the production build renames postgres.js's
-class. Examples: `PostgresError 28P01` (wrong password), `PostgresError 42501` (a missing
+is ignored). An error the database sent back is always reported as `PostgresError`, since the
+production build renames postgres.js's class. Examples: `PostgresError 28P01` (wrong password), `PostgresError 42501` (a missing
 permission), `Error ECONNREFUSED` (nothing answers), `Error` plus Node's certificate error code (a
 certificate that doesn't chain), `CheckFailed` (the login role doesn't skip RLS), or just `Error`
 (our own `Missing DATABASE_URL` / `DATABASE_URL is not a valid URL`). Never the message, which can
