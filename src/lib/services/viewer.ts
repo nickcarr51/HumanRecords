@@ -6,7 +6,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { UserRole } from "@/lib/auth/role";
 import { DomainError } from "./errors";
 
-export type JwtClaims = Record<string, unknown> & { sub: string };
+declare const verifiedBrand: unique symbol;
+// Verified JWT claims. Only getClaims() may create one.
+export type JwtClaims = Record<string, unknown> & { sub: string; readonly [verifiedBrand]: true };
 export type Viewer = { userId: string; role: UserRole | null; claims: JwtClaims };
 
 // getClaims() verifies the token's signature; never trust an unverified cookie.
