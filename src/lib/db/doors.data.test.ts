@@ -1,12 +1,11 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
 import { authorize } from "@/lib/services/policy";
 import { getClaims, getViewer, type JwtClaims } from "@/lib/services/viewer";
-import type { Db } from "./client";
+import { createDb } from "./client";
 import { asSystem } from "./system";
 import { asUser } from "./user";
 
@@ -23,7 +22,7 @@ beforeAll(async () => {
   label = await createTestUser({ role: "label_member" });
   listenerClaims = await getClaims(await listener.signIn());
   labelClaims = await getClaims(await label.signIn());
-  const t = await admin.from("tracks").insert({ title: `DOORS${Date.now()}`, audio_url: "tracks/x.mp3" }).select("id").single();
+  const t = await admin.from("tracks").insert({ title: `TXSETUP${Date.now()}`, audio_url: "tracks/x.mp3" }).select("id").single();
   if (t.error) throw t.error;
   trackId = t.data.id;
   const r = await admin
@@ -52,7 +51,9 @@ afterAll(async () => {
   }
 });
 
-// The bare-connection state a door must leave behind, even after a failure.
+// The bare-connection state asUser and asSystem must leave behind, even after
+// a failure. The 10s timeouts are transaction-local too, so statement_timeout
+// is back to 0.
 async function expectCleanConnection(client: postgres.Sql) {
   const [row] = await client`select current_user as who, current_setting('request.jwt.claims', true) as claims, current_setting('statement_timeout') as st`;
   expect(row.who).toBe("postgres");
@@ -60,7 +61,7 @@ async function expectCleanConnection(client: postgres.Sql) {
   expect(row.st).toBe("0");
 }
 
-describe("asUser (Door 1)", () => {
+describe("asUser", () => {
   it("runs as the caller", async () => {
     const [row] = await asUser(listenerClaims, (tx) =>
       tx.execute<{ uid: string; who: string }>(sql`select auth.uid()::text as uid, current_user as who`),
@@ -98,11 +99,8 @@ describe("asUser (Door 1)", () => {
   it("leaves no identity on the pooled connection afterwards", async () => {
     const client = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
     try {
-      await asUser(listenerClaims, (tx) => tx.execute(sql`select 1`), drizzle(client) as unknown as Db);
-      const [row] = await client`select current_user as who, current_setting('request.jwt.claims', true) as claims, current_setting('statement_timeout') as st`;
-      expect(row.who).toBe("postgres");
-      expect(row.claims ?? "").toBe("");
-      expect(row.st).toBe("0"); // the 10s timeout is transaction-local too
+      await asUser(listenerClaims, (tx) => tx.execute(sql`select 1`), createDb(client));
+      await expectCleanConnection(client);
     } finally {
       await client.end();
     }
@@ -117,7 +115,7 @@ describe("asUser (Door 1)", () => {
           () => {
             throw new Error("boom");
           },
-          drizzle(client) as unknown as Db,
+          createDb(client),
         ),
       ).rejects.toThrow("boom");
       await expectCleanConnection(client);
@@ -127,7 +125,7 @@ describe("asUser (Door 1)", () => {
   });
 });
 
-describe("asSystem (Door 2)", () => {
+describe("asSystem", () => {
   it("runs as postgres with the 10s timeouts", async () => {
     const grant = authorize(await getViewer(await label.signIn()), "users.list");
     const [row] = await asSystem(grant, (tx) =>
@@ -148,7 +146,7 @@ describe("asSystem (Door 2)", () => {
           () => {
             throw new Error("boom");
           },
-          drizzle(client) as unknown as Db,
+          createDb(client),
         ),
       ).rejects.toThrow("boom");
       await expectCleanConnection(client);

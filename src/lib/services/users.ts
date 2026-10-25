@@ -11,7 +11,8 @@ import type { Viewer } from "./viewer";
 
 // Every user with email + ban state (from auth.users) and invite state.
 // Replaces the admin_list_users() SQL function; same columns, same order.
-// Door 2 because auth.users isn't readable under RLS.
+// Uses asSystem (admin access, RLS bypassed, only after authorize() has
+// confirmed permission) because auth.users isn't readable under RLS.
 // Aliased: public.users and auth.users would otherwise both render as
 // "users" ("table reference is ambiguous", verified 2026-10-24).
 const au = alias(authUsers, "auth_users");
@@ -37,9 +38,7 @@ export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
         email: sql<string>`${au.email}::text`,
         name: users.name,
         role: users.role,
-        // users.created_at is NOT NULL, so this one is typed string. Same
-        // expression as pgrstTs.
-        created_at: sql<string>`to_json(${users.createdAt}) #>> '{}'`,
+        created_at: pgrstTs(users.createdAt),
         invite_token: invites.token,
         invite_used_at: pgrstTs(invites.usedAt),
         banned_until: pgrstTs(au.bannedUntil),

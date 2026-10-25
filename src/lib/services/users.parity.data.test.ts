@@ -26,7 +26,7 @@ afterAll(async () => {
   for (const u of users) await u.cleanup();
 });
 
-describe("listUsers (Door 2) vs admin_list_users", () => {
+describe("listUsers vs admin_list_users", () => {
   it("returns the same rows, byte for byte, newest first", async () => {
     const label = await createTestUser({ role: "label_member" });
     try {

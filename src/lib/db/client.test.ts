@@ -19,6 +19,23 @@ describe("getDb", () => {
     const { getDb } = await import("./client");
     expect(getDb()).toBe(getDb());
   });
+
+  it("throws a clean error for a malformed DATABASE_URL, without the password", async () => {
+    const password = "fake-pw-8c1f2e";
+    vi.stubEnv("DATABASE_URL", `postgresql://postgres:${password}@127.0.0.1:not-a-port/postgres`);
+    const { getDb } = await import("./client");
+    let caught: unknown;
+    try {
+      getDb();
+    } catch (e) {
+      caught = e;
+    }
+    if (!(caught instanceof Error)) throw new Error("getDb did not throw an Error");
+    expect(caught.message).toBe("DATABASE_URL is not a valid URL");
+    for (const key of Object.getOwnPropertyNames(caught)) {
+      expect(String(Reflect.get(caught, key))).not.toContain(password);
+    }
+  });
 });
 
 describe("connectionOptions", () => {

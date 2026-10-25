@@ -19,7 +19,7 @@ export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined, n
   return {
     id: row.id,
     email: row.email,
-    name: row.name ?? null,
+    name: row.name,
     role: row.role,
     createdAt: row.created_at,
     // Deactivated = Supabase auth ban that hasn't expired yet.

@@ -78,7 +78,7 @@ const RELEASE_WITH = {
 // PostgREST's exact string).
 type DbRelease = {
   kind: "single" | "album";
-  createdAt: string | null;
+  createdAt: string;
   track: DbTrack | null;
   album: {
     id: string;
@@ -100,7 +100,7 @@ function toFeedItem(row: DbRelease): FeedItem | null {
       title: row.track.title,
       trackArtUrl: row.track.trackArtUrl,
       artistNames: artistNamesOf(row.track.trackArtists),
-      createdAt: row.createdAt as string,
+      createdAt: row.createdAt,
     };
   }
   if (row.kind === "album" && row.album) {
@@ -116,7 +116,7 @@ function toFeedItem(row: DbRelease): FeedItem | null {
       title: row.album.title,
       albumArtUrl: row.album.albumArtUrl,
       artistNames: artistNamesOf(row.album.albumArtists),
-      createdAt: row.createdAt as string,
+      createdAt: row.createdAt,
       tracks,
     };
   }

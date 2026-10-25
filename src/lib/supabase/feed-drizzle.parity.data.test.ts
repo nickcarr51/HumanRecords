@@ -117,13 +117,15 @@ describe("getFeed on Drizzle: parity with search_feed", () => {
   });
 
   it("createdAt is byte-identical to PostgREST's string", async () => {
-    const { data } = await admin.from("releases").select("created_at").eq("id", singleRelease).single();
+    const { data, error } = await admin.from("releases").select("created_at").eq("id", singleRelease).single();
+    if (error) throw error;
     const { items } = await getFeed(client, { q: `${tag} 100%`, pageSize: 5 });
-    expect(items[0].createdAt).toBe(data!.created_at);
+    expect(items[0].createdAt).toBe(data.created_at);
   });
 
   it("a page past the end has no items and correct totals", async () => {
-    const { count } = await client.from("releases").select("id", { count: "exact", head: true }).is("archived_at", null);
+    const { count, error } = await client.from("releases").select("id", { count: "exact", head: true }).is("archived_at", null);
+    if (error) throw error;
     const page = await getFeed(client, { page: 9999, pageSize: 1 });
     expect(page).toMatchObject({ items: [], total: count, totalPages: Math.max(1, count!), hasMore: false });
   });

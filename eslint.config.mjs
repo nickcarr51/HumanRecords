@@ -11,20 +11,22 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
-  // Outside src/lib/db and src/lib/services: no Drizzle client, no Door 2.
+  // Outside src/lib/db and src/lib/services: no Drizzle client, and no asSystem
+  // (admin access, RLS bypassed).
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/lib/db/**", "src/lib/services/**"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [
         { group: ["@/lib/db/client", "**/db/client"], allowTypeImports: true,
-          message: "Use asUser (Door 1) or a service; only src/lib/db uses the Drizzle client directly." },
+          message: "Use asUser (runs the query as the signed-in user, so RLS applies) or a service; only src/lib/db uses the Drizzle client directly." },
         { group: ["@/lib/db/system", "**/db/system"],
           message: "asSystem bypasses RLS; only src/lib/services may call it." },
       ] }],
     },
   },
-  // Services may use Door 2 but not the raw client.
+  // Services may use asSystem (admin access, only after authorize() has
+  // confirmed permission) but not the raw client.
   {
     files: ["src/lib/services/**/*.{ts,tsx}"],
     rules: {

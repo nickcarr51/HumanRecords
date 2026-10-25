@@ -17,7 +17,7 @@ every table has an `authenticated … for select` policy: `using (true)` for mos
 member), and `r2_cleanup_queue` (no policies at all; service role only). See
 `References/rls-model.md`. And **no table has a write policy except `artists`** (label-member insert/update,
 for `/admin/artists`). Every other write goes through one of
-two doors: a `security definer` SQL function that checks the caller itself
+two routes: a `security definer` SQL function that checks the caller itself
 (`increment_play_count`, `publish_release`, `move_release`, `admin_delete_artist`), or the server-only **service-role** client
 (`createServiceClient`, used for recording downloads). A blocked write under RLS does not
 error — it silently affects zero rows. Design new writes as a definer function with a role

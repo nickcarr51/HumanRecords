@@ -72,7 +72,8 @@ export async function createTestUser(opts: {
   }
 
   async function cleanup() {
-    await admin.auth.admin.deleteUser(id);
+    const { error } = await admin.auth.admin.deleteUser(id);
+    if (error) throw error;
   }
 
   return { id, email, signIn, cleanup };

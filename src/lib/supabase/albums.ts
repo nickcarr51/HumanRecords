@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "./database.types";
-import type { FeedTrack } from "./feed";
 import { eq } from "drizzle-orm";
 import { albums } from "@/lib/db/generated/schema";
 import { asUser } from "@/lib/db/user";
 import { getClaims } from "@/lib/services/viewer";
+import type { Database } from "./database.types";
 import { artistNamesOf, byPosition } from "./artist-names";
 import { ARTIST_NAMES, TRACK_WITH, toFeedTrack } from "./catalog-selects";
+import type { FeedTrack } from "./feed";
 
 export type AlbumDetail = {
   id: string;

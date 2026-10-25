@@ -40,7 +40,7 @@ function countOf(rel: unknown): number {
 
 async function listUsers(db: Db): Promise<LinkedUser[]> {
   const rows = await listAllUsers(await getViewer(db));
-  return rows.map((u) => ({ id: u.id, name: u.name ?? null, email: u.email }));
+  return rows.map((u) => ({ id: u.id, name: u.name, email: u.email }));
 }
 
 function toRow(r: RawRow, users: Map<string, LinkedUser>): AdminArtistRow {

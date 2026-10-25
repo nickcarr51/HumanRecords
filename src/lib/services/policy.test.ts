@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { asSystem } from "@/lib/db/system";
-import { DomainError } from "./errors";
 import { authorize } from "./policy";
 import type { JwtClaims, Viewer } from "./viewer";
 import type { Grant } from "./policy";
@@ -13,12 +12,9 @@ describe("authorize", () => {
   });
 
   it.each(["listener", "artist", null] as const)("forbids users.list for %s", (role) => {
-    expect(() => authorize(viewer(role), "users.list")).toThrow(DomainError);
-    try {
-      authorize(viewer(role), "users.list");
-    } catch (e) {
-      expect((e as DomainError).code).toBe("FORBIDDEN");
-    }
+    expect(() => authorize(viewer(role), "users.list")).toThrow(
+      expect.objectContaining({ name: "DomainError", code: "FORBIDDEN" }),
+    );
   });
 
   it("asSystem only accepts a Grant made by authorize (checked by yarn typecheck)", () => {
