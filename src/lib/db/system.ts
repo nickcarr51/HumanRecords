@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb, type Tx } from "./client";
-import { applyTimeouts } from "./timeouts";
+import { doorSetup } from "./timeouts";
 import { DomainError } from "@/lib/services/errors";
 import { isIssuedGrant, type Grant } from "@/lib/services/policy";
 
@@ -10,7 +10,7 @@ import { isIssuedGrant, type Grant } from "@/lib/services/policy";
 export async function asSystem<T>(grant: Grant, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!isIssuedGrant(grant)) throw new DomainError("FORBIDDEN", "Not authorized.");
   return getDb().transaction(async (tx) => {
-    await applyTimeouts(tx);
+    await doorSetup(tx);
     return fn(tx);
   });
 }

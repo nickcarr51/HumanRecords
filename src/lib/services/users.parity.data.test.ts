@@ -10,25 +10,33 @@ const users: Array<Awaited<ReturnType<typeof createTestUser>>> = [];
 beforeAll(async () => {
   const [unused, used, banned] = await Promise.all([createTestUser(), createTestUser(), createTestUser()]);
   users.push(unused, used, banned);
-  await admin.from("invites").insert([
+  const { error: inviteError } = await admin.from("invites").insert([
     { user_id: unused.id, token: `tok-${unused.id}` },
     { user_id: used.id, token: null, used_at: new Date().toISOString() },
   ]);
-  await admin.auth.admin.updateUserById(banned.id, { ban_duration: "24h" });
+  if (inviteError) throw inviteError;
+  const { error: banError } = await admin.auth.admin.updateUserById(banned.id, { ban_duration: "24h" });
+  if (banError) throw banError;
 });
+
+// Rows tied on created_at may come back in either order, so compare by id.
+const byId = <T extends { id: string }>(rows: T[]) => [...rows].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 afterAll(async () => {
   for (const u of users) await u.cleanup();
 });
 
 describe("listUsers (Door 2) vs admin_list_users", () => {
-  it("returns the same rows, byte for byte, in the same order", async () => {
+  it("returns the same rows, byte for byte, newest first", async () => {
     const label = await createTestUser({ role: "label_member" });
     try {
       const client = await label.signIn();
       const { data, error } = await client.rpc("admin_list_users");
       if (error) throw error;
-      expect(await listUsers(await getViewer(client))).toEqual(data);
+      const rows = await listUsers(await getViewer(client));
+      expect(byId(rows)).toEqual(byId(data));
+      const times = rows.map((r) => Date.parse(r.created_at));
+      for (let i = 1; i < times.length; i++) expect(times[i]).toBeLessThanOrEqual(times[i - 1]);
     } finally {
       await label.cleanup();
     }

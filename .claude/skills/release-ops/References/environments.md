@@ -36,6 +36,9 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 | `NEXT_PUBLIC_SENTRY_DSN` | blank | DSN | DSN |
 | `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | blank | set (source maps at build) | set |
 
+`DATABASE_URL`: the app forces TLS (`ssl: "require"`, `connectionOptions` in `src/lib/db/client.ts`)
+for every host except `127.0.0.1`/`localhost`, so the dashboard's pooler string works as-is.
+
 The prod R2 token lives only in Vercel Production. The backup token lives only in GitHub.
 
 Not an env var: night mode. The root layout (`src/app/layout.tsx`) reads the `hs-theme` cookie

@@ -140,16 +140,19 @@ export async function getFeed(
 
     // One ordering definition for search and the plain feed:
     // pinned first, then newest sort_at, id as the tiebreak.
-    const rows = await tx.query.releases.findMany({
-      columns: { kind: true },
-      extras: { createdAt: pgrstTs(releases.createdAt).as("created_at") },
-      where,
-      orderBy: [desc(releases.pinned), desc(releases.sortAt), desc(releases.id)],
-      limit: pageSize,
-      offset: from,
-      with: RELEASE_WITH,
-    });
-    const [{ total }] = await tx.select({ total: count() }).from(releases).where(where);
+    // The rows and the count are pipelined on the same transaction.
+    const [rows, [{ total }]] = await Promise.all([
+      tx.query.releases.findMany({
+        columns: { kind: true },
+        extras: { createdAt: pgrstTs(releases.createdAt).as("created_at") },
+        where,
+        orderBy: [desc(releases.pinned), desc(releases.sortAt), desc(releases.id)],
+        limit: pageSize,
+        offset: from,
+        with: RELEASE_WITH,
+      }),
+      tx.select({ total: count() }).from(releases).where(where),
+    ]);
 
     const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));

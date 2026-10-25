@@ -31,7 +31,7 @@ for new functions as long as `''` functions schema-qualify every reference.
 - Returns `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`, newest first.
   `banned_until` (from `auth.users`) was added in `20261010120500` (drop + recreate, since the return type changed; the deployed code ignores the extra column). Nothing renders it yet; the user-admin branch will.
   Generated types mark `name`/`invite_token`/`invite_used_at` non-null though they can be null.
-- Grants: revoked from `public`/`anon`, granted to `authenticated`. Caller: [[invites]].
+- Grants: revoked from `public`/`anon`, granted to `authenticated`. Former caller (before Drizzle slice 1): [[invites]].
 - No app callers since Drizzle slice 1 (`listUsers` in `services/users.ts`); kept in the DB until a later cleanup migration.
 
 ## `admin_set_user_role(target uuid, new_role user_role)` → void
@@ -115,7 +115,7 @@ for new functions as long as `''` functions schema-qualify every reference.
 - Returns plain `releases` rows so the caller chains the same embedded select, order and `range` as
   `getFeed`. PostgREST orders an RPC result only by columns in the select projection, so the select
   must include `pinned, sort_at` (as `RELEASE_SELECT` does).
-- Caller: `getFeed` in `src/lib/supabase/feed.ts` (the `/feed` search box), via the shared order helper.
+- Former caller (before Drizzle slice 1): `getFeed` in `src/lib/supabase/feed.ts` (the `/feed` search box), via the shared order helper.
 - No app callers since Drizzle slice 1 (`searchMatches` in `feed-search.ts`); kept in the DB until a later cleanup migration.
 
 ## Triggers `releases_default_sort_at()`, `keep_created_at()` and `keep_catalog_number()`

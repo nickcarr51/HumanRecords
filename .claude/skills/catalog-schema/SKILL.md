@@ -104,7 +104,7 @@ role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timel
 [[release-ops]] (how migrations
 reach hosted databases).
 
-## Known deferrals (as of 2026-10-11)
+## Known deferrals (as of 2026-10-24)
 
 - Soft delete exists in the schema (`archived_at`); the release admin UI for it is built
   ([[content-lifecycle]]).

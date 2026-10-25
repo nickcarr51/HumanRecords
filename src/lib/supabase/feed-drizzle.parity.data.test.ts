@@ -8,7 +8,9 @@ import { createAdminClient, createAnonClient, createTestUser } from "./test-help
 const admin = createAdminClient();
 const tag = `FDZ${Date.now()}`;
 let user: Awaited<ReturnType<typeof createTestUser>>;
+let labelUser: Awaited<ReturnType<typeof createTestUser>>;
 let client: SupabaseClient;
+let labelClient: SupabaseClient;
 let singleRelease: string;
 
 // Delete in FK-safe order. Track and album deletes cascade their link rows;
@@ -19,6 +21,10 @@ async function row(table: keyof typeof created, values: Record<string, unknown>)
   if (error) throw error;
   created[table].push(data.id);
   return data.id as string;
+}
+async function insert(table: "track_albums" | "album_artists", values: Record<string, unknown>) {
+  const { error } = await admin.from(table).insert(values);
+  if (error) throw error;
 }
 
 beforeAll(async () => {
@@ -36,8 +42,21 @@ beforeAll(async () => {
     { album_id: al, track_id: archived, position: 2 },
   ]);
   await row("releases", { kind: "album", album_id: al });
+  // An album that matches through its own title, and one through its album artist credit.
+  const titled = await row("albums", { title: `${tag} Titled LP` });
+  const titledTrack = await row("tracks", { title: "Titled track", audio_url: "tracks/d.mp3" });
+  await insert("track_albums", { album_id: titled, track_id: titledTrack, position: 1 });
+  await row("releases", { kind: "album", album_id: titled });
+  const credited = await row("albums", { title: "Credited Album" });
+  const creditArtist = await row("artists", { name: `${tag} Album Credit` });
+  await insert("album_artists", { album_id: credited, artist_id: creditArtist, position: 1 });
+  const creditedTrack = await row("tracks", { title: "Credited track", audio_url: "tracks/e.mp3" });
+  await insert("track_albums", { album_id: credited, track_id: creditedTrack, position: 1 });
+  await row("releases", { kind: "album", album_id: credited });
   user = await createTestUser({ role: "listener" });
   client = await user.signIn();
+  labelUser = await createTestUser({ role: "label_member" });
+  labelClient = await labelUser.signIn();
 });
 
 afterAll(async () => {
@@ -46,10 +65,11 @@ afterAll(async () => {
     if (ids.length) await admin.from(table).delete().in("id", ids);
   }
   await user.cleanup();
+  await labelUser.cleanup();
 });
 
-async function rpcIds(q: string): Promise<string[]> {
-  const { data, error } = await client
+async function rpcIds(c: SupabaseClient, q: string): Promise<string[]> {
+  const { data, error } = await c
     .rpc("search_feed", { q })
     .select("kind, album_id, track_id, pinned, sort_at, id")
     .is("archived_at", null)
@@ -62,20 +82,29 @@ async function rpcIds(q: string): Promise<string[]> {
   );
 }
 
+const SEARCH_CASES = [
+  tag,
+  `${tag} 100%`,
+  `under_score`,
+  `back\\slash`,
+  `${tag.toLowerCase()} mixed artist`,
+  `${tag} ghost`,
+  `${tag} inner`,
+  `${tag} Titled`,
+  `${tag} Album Credit`,
+  `%`,
+  `_`,
+];
+
 describe("getFeed on Drizzle: parity with search_feed", () => {
-  it.each([
-    tag,
-    `${tag} 100%`,
-    `under_score`,
-    `back\\slash`,
-    `${tag.toLowerCase()} mixed artist`,
-    `${tag} ghost`,
-    `${tag} inner`,
-    `%`,
-    `_`,
-  ])("same matches and order as search_feed for %j", async (q) => {
+  it.each(SEARCH_CASES)("same matches and order as search_feed for %j (listener)", async (q) => {
     const { items } = await getFeed(client, { q, pageSize: 500 });
-    expect(items.map((i) => i.id)).toEqual(await rpcIds(q));
+    expect(items.map((i) => i.id)).toEqual(await rpcIds(client, q));
+  });
+
+  it.each(SEARCH_CASES)("same matches and order as search_feed for %j (label_member)", async (q) => {
+    const { items } = await getFeed(labelClient, { q, pageSize: 500 });
+    expect(items.map((i) => i.id)).toEqual(await rpcIds(labelClient, q));
   });
 
   it("createdAt is byte-identical to PostgREST's string", async () => {

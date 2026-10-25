@@ -76,17 +76,26 @@ Rule: a read or write on one table stays supabase-js; more than one table goes t
 Drizzle sits next to supabase-js, not instead of it.
 
 - `getDb()` (`src/lib/db/client.ts`): lazy postgres.js + Drizzle over `DATABASE_URL` (transaction
-  pooler, port 6543; `prepare: false`, `max: 5`). Throws "Missing DATABASE_URL" on first use, so
-  `yarn build` and pages that never touch it work with the variable unset. Never import it outside
-  `src/lib/db` (lint, below).
-- Two doors, both in one transaction that calls `applyTimeouts` first (`set local statement_timeout`
-  and `lock_timeout`, both `'10s'`; 10s is the owner's choice, PostgREST uses 8s and a raw Drizzle
-  connection has neither):
-  - `asUser(claims, fn)` (`db/user.ts`, Door 1): RLS on. Sets `request.jwt.claims` and
-    `set local role authenticated`, the same identity PostgREST uses.
+  pooler, port 6543). Options come from the pure `connectionOptions(url)`: `prepare: false`
+  (Supavisor transaction mode), `max: 5`, `idle_timeout: 20`, `connect_timeout: 10`, and `ssl`.
+  Throws "Missing DATABASE_URL" on first use, so `yarn build` and pages that never touch it work
+  with the variable unset. Never import it outside `src/lib/db` (lint, below).
+- TLS: `connectionOptions` sets `ssl: "require"` for every host except `127.0.0.1`/`localhost`
+  (`ssl: false`, the local stack has no TLS). postgres.js defaults to no TLS, so never build a
+  hosted connection without it.
+- Two doors, both in one transaction that starts with `doorSetup(tx, claims?)` (`db/timeouts.ts`):
+  ONE `select set_config(...)` statement, every setting transaction-local. It always sets
+  `statement_timeout` and `lock_timeout` to `QUERY_TIMEOUT` (`'10s'`, a bound parameter; 10s is the
+  owner's choice, PostgREST uses 8s and a raw Drizzle connection has neither). With claims it also
+  sets `request.jwt.claims` and `role` = `authenticated` in the same statement.
+  - `asUser(claims, fn)` (`db/user.ts`, Door 1): RLS on. `doorSetup(tx, claims)`, so it runs as
+    `authenticated` with the verified claims, the same identity PostgREST uses.
   - `asSystem(grant, fn)` (`db/system.ts`, Door 2): RLS off, like a security definer function. It is
     `async` and rejects with `DomainError("FORBIDDEN")` for any `Grant` that `authorize()` did not
-    issue (module-private `WeakSet`; `isIssuedGrant` is exported from `policy.ts`).
+    issue (module-private `WeakSet`; `isIssuedGrant` is exported from `policy.ts`). `doorSetup(tx)`
+  sets only the timeouts.
+- The relational API (`tx.query.*`) selects every column of a table. Revoking a column from `authenticated` would therefore break Door 1 reads with
+  "permission denied"; add a grant change only together with a matching Drizzle change.
 - `src/lib/services/`: `authorize(viewer, action)` in `policy.ts` returns the `Grant` or throws
   `FORBIDDEN`; `errors.ts` has `DomainError` and `fromPgError` (maps the SQLSTATEs the SQL functions
   raise); `users.ts` is the first service (`listUsers`, replacing `admin_list_users`).
