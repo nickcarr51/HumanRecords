@@ -60,11 +60,13 @@ jobs:
           # Separate lines: under `bash -e`, a failing non-final `&&` operand doesn't exit.
           test -n "$API_URL"
           test -n "$SECRET_KEY"
+          test -n "$DB_URL"
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
             echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+            echo "DATABASE_URL=$DB_URL"
           } >> "$GITHUB_ENV"
       - run: yarn test
 
