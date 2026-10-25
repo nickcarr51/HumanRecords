@@ -89,18 +89,26 @@ Drizzle sits next to supabase-js, not instead of it.
   ONE `select set_config(...)` statement, every setting transaction-local. It always sets
   `statement_timeout` and `lock_timeout` to `QUERY_TIMEOUT` (`'10s'`, a bound parameter; 10s is the
   owner's choice, PostgREST uses 8s and a raw Drizzle connection has neither). With claims it also
-  sets `request.jwt.claims` and `role` = `authenticated` in the same statement.
-  - `asUser(claims, fn)` (`db/user.ts`, Door 1): RLS on. `doorSetup(tx, claims)`, so it runs as
-    `authenticated` with the verified claims, the same identity PostgREST uses.
-  - `asSystem(grant, fn)` (`db/system.ts`, Door 2): RLS off, like a security definer function. It is
+  sets `role` = `authenticated` and `request.jwt.claims` to only `{ sub, role: "authenticated" }`
+  (a bound parameter) in the same statement. Only the user id is sent because the database reads
+  nothing else (`auth.uid()` reads `request.jwt.claims ->> 'sub'`; no policy reads another claim),
+  and a failed query's logged params then contain only the user id, never name, phone or session.
+  - `asUser(claims, fn, db?)` (`db/user.ts`, Door 1): RLS on. `doorSetup(tx, claims)`, so it runs as
+    `authenticated` with the verified user id, the same identity PostgREST uses. `db` is injectable
+    for the connection-reset tests only.
+  - `asSystem(grant, fn, db?)` (`db/system.ts`, Door 2): RLS off, like a security definer function. It is
     `async` and rejects with `DomainError("FORBIDDEN")` for any `Grant` that `authorize()` did not
     issue (module-private `WeakSet`; `isIssuedGrant` is exported from `policy.ts`). `doorSetup(tx)`
-  sets only the timeouts.
+  sets only the timeouts. The optional `db` (for the failed-transaction test only) is resolved as
+  `db ?? getDb()` inside the function, after the grant check, never as a default parameter, so a
+  forged grant fails before any database access.
 - The relational API (`tx.query.*`) selects every column of a table. Revoking a column from `authenticated` would therefore break Door 1 reads with
   "permission denied"; add a grant change only together with a matching Drizzle change.
 - `src/lib/services/`: `authorize(viewer, action)` in `policy.ts` returns the `Grant` or throws
-  `FORBIDDEN`; `errors.ts` has `DomainError` and `fromPgError` (maps the SQLSTATEs the SQL functions
-  raise); `users.ts` is the first service (`listUsers`, replacing `admin_list_users`).
+  `FORBIDDEN`; `errors.ts` has `DomainError` and `fromPgError` (turns an error whose `code`, or
+  `cause.code`, is a mapped SQLSTATE into a `DomainError`: `42501` FORBIDDEN, `22023` INVALID, `P0002`
+  NOT_FOUND (the three the SQL functions raise), plus Postgres's own `40P01` RETRY and `23503`
+  CONFLICT; any other error is returned unchanged); `users.ts` is the first service (`listUsers`, replacing `admin_list_users`).
 - `getViewer(supabase)` (`services/viewer.ts`): `{ userId, role, claims }`. Role is read from the DB
   (`current_user_role()`), not the JWT, because `admin_set_user_role` does not update `app_metadata`.
   `JwtClaims` is a branded type: only `getClaims()` (which verifies the signature) produces one, so a

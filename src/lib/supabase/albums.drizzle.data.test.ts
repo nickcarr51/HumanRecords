@@ -11,7 +11,9 @@ const created = { releases: [] as string[], tracks: [] as string[], albums: [] a
 afterEach(async () => {
   for (const table of ["releases", "tracks", "albums", "artists"] as const) {
     const ids = created[table].splice(0);
-    if (ids.length) await admin.from(table).delete().in("id", ids);
+    if (!ids.length) continue;
+    const { error } = await admin.from(table).delete().in("id", ids);
+    if (error) throw error;
   }
 });
 async function row(table: keyof typeof created, values: Record<string, unknown>) {
@@ -20,6 +22,13 @@ async function row(table: keyof typeof created, values: Record<string, unknown>)
   created[table].push(data.id);
   return data.id as string;
 }
+async function insert(
+  table: "track_albums" | "album_artists" | "track_artists",
+  values: Array<Record<string, unknown>>,
+) {
+  const { error } = await admin.from(table).insert(values);
+  if (error) throw error;
+}
 
 describe("getAlbum (Drizzle)", () => {
   it("orders tracks and artists by position, dedupes artists, drops archived tracks", async () => {
@@ -27,19 +36,19 @@ describe("getAlbum (Drizzle)", () => {
     const al = await row("albums", { title: `${tag} LP` });
     const a1 = await row("artists", { name: `${tag} First` });
     const a2 = await row("artists", { name: `${tag} Second` });
-    await admin.from("album_artists").insert([
+    await insert("album_artists", [
       { album_id: al, artist_id: a2, position: 2 },
       { album_id: al, artist_id: a1, position: 1 },
     ]);
     const t1 = await row("tracks", { title: `${tag} One`, audio_url: "tracks/1.mp3" });
     const t2 = await row("tracks", { title: `${tag} Two`, audio_url: "tracks/2.mp3" });
     const gone = await row("tracks", { title: `${tag} Gone`, audio_url: "tracks/3.mp3", archived_at: new Date().toISOString() });
-    await admin.from("track_albums").insert([
+    await insert("track_albums", [
       { album_id: al, track_id: t2, position: 2 },
       { album_id: al, track_id: gone, position: 3 },
       { album_id: al, track_id: t1, position: 1 },
     ]);
-    await admin.from("track_artists").insert([
+    await insert("track_artists", [
       { track_id: t1, artist_id: a1, position: 1 },
       { track_id: t1, artist_id: a2, position: 2 },
     ]);

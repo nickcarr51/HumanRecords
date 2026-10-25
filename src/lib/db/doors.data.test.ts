@@ -37,10 +37,19 @@ beforeAll(async () => {
 
 // Guarded: when setup failed part-way, clean up only what was created.
 afterAll(async () => {
-  if (releaseId) await admin.from("releases").delete().eq("id", releaseId);
-  if (trackId) await admin.from("tracks").delete().eq("id", trackId);
-  if (listener) await listener.cleanup();
-  if (label) await label.cleanup();
+  try {
+    if (releaseId) {
+      const { error } = await admin.from("releases").delete().eq("id", releaseId);
+      if (error) throw error;
+    }
+    if (trackId) {
+      const { error } = await admin.from("tracks").delete().eq("id", trackId);
+      if (error) throw error;
+    }
+  } finally {
+    if (listener) await listener.cleanup();
+    if (label) await label.cleanup();
+  }
 });
 
 // The bare-connection state a door must leave behind, even after a failure.

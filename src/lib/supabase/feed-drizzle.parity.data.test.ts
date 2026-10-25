@@ -21,7 +21,10 @@ async function row(table: keyof typeof created, values: Record<string, unknown>)
   created[table].push(data.id);
   return data.id as string;
 }
-async function insert(table: "track_albums" | "album_artists", values: Record<string, unknown>) {
+async function insert(
+  table: "track_albums" | "album_artists" | "track_artists",
+  values: Record<string, unknown> | Array<Record<string, unknown>>,
+) {
   const { error } = await admin.from(table).insert(values);
   if (error) throw error;
 }
@@ -30,13 +33,13 @@ beforeAll(async () => {
   // A single with a %, _ and \ in its title, credited to a mixed-case artist.
   const t = await row("tracks", { title: `${tag} 100% under_score back\\slash`, audio_url: "tracks/a.mp3" });
   const a = await row("artists", { name: `${tag} MiXeD Artist` });
-  await admin.from("track_artists").insert({ track_id: t, artist_id: a, position: 1 });
+  await insert("track_artists", { track_id: t, artist_id: a, position: 1 });
   singleRelease = await row("releases", { kind: "single", track_id: t });
   // An album that matches only through a live track, plus an archived track that must not match.
   const al = await row("albums", { title: "Plain Album" });
   const live = await row("tracks", { title: `${tag} inner live`, audio_url: "tracks/b.mp3" });
   const archived = await row("tracks", { title: `${tag} ghost`, audio_url: "tracks/c.mp3", archived_at: new Date().toISOString() });
-  await admin.from("track_albums").insert([
+  await insert("track_albums", [
     { album_id: al, track_id: live, position: 1 },
     { album_id: al, track_id: archived, position: 2 },
   ]);
@@ -58,13 +61,20 @@ beforeAll(async () => {
   labelClient = await labelUser.signIn();
 });
 
+// Users are guarded so a failed beforeAll doesn't make cleanup throw; a failed
+// fixture delete still fails the run after the users are removed.
 afterAll(async () => {
-  for (const table of ["releases", "tracks", "albums", "artists"] as const) {
-    const ids = created[table].splice(0);
-    if (ids.length) await admin.from(table).delete().in("id", ids);
+  try {
+    for (const table of ["releases", "tracks", "albums", "artists"] as const) {
+      const ids = created[table].splice(0);
+      if (!ids.length) continue;
+      const { error } = await admin.from(table).delete().in("id", ids);
+      if (error) throw error;
+    }
+  } finally {
+    if (user) await user.cleanup();
+    if (labelUser) await labelUser.cleanup();
   }
-  await user.cleanup();
-  await labelUser.cleanup();
 });
 
 async function rpcIds(c: SupabaseClient, q: string): Promise<string[]> {
