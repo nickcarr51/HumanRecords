@@ -96,6 +96,13 @@ jobs:
             echo "::error::database.types.ts is stale. Run: yarn -s supabase gen types typescript --local > src/lib/supabase/database.types.ts"
             exit 1
           }
+      - name: Drizzle schema matches the committed files
+        run: |
+          yarn -s db:pull
+          git diff --exit-code src/lib/db/generated/schema.ts || {
+            echo "::error::src/lib/db/generated/schema.ts is stale. Run: yarn db:pull"
+            exit 1
+          }
 
   main-source:
     if: github.base_ref == 'main'

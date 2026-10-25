@@ -32,6 +32,10 @@ elif has '(psql|pg_dump|pg_restore|dropdb)' && has 'supabase\.(co|com)|pooler\.s
 # R2 deletions (any bucket) — prod media is locked, but dev/local data matters too.
 elif has '(aws[^|;&]*[[:space:]]+s3[[:space:]]+(rm|rb|mv)|aws[^|;&]*[[:space:]]+s3[[:space:]]+sync.*--delete|aws[^|;&]*[[:space:]]+s3api[^|;&]*[[:space:]]+delete-(object|objects|bucket)|rclone[^|;&]*[[:space:]]+(delete|deletefile|purge|rmdir|rmdirs)|wrangler[^|;&]*[[:space:]]+r2[^|;&]*[[:space:]]+(object|bucket)[[:space:]]+delete)'; then
   reason="Deletes or moves R2 objects or buckets."
+elif has 'drizzle-kit' && has '(^|[[:space:]])(push|migrate|drop|up)([[:space:]]|$)'; then
+  reason="drizzle-kit push/migrate/drop/up can write schema changes to a database. Supabase migrations are the only schema path."
+elif has 'drizzle-kit' && has 'supabase\.(co|com)|pooler\.supabase'; then
+  reason="drizzle-kit pointed at a HOSTED Supabase database."
 # Anything naming production resources.
 elif has '(media-prod|humanrecords-backups|gglrarflzvfxhdnjbnvt)'; then
   reason="Command references a PRODUCTION resource (prod media bucket, backups bucket, or prod Supabase project)."

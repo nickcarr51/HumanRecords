@@ -57,3 +57,6 @@ backup*.sql
 supabase/seed.local.sql
 scripts/users.local.json
 supabase/seed-media/
+
+# drizzle-kit pull scratch output (only generated/schema.ts is copied out)
+.drizzle-pull/
