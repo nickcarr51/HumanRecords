@@ -15,7 +15,8 @@ describe("getViewer", () => {
     const user = await createTestUser({ role: "listener" });
     cleanups.push(user.cleanup);
     const client = await user.signIn(); // JWT app_metadata still says listener
-    await admin.from("users").update({ role: "label_member" }).eq("id", user.id);
+    const { error } = await admin.from("users").update({ role: "label_member" }).eq("id", user.id);
+    if (error) throw error;
     expect((await getViewer(client)).role).toBe("label_member");
   });
 

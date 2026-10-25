@@ -80,9 +80,11 @@ Drizzle sits next to supabase-js, not instead of it.
   (Supavisor transaction mode), `max: 5`, `idle_timeout: 20`, `connect_timeout: 10`, and `ssl`.
   Throws "Missing DATABASE_URL" on first use, so `yarn build` and pages that never touch it work
   with the variable unset. Never import it outside `src/lib/db` (lint, below).
-- TLS: `connectionOptions` sets `ssl: "require"` for every host except `127.0.0.1`/`localhost`
-  (`ssl: false`, the local stack has no TLS). postgres.js defaults to no TLS, so never build a
-  hosted connection without it.
+- TLS: every host except `127.0.0.1`/`localhost` gets verified TLS using the embedded Supabase
+  Root 2021 CA (`src/lib/db/supabase-ca.ts`, expires 2031-04-26): `connectionOptions` sets
+  `ssl: { ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true }`, so the certificate and hostname
+  are checked, with nothing to configure per environment. Local hosts get `ssl: false` (the local
+  stack has no TLS). postgres.js defaults to no TLS, so never build a hosted connection without it.
 - Two doors, both in one transaction that starts with `doorSetup(tx, claims?)` (`db/timeouts.ts`):
   ONE `select set_config(...)` statement, every setting transaction-local. It always sets
   `statement_timeout` and `lock_timeout` to `QUERY_TIMEOUT` (`'10s'`, a bound parameter; 10s is the

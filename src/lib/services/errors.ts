@@ -11,8 +11,9 @@ export class DomainError extends Error {
   }
 }
 
-// Same SQLSTATEs the SQL functions raise today, so callers map errors the
-// same way whichever path produced them.
+// The SQLSTATEs callers map today: the three the SQL functions raise (42501,
+// 22023, P0002) plus Postgres's own deadlock (40P01) and foreign-key (23503)
+// errors, so callers map errors the same way whichever path produced them.
 const BY_SQLSTATE: Record<string, DomainErrorCode> = {
   "42501": "FORBIDDEN",
   "22023": "INVALID",

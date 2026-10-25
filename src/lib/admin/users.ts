@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { inviteUrl } from "@/lib/invites/url";
-import { listUsers } from "@/lib/services/users";
+import { listUsers, type UserRow } from "@/lib/services/users";
 import { getViewer } from "@/lib/services/viewer";
 import type { AdminUserRow, InviteState } from "./users-types";
 
-export type AdminListRow = Database["public"]["Functions"]["admin_list_users"]["Returns"][number];
+export type AdminListRow = UserRow;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,7 +38,7 @@ export async function listAdminUsers(
   return rows.map((r) => toAdminUserRow(r, siteUrl));
 }
 
-// One user for /admin/users/[id]. Reuses admin_list_users (the role check
+// One user for /admin/users/[id]. Reuses listAdminUsers (the role check
 // lives in the users service); the list is small, so filtering in TS is fine.
 export async function getAdminUser(
   db: SupabaseClient<Database>,

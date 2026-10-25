@@ -1,4 +1,3 @@
-// src/lib/supabase/feed-drizzle.parity.data.test.ts
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";

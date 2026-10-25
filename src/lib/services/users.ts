@@ -5,7 +5,7 @@ import { authUsers } from "@/lib/db/auth-schema";
 import { invites, users } from "@/lib/db/generated/schema";
 import { asSystem } from "@/lib/db/system";
 import { pgrstTs } from "@/lib/db/timestamps";
-import type { AdminListRow } from "@/lib/admin/users";
+import type { UserRole } from "@/lib/auth/role";
 import { authorize } from "./policy";
 import type { Viewer } from "./viewer";
 
@@ -16,16 +16,30 @@ import type { Viewer } from "./viewer";
 // "users" ("table reference is ambiguous", verified 2026-10-24).
 const au = alias(authUsers, "auth_users");
 
-export async function listUsers(viewer: Viewer): Promise<AdminListRow[]> {
+// The shape listUsers selects. name and the invite/ban columns can be null.
+export type UserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+  created_at: string;
+  invite_token: string | null;
+  invite_used_at: string | null;
+  banned_until: string | null;
+};
+
+export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
   const grant = authorize(viewer, "users.list");
-  const rows = await asSystem(grant, (tx) =>
+  return asSystem(grant, (tx) =>
     tx
       .select({
         id: users.id,
         email: sql<string>`${au.email}::text`,
         name: users.name,
         role: users.role,
-        created_at: pgrstTs(users.createdAt),
+        // users.created_at is NOT NULL, so this one is typed string. Same
+        // expression as pgrstTs.
+        created_at: sql<string>`to_json(${users.createdAt}) #>> '{}'`,
         invite_token: invites.token,
         invite_used_at: pgrstTs(invites.usedAt),
         banned_until: pgrstTs(au.bannedUntil),
@@ -35,7 +49,4 @@ export async function listUsers(viewer: Viewer): Promise<AdminListRow[]> {
       .leftJoin(invites, eq(invites.userId, users.id))
       .orderBy(desc(users.createdAt)),
   );
-  // The generated AdminListRow marks name/invite_* non-null though they can be
-  // null (catalog-schema functions.md); the rows match the RPC's exactly.
-  return rows as AdminListRow[];
 }

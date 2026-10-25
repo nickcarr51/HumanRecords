@@ -15,8 +15,8 @@ let listener: Awaited<ReturnType<typeof createTestUser>>;
 let label: Awaited<ReturnType<typeof createTestUser>>;
 let listenerClaims: JwtClaims;
 let labelClaims: JwtClaims;
-let trackId: string;
-let releaseId: string;
+let trackId: string | undefined;
+let releaseId: string | undefined;
 
 beforeAll(async () => {
   listener = await createTestUser({ role: "listener" });
@@ -24,21 +24,32 @@ beforeAll(async () => {
   listenerClaims = await getClaims(await listener.signIn());
   labelClaims = await getClaims(await label.signIn());
   const t = await admin.from("tracks").insert({ title: `DOORS${Date.now()}`, audio_url: "tracks/x.mp3" }).select("id").single();
-  trackId = t.data!.id;
+  if (t.error) throw t.error;
+  trackId = t.data.id;
   const r = await admin
     .from("releases")
     .insert({ kind: "single", track_id: trackId, archived_at: new Date().toISOString() })
     .select("id")
     .single();
-  releaseId = r.data!.id;
+  if (r.error) throw r.error;
+  releaseId = r.data.id;
 });
 
+// Guarded: when setup failed part-way, clean up only what was created.
 afterAll(async () => {
-  await admin.from("releases").delete().eq("id", releaseId);
-  await admin.from("tracks").delete().eq("id", trackId);
-  await listener.cleanup();
-  await label.cleanup();
+  if (releaseId) await admin.from("releases").delete().eq("id", releaseId);
+  if (trackId) await admin.from("tracks").delete().eq("id", trackId);
+  if (listener) await listener.cleanup();
+  if (label) await label.cleanup();
 });
+
+// The bare-connection state a door must leave behind, even after a failure.
+async function expectCleanConnection(client: postgres.Sql) {
+  const [row] = await client`select current_user as who, current_setting('request.jwt.claims', true) as claims, current_setting('statement_timeout') as st`;
+  expect(row.who).toBe("postgres");
+  expect(row.claims ?? "").toBe("");
+  expect(row.st).toBe("0");
+}
 
 describe("asUser (Door 1)", () => {
   it("runs as the caller", async () => {
@@ -54,6 +65,16 @@ describe("asUser (Door 1)", () => {
       asUser(claims, (tx) => tx.execute(sql`select id from public.releases where id = ${releaseId}`));
     expect(await visible(listenerClaims)).toHaveLength(0);
     expect(await visible(labelClaims)).toHaveLength(1);
+  });
+
+  it("sends the database only the user id and role", async () => {
+    const [row] = await asUser(listenerClaims, (tx) =>
+      tx.execute<{ keys: string[]; sub: string }>(
+        sql`select array(select jsonb_object_keys(current_setting('request.jwt.claims')::jsonb) order by 1) as keys, current_setting('request.jwt.claims')::jsonb ->> 'sub' as sub`,
+      ),
+    );
+    expect(row.keys).toEqual(["role", "sub"]);
+    expect(row.sub).toBe(listener.id);
   });
 
   it("applies the 10s statement and lock timeouts", async () => {
@@ -77,6 +98,24 @@ describe("asUser (Door 1)", () => {
       await client.end();
     }
   });
+
+  it("leaves no identity on the connection after the callback throws", async () => {
+    const client = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
+    try {
+      await expect(
+        asUser(
+          listenerClaims,
+          () => {
+            throw new Error("boom");
+          },
+          drizzle(client) as unknown as Db,
+        ),
+      ).rejects.toThrow("boom");
+      await expectCleanConnection(client);
+    } finally {
+      await client.end();
+    }
+  });
 });
 
 describe("asSystem (Door 2)", () => {
@@ -88,5 +127,24 @@ describe("asSystem (Door 2)", () => {
       ),
     );
     expect(row).toMatchObject({ who: "postgres", st: "10s", lt: "10s" });
+  });
+
+  it("leaves no settings on the connection after the callback throws", async () => {
+    const grant = authorize(await getViewer(await label.signIn()), "users.list");
+    const client = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
+    try {
+      await expect(
+        asSystem(
+          grant,
+          () => {
+            throw new Error("boom");
+          },
+          drizzle(client) as unknown as Db,
+        ),
+      ).rejects.toThrow("boom");
+      await expectCleanConnection(client);
+    } finally {
+      await client.end();
+    }
   });
 });

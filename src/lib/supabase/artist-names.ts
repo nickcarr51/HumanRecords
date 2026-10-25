@@ -1,7 +1,7 @@
 // Shared shape + flattener for PostgREST `... ( position, artists ( name ) )`
 // embeds. The generated types type these embeds loosely, so the shape here
-// mirrors the exact `select()` strings in feed.ts / albums.ts and is bridged
-// with `as unknown` at the call sites.
+// mirrors the exact `select()` string in storage/actions.ts and is bridged
+// with `as unknown` at the call site.
 export type ArtistNameRel = Array<{
   position?: number | null;
   artists: { name: string } | null;

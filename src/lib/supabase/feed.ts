@@ -50,8 +50,9 @@ const DEFAULT_PAGE_SIZE = 20;
 
 // FEED_PAGE_SIZE lets local dev use tiny pages (e.g. 3) to exercise paging
 // and auto-advance with a small catalog. Production leaves it unset.
-// Input caps: PostgREST rejects an exponent-notation offset (page 1e22), and a
-// search string has no business being longer than this.
+// Input caps: Postgres rejects an exponent-notation offset (page 1e22 sends
+// "2e+23", invalid bigint), and a search string has no business being longer
+// than this.
 export const MAX_PAGE = 100_000;
 export const MAX_QUERY_LENGTH = 200;
 
