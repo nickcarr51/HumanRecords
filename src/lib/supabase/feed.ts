@@ -1,6 +1,13 @@
-import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { and, count, desc, isNull } from "drizzle-orm";
+import { releases } from "@/lib/db/generated/schema";
+import { pgrstTs } from "@/lib/db/timestamps";
+import { asUser } from "@/lib/db/user";
+import { getClaims } from "@/lib/services/viewer";
 import type { Database } from "./database.types";
-import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
+import { artistNamesOf, byPosition, type ArtistLink } from "./artist-names";
+import { ARTIST_NAMES, TRACK_WITH, toFeedTrack, type DbTrack } from "./catalog-selects";
+import { searchMatches } from "./feed-search";
 
 export type FeedTrack = {
   id: string;
@@ -54,85 +61,65 @@ export function feedPageSize(): number {
   return Number.isInteger(n) && n > 0 ? n : DEFAULT_PAGE_SIZE;
 }
 
-// pinned and sort_at are selected only so PostgREST can order by them: it
-// orders an RPC result (search_feed, chained later) only by projected columns.
-const RELEASE_SELECT = `
-  id, kind, created_at, pinned, sort_at,
-  track:tracks ( id, catalog_number, title, track_art_url, archived_at, track_artists ( position, artists ( name ) ) ),
-  album:albums (
-    id, catalog_number, title, album_art_url,
-    album_artists ( position, artists ( name ) ),
-    track_albums ( position, tracks ( id, catalog_number, title, archived_at, track_artists ( position, artists ( name ) ) ) )
-  )
-`;
+// The nested data each feed row needs (same fields as the old RELEASE_SELECT).
+const RELEASE_WITH = {
+  track: TRACK_WITH,
+  album: {
+    columns: { id: true, catalogNumber: true, title: true, albumArtUrl: true },
+    with: {
+      albumArtists: ARTIST_NAMES,
+      trackAlbums: { columns: { position: true }, with: { track: TRACK_WITH } },
+    },
+  },
+} as const;
 
-type TrackRel = { id: string; catalog_number: number; title: string; track_art_url?: string | null; archived_at?: string | null; track_artists: ArtistNameRel };
-type ReleaseRow = {
+// What one RELEASE_WITH row returns (createdAt comes from pgrstTs, so it is
+// PostgREST's exact string).
+type DbRelease = {
   kind: "single" | "album";
-  created_at: string;
-  track: TrackRel | null;
+  createdAt: string | null;
+  track: DbTrack | null;
   album: {
     id: string;
-    catalog_number: number;
+    catalogNumber: number;
     title: string;
-    album_art_url: string | null;
-    album_artists: ArtistNameRel;
-    track_albums: Array<{ position: number; tracks: TrackRel | null }> | null;
+    albumArtUrl: string | null;
+    albumArtists: ArtistLink[];
+    trackAlbums: Array<{ position: number; track: DbTrack | null }>;
   } | null;
 };
 
-function toFeedItem(row: ReleaseRow): FeedItem | null {
+function toFeedItem(row: DbRelease): FeedItem | null {
   if (row.kind === "single" && row.track) {
-    if (row.track.archived_at) return null;
+    if (row.track.archivedAt) return null;
     return {
       kind: "track",
       id: row.track.id,
-      catalogNumber: row.track.catalog_number,
+      catalogNumber: row.track.catalogNumber,
       title: row.track.title,
-      trackArtUrl: row.track.track_art_url ?? null,
-      artistNames: namesFrom(row.track.track_artists),
-      createdAt: row.created_at,
+      trackArtUrl: row.track.trackArtUrl,
+      artistNames: artistNamesOf(row.track.trackArtists),
+      createdAt: row.createdAt as string,
     };
   }
   if (row.kind === "album" && row.album) {
-    const tracks: FeedTrack[] = byPosition(row.album.track_albums ?? [])
-      .map((r) => r.tracks)
-      .filter((t): t is TrackRel => t !== null && !t.archived_at)
-      .map((t) => ({ id: t.id, catalogNumber: t.catalog_number, title: t.title, artistNames: namesFrom(t.track_artists) }));
+    const tracks = byPosition(row.album.trackAlbums)
+      .map((r) => r.track)
+      .filter((t): t is DbTrack => t !== null && !t.archivedAt)
+      .map(toFeedTrack);
     if (tracks.length === 0) return null; // never show an empty album
     return {
       kind: "album",
       id: row.album.id,
-      catalogNumber: row.album.catalog_number,
+      catalogNumber: row.album.catalogNumber,
       title: row.album.title,
-      albumArtUrl: row.album.album_art_url,
-      artistNames: namesFrom(row.album.album_artists),
-      createdAt: row.created_at,
+      albumArtUrl: row.album.albumArtUrl,
+      artistNames: artistNamesOf(row.album.albumArtists),
+      createdAt: row.createdAt as string,
       tracks,
     };
   }
-  return null; // a release whose target was hidden/removed — skip rather than crash
-}
-
-// Both sources (the releases table and the search_feed RPC) are PostgREST
-// builders over release rows. Typing them as one shape lets a single function
-// own the archived filter, the order and the range, so search results and the
-// plain feed can never disagree on order.
-type FeedQuery = PromiseLike<{ data: unknown; error: PostgrestError | null; count: number | null }> & {
-  is(column: "archived_at", value: null): FeedQuery;
-  order(column: "pinned" | "sort_at" | "id", opts: { ascending: boolean }): FeedQuery;
-  range(from: number, to: number): FeedQuery;
-};
-
-function releaseQuery(supabase: SupabaseClient<Database>, q: string, countOnly = false): FeedQuery {
-  const columns = countOnly ? "id" : RELEASE_SELECT;
-  const opts = countOnly ? ({ count: "exact", head: true } as const) : ({ count: "exact" } as const);
-  // search_feed only filters (an empty pattern would match everything, so it
-  // is skipped for a blank q); count: 'exact' gives the page count either way.
-  const query = q
-    ? supabase.rpc("search_feed", { q }, opts).select(columns)
-    : supabase.from("releases").select(columns, opts);
-  return query as unknown as FeedQuery;
+  return null; // a release whose target was hidden/removed: skip rather than crash
 }
 
 export async function getFeed(
@@ -145,30 +132,31 @@ export async function getFeed(
   const q = typeof opts.q === "string" ? opts.q.trim().slice(0, MAX_QUERY_LENGTH) : "";
   const from = (page - 1) * pageSize;
 
-  const { data, error, count } = await releaseQuery(supabase, q)
+  const claims = await getClaims(supabase);
+  return asUser(claims, async (tx) => {
     // RLS already hides archived rows from listeners; label members can read
-    // them, so the feed filters explicitly.
-    .is("archived_at", null)
-    .order("pinned", { ascending: false })
-    .order("sort_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, from + pageSize - 1);
-  if (error) {
-    if (error.code !== "PGRST103") throw error;
-    // Past-the-end page: PostgREST refuses the range. Report the totals (same
-    // source and archived filter, count only) so callers can redirect.
-    const counted = await releaseQuery(supabase, q, true).is("archived_at", null);
-    if (counted.error) throw counted.error;
-    const total = counted.count ?? 0;
-    return { items: [], page, pageSize, hasMore: false, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
-  }
+    // them, so the feed filters explicitly. A blank q means no search filter.
+    const where = and(isNull(releases.archivedAt), q ? searchMatches(tx, q) : undefined);
 
-  const rows = (data ?? []) as unknown as ReleaseRow[];
-  const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);
-  const total = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    // One ordering definition for search and the plain feed:
+    // pinned first, then newest sort_at, id as the tiebreak.
+    const rows = await tx.query.releases.findMany({
+      columns: { kind: true },
+      extras: { createdAt: pgrstTs(releases.createdAt).as("created_at") },
+      where,
+      orderBy: [desc(releases.pinned), desc(releases.sortAt), desc(releases.id)],
+      limit: pageSize,
+      offset: from,
+      with: RELEASE_WITH,
+    });
+    const [{ total }] = await tx.select({ total: count() }).from(releases).where(where);
 
-  return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
+    const items = rows.map(toFeedItem).filter((i): i is FeedItem => i !== null);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    // A page past the end simply comes back empty with the real totals, which
+    // is what the old PGRST103 branch reconstructed.
+    return { items, page, pageSize, hasMore: page < totalPages, total, totalPages };
+  });
 }
 
 // A release in the feed: an album by its album id, a single by its track id
