@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import type { FeedTrack } from "./feed";
-import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
+import { eq } from "drizzle-orm";
+import { albums } from "@/lib/db/generated/schema";
+import { asUser } from "@/lib/db/user";
+import { getClaims } from "@/lib/services/viewer";
+import { artistNamesOf, byPosition } from "./artist-names";
+import { ARTIST_NAMES, TRACK_WITH, toFeedTrack } from "./catalog-selects";
 
 export type AlbumDetail = {
   id: string;
@@ -20,43 +25,39 @@ export async function getAlbum(
   id: string,
 ): Promise<AlbumDetail | null> {
   // A non-UUID id would make Postgres raise "invalid input syntax for type
-  // uuid" and surface as a 500; treat a malformed id as simply not found.
+  // uuid"; treat a malformed id as simply not found.
   if (!UUID_RE.test(id)) return null;
 
-  const { data, error } = await supabase
-    .from("albums")
-    .select(
-      "id, catalog_number, title, album_art_url, releases ( archived_at ), album_artists ( position, artists ( name ) ), track_albums ( position, tracks ( id, catalog_number, title, archived_at, track_artists ( position, artists ( name ) ) ) )",
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
+  const claims = await getClaims(supabase);
+  const data = await asUser(claims, (tx) =>
+    tx.query.albums.findFirst({
+      columns: { id: true, catalogNumber: true, title: true, albumArtUrl: true },
+      where: eq(albums.id, id),
+      with: {
+        releases: { columns: { archivedAt: true } },
+        albumArtists: ARTIST_NAMES,
+        trackAlbums: { columns: { position: true }, with: { track: TRACK_WITH } },
+      },
+    }),
+  );
   if (!data) return null;
 
   // An archived album is gone for everyone, label members included (they
-  // manage it from the admin pages, not the listener view). The embed is
-  // one-to-one (releases.album_id is unique) but tolerate an array too.
-  const rel = (data as unknown as { releases: { archived_at: string | null } | Array<{ archived_at: string | null }> | null }).releases;
-  const relRows = Array.isArray(rel) ? rel : rel ? [rel] : [];
-  // RLS hides an archived release from listeners, so the embed comes back
-  // empty for them; every album has a release, so a missing one is not found.
-  if (relRows.length === 0 || relRows.some((r) => r.archived_at)) return null;
+  // manage it from the admin pages). RLS hides an archived release from
+  // listeners, so it comes back empty for them; every album has a release.
+  if (data.releases.length === 0 || data.releases.some((r) => r.archivedAt)) return null;
 
-  const trackRel = (data.track_albums ?? []) as unknown as Array<{
-    position: number;
-    tracks: { id: string; catalog_number: number; title: string; archived_at: string | null; track_artists: ArtistNameRel } | null;
-  }>;
-  const tracks: FeedTrack[] = byPosition(trackRel)
-    .map((r) => r.tracks)
-    .filter((t): t is NonNullable<typeof t> => t !== null && !t.archived_at)
-    .map((t) => ({ id: t.id, catalogNumber: t.catalog_number, title: t.title, artistNames: namesFrom(t.track_artists) }));
+  const tracks: FeedTrack[] = byPosition(data.trackAlbums)
+    .map((r) => r.track)
+    .filter((t): t is NonNullable<typeof t> => t !== null && !t.archivedAt)
+    .map(toFeedTrack);
 
   return {
     id: data.id,
-    catalogNumber: data.catalog_number,
+    catalogNumber: data.catalogNumber,
     title: data.title,
-    albumArtUrl: data.album_art_url,
-    artistNames: namesFrom(data.album_artists as unknown as ArtistNameRel),
+    albumArtUrl: data.albumArtUrl,
+    artistNames: artistNamesOf(data.albumArtists),
     tracks,
   };
 }

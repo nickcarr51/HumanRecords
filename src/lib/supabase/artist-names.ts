@@ -20,6 +20,18 @@ export function namesFrom(rel: ArtistNameRel): string[] {
   return Array.from(new Set(names));
 }
 
+// Drizzle relational rows: `{ position, artist: { name } }` (singular
+// `artist`, unlike PostgREST's `artists` embed). Same rules as namesFrom:
+// position order, missing artists dropped, duplicates removed.
+export type ArtistLink = { position?: number | null; artist: { name: string } | null };
+
+export function artistNamesOf(links: ArtistLink[]): string[] {
+  const names = byPosition(links)
+    .map((l) => l.artist?.name)
+    .filter((n): n is string => Boolean(n));
+  return Array.from(new Set(names));
+}
+
 export const VARIOUS_ARTISTS = "Various Artists";
 
 // Display-only fallback: an album with no album_artists rows reads as a
