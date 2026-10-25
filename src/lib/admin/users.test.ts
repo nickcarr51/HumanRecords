@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getAdminUser, toAdminUserRow, type AdminListRow } from "./users";
+
+const { listUsers } = vi.hoisted(() => ({ listUsers: vi.fn() }));
+vi.mock("@/lib/services/viewer", () => ({
+  getViewer: async () => ({ userId: "me", role: "label_member", claims: { sub: "me" } }),
+}));
+vi.mock("@/lib/services/users", () => ({ listUsers: (...a: unknown[]) => listUsers(...a) }));
 
 const base = {
   id: "u1",
@@ -61,8 +67,10 @@ describe("toAdminUserRow deactivated", () => {
 
 describe("getAdminUser", () => {
   const ID = "11111111-1111-4111-8111-111111111111";
-  const db = (rows: unknown[]) =>
-    ({ rpc: async () => ({ data: rows, error: null }) }) as unknown as Parameters<typeof getAdminUser>[0];
+  const db = (rows: unknown[]) => {
+    listUsers.mockResolvedValue(rows);
+    return {} as unknown as Parameters<typeof getAdminUser>[0];
+  };
   it("returns the matching row", async () => {
     const row = await getAdminUser(db([{ ...base, id: ID }]), SITE, ID);
     expect(row?.id).toBe(ID);

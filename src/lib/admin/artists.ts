@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { escapeLike } from "@/lib/supabase/artists";
+import { listUsers as listAllUsers } from "@/lib/services/users";
+import { getViewer } from "@/lib/services/viewer";
 import {
   ADMIN_ARTISTS_PAGE_SIZE,
   LINKABLE_USERS_LIMIT,
@@ -12,8 +14,8 @@ import {
 } from "./artists-types";
 
 // Reads for /admin/artists. Pass the cookie-bound server client: artists are
-// readable by any signed-in user, and admin_list_users checks the caller's
-// role inside Postgres.
+// readable by any signed-in user, and the users service checks the caller's
+// role.
 
 type Db = SupabaseClient<Database>;
 export type LinkTargets = { users: LinkedUser[]; links: Array<{ id: string; name: string; userId: string }> };
@@ -37,9 +39,8 @@ function countOf(rel: unknown): number {
 }
 
 async function listUsers(db: Db): Promise<LinkedUser[]> {
-  const { data, error } = await db.rpc("admin_list_users");
-  if (error) throw error;
-  return (data ?? []).map((u) => ({ id: u.id, name: u.name ?? null, email: u.email }));
+  const rows = await listAllUsers(await getViewer(db));
+  return rows.map((u) => ({ id: u.id, name: u.name ?? null, email: u.email }));
 }
 
 function toRow(r: RawRow, users: Map<string, LinkedUser>): AdminArtistRow {

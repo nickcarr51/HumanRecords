@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { inviteUrl } from "@/lib/invites/url";
+import { listUsers } from "@/lib/services/users";
+import { getViewer } from "@/lib/services/viewer";
 import type { AdminUserRow, InviteState } from "./users-types";
 
 export type AdminListRow = Database["public"]["Functions"]["admin_list_users"]["Returns"][number];
@@ -26,19 +28,18 @@ export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined, n
   };
 }
 
-// Pass the cookie-bound server client: admin_list_users checks the caller's
-// role inside Postgres.
+// Pass the cookie-bound server client: it identifies the caller, and the users
+// service checks the label-member role before reading.
 export async function listAdminUsers(
   db: SupabaseClient<Database>,
   siteUrl: string | undefined,
 ): Promise<AdminUserRow[]> {
-  const { data, error } = await db.rpc("admin_list_users");
-  if (error) throw error;
-  return (data ?? []).map((r) => toAdminUserRow(r, siteUrl));
+  const rows = await listUsers(await getViewer(db));
+  return rows.map((r) => toAdminUserRow(r, siteUrl));
 }
 
 // One user for /admin/users/[id]. Reuses admin_list_users (the role check
-// lives in Postgres); the list is small, so filtering in TS is fine.
+// lives in the users service); the list is small, so filtering in TS is fine.
 export async function getAdminUser(
   db: SupabaseClient<Database>,
   siteUrl: string | undefined,
