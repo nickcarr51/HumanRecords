@@ -5,9 +5,9 @@
 | Job | What it does |
 |---|---|
 | `app` | `yarn install --frozen-lockfile`, `yarn lint`, `yarn typecheck`, `yarn build` (dummy env) |
-| `test` | `supabase start` (minimal services), env from `supabase status`, full `yarn test` incl. DB-dependent files; no `seed.local.sql` in CI |
+| `test` | `supabase start` (minimal services), env from `supabase status`, full `yarn test` incl. DB-dependent files; sets `DATABASE_URL` from `DB_URL`; no `seed.local.sql` in CI |
 | `migrations` | `scripts/check-migrations.mts origin/<base>`: fails modified/renamed/deleted migrations, a new migration not newer than the base's newest, and `--include-seed` in any workflow |
-| `types` | regenerates `database.types.ts` from the local stack and diffs against the committed file |
+| `types` | regenerates `database.types.ts` from the local stack and diffs against the committed file; also runs `yarn db:pull` and diffs `src/lib/db/generated/schema.ts` |
 | `main-source` | PRs into `main` must come from `develop` |
 
 All are required checks (rulesets on `main` and `develop`: PR required, no force-push, no

@@ -69,3 +69,50 @@ trigger, see [functions.md](functions.md)). The app view types follow the Row sh
 why a database without the migration breaks those pages with `42703 column tracks_1.catalog_number
 does not exist` — see [local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###`
 happens only in `src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
+
+## Drizzle (slice 1, 2026-10)
+
+Rule: a read or write on one table stays supabase-js; more than one table goes through Drizzle.
+Drizzle sits next to supabase-js, not instead of it.
+
+- `getDb()` (`src/lib/db/client.ts`): lazy postgres.js + Drizzle over `DATABASE_URL` (transaction
+  pooler, port 6543; `prepare: false`, `max: 5`). Throws "Missing DATABASE_URL" on first use, so
+  `yarn build` and pages that never touch it work with the variable unset. Never import it outside
+  `src/lib/db` (lint, below).
+- Two doors, both in one transaction that calls `applyTimeouts` first (`set local statement_timeout`
+  and `lock_timeout`, both `'10s'`; 10s is the owner's choice, PostgREST uses 8s and a raw Drizzle
+  connection has neither):
+  - `asUser(claims, fn)` (`db/user.ts`, Door 1): RLS on. Sets `request.jwt.claims` and
+    `set local role authenticated`, the same identity PostgREST uses.
+  - `asSystem(grant, fn)` (`db/system.ts`, Door 2): RLS off, like a security definer function. It is
+    `async` and rejects with `DomainError("FORBIDDEN")` for any `Grant` that `authorize()` did not
+    issue (module-private `WeakSet`; `isIssuedGrant` is exported from `policy.ts`).
+- `src/lib/services/`: `authorize(viewer, action)` in `policy.ts` returns the `Grant` or throws
+  `FORBIDDEN`; `errors.ts` has `DomainError` and `fromPgError` (maps the SQLSTATEs the SQL functions
+  raise); `users.ts` is the first service (`listUsers`, replacing `admin_list_users`).
+- `getViewer(supabase)` (`services/viewer.ts`): `{ userId, role, claims }`. Role is read from the DB
+  (`current_user_role()`), not the JWT, because `admin_set_user_role` does not update `app_metadata`.
+  `JwtClaims` is a branded type: only `getClaims()` (which verifies the signature) produces one, so a
+  hand-built object fails typecheck.
+- `yarn db:pull` (local stack only; `drizzle.config.ts` hardcodes `127.0.0.1:54322` and never reads
+  `DATABASE_URL`): runs `drizzle-kit pull` and copies only `schema.ts` into `src/lib/db/generated/`.
+  Never hand-edit `generated/` (eslint ignores it); CI re-pulls and diffs it. Re-run after every
+  migration, next to the `database.types.ts` regeneration.
+- `src/lib/db/relations.ts` is hand-written because the pulled `relations.ts` does not compile
+  (hence only `schema.ts` is copied).
+- `auth.users` is declared by hand in `db/auth-schema.ts` (the pull is limited to `public`). Always
+  alias it, `alias(authUsers, "auth_users")`: unaliased, Drizzle renders `public.users` and
+  `auth.users` both as `"users"` and Postgres fails with "table reference is ambiguous". Read it
+  through Door 2 only.
+- `pgrstTs(col)` (`db/timestamps.ts`): selects a timestamptz as `to_json(col) #>> '{}'` so strings are
+  byte-identical to what PostgREST returned. Use it for every timestamp a Drizzle read returns.
+- Lint (`eslint.config.mjs`): outside `src/lib/db` and `src/lib/services`, importing `db/client`
+  (type imports allowed) or `db/system` is an error. Inside `services`, `db/client` is still banned;
+  go through `asUser`/`asSystem`.
+- Callers so far: `getFeed`/`searchMatches` (`supabase/feed.ts`, `feed-search.ts`) and `getAlbum`
+  (`albums.ts`) via Door 1, `listUsers` via Door 2. Shared select fragments live in
+  `catalog-selects.ts` and `artist-names.ts`.
+- For slice 2 (writes): PostgREST sessions load `safeupdate` (blocks `UPDATE`/`DELETE` without
+  `WHERE`) and Drizzle connections do not, so write paths must not rely on it.
+- Env: `DATABASE_URL` is server-only; see release-ops `References/environments.md` for the per-env
+  values. The CI `test` job sets it from `DB_URL`.

@@ -26,6 +26,7 @@ Entered by the owner in the dashboard; secrets never pass through Claude.
 | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL` | local stack | dev project | prod project |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | local | dev | prod |
 | `SUPABASE_SECRET_KEY` | local | dev | prod |
+| `DATABASE_URL` (server-only; transaction pooler, port 6543; add before the deploy) | local stack (`postgresql://postgres:postgres@127.0.0.1:54322/postgres`) | dev pooler URL | prod pooler URL |
 | `R2_ACCOUNT_ID`, `R2_ENDPOINT` | same | same | same |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | local token | dev token | prod token |
 | `R2_BUCKET_NAME` | `humanrecords-media-local` | `humanrecords-media-dev` | `humanrecords-media-prod` |

@@ -111,7 +111,7 @@ reach hosted databases).
 - `play_count` has an RPC but nothing in the app calls it yet.
 - Catalog numbers are display-only: nothing searches or sorts by `catalog_number` yet, and the
   admin UI does not show them.
-- No ORM. Raw supabase-js + SQL functions; edit/delete shipped as SQL functions without one; revisit (likely Drizzle) only if more multi-table writes appear.
+- Drizzle since slice 1 (2026-10): one table → supabase-js, more → Drizzle; see [clients-and-types.md](References/clients-and-types.md).
 
 A code guide (migration-by-migration read, with why each security fix exists) is in
 `Walkthrough/walkthrough.md` (gitignored).
