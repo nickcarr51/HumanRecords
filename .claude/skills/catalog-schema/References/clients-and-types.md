@@ -71,8 +71,9 @@ So a typed client can read the number but any attempt to insert or update it is 
 mirroring Postgres, which rejects the write at runtime (`428C9`; and the `keep_catalog_number`
 trigger, see [functions.md](functions.md)). The app view types follow the Row shape:
 `catalogNumber: number` is **required** on `FeedItem`/`FeedTrack` (`feed.ts`) and `AlbumDetail`
-(`albums.ts`), and the Drizzle reads behind `getFeed` / `getAlbum` (`TRACK_WITH` and the album
-`columns` in `catalog-selects.ts` / `feed.ts` / `albums.ts`) select `catalog_number` explicitly.
+(`albums.ts`), and the Drizzle reads behind `getFeed` / `getAlbum` (`TRACK_WITH`,
+`ALBUM_TRACK_WITH` and the album `columns` in `catalog-selects.ts` / `feed.ts` / `albums.ts`)
+select `catalog_number` explicitly.
 That is why a database without the migration breaks those pages with Postgres error `42703` — see
 [local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###` happens only in
 `src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
@@ -100,7 +101,8 @@ Drizzle. Drizzle sits next to supabase-js, not instead of it. The full guide is 
     the caller's role from `current_user_role()`);
   - through `asSystem`: `listUsers` (`src/lib/services/users.ts`), called by `listAdminUsers` and
     `getAdminUser` (`src/lib/admin/users.ts`) and by `linkedUsersFor` (`src/lib/admin/artists.ts`).
-  - Shared query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`, `toFeedTrack`);
+  - Shared query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`,
+    `ALBUM_TRACK_WITH`, `toFeedTrack`);
     the artist-name mapper `artistNamesOf` is in `artist-names.ts`.
 - After every migration, run `yarn db:pull` (local stack only) next to the `database.types.ts`
   regeneration above, and commit `src/lib/db/generated/schema.ts`; CI diffs both.

@@ -14,7 +14,8 @@ import type { Viewer } from "./viewer";
 // Replaces the admin_list_users() SQL function; same columns, same order,
 // and the same 1000-row cap PostgREST applied to it (MAX_ROWS).
 // Uses asSystem (admin access, RLS bypassed, only after authorize() has
-// confirmed permission) because auth.users isn't readable under RLS.
+// confirmed permission) because the signed-in role has no permission to read
+// auth.users.
 // Aliased: public.users and auth.users would otherwise both render as
 // "users" ("table reference is ambiguous", verified 2026-10-24).
 const au = alias(authUsers, "auth_users");

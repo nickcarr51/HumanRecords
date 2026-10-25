@@ -15,7 +15,8 @@ Why `getClaims()`: it verifies the JWT signature (locally via JWKS where possibl
 trusting the cookie. Don't use `getSession()` on the server for authorization — it returns the
 cookie contents unverified.
 
-Callers: `(app)/layout.tsx`, `dashboard/page.tsx`, `not-found.tsx`, and every server action in
+Callers: `(app)/layout.tsx`, `dashboard/page.tsx`, `not-found.tsx`, `admin/users/page.tsx`,
+`admin/users/[id]/page.tsx`, `src/lib/feed/actions.ts`, and every server action in
 `src/lib/storage/actions.ts` (uses `claims.sub` as the user id).
 
 ## `getClaims(supabase)` / `getViewer(supabase)` (`src/lib/services/viewer.ts`)

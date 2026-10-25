@@ -55,8 +55,10 @@ const links = (Object.values(relations) as unknown[])
   );
 
 describe("relations.ts", () => {
-  it("declares links to check", () => {
-    expect(links.length).toBeGreaterThan(0);
+  // Every one() and many() in relations.ts. Update this number when a link is
+  // added or removed there, so a walk that quietly drops links can't pass.
+  it("finds all 16 links relations.ts declares", () => {
+    expect(links).toHaveLength(16);
   });
 
   it.each(links)("%s matches a real foreign key", (_name, table, columns, pointsAt) => {

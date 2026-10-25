@@ -41,7 +41,10 @@ elif has '(media-prod|humanrecords-backups|gglrarflzvfxhdnjbnvt)'; then
   reason="Command references a PRODUCTION resource (prod media bucket, backups bucket, or prod Supabase project)."
 # Any command carrying a hosted database URL, e.g. `DATABASE_URL=<hosted> yarn dev`
 # or `yarn test`: the app and the tests connect straight to DATABASE_URL.
-elif has 'postgres(ql)?://([^[:space:]@/]*@)?[^[:space:]@/]*(supabase\.(co|com)|pooler\.supabase)'; then
+# A database URL anywhere plus a hosted address anywhere counts, so no password
+# (raw `@` or `/`, quotes, spaces) can hide one. It also asks when a local URL
+# and a hosted name only happen to share a command.
+elif has 'postgres(ql)?://' && has 'supabase\.(co|com)|pooler\.supabase'; then
   reason="Command contains a HOSTED Supabase database URL."
 fi
 

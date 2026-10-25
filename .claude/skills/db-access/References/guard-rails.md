@@ -17,10 +17,10 @@ Server-only (never `NEXT_PUBLIC_`), read in exactly one place: `getDb()` in `src
 
 | Where | Not allowed | Why |
 |---|---|---|
-| All of `src/` outside `src/lib/db` (services included) | importing `postgres` or `drizzle-orm/*-js` (e.g. `drizzle-orm/postgres-js`) | only `src/lib/db` opens a connection; a direct one logs in as `postgres` and skips `asUser` and RLS |
+| All of `src/` outside `src/lib/db` (services included) | importing `postgres` or any `drizzle-orm/...` path except `drizzle-orm/pg-core` (so every Drizzle driver, now or later, e.g. `drizzle-orm/postgres-js`), statically or with `import(...)`; `require(...)` is already an error everywhere (`@typescript-eslint/no-require-imports`) | only `src/lib/db` opens a connection; a direct one logs in as `postgres` and skips `asUser` and RLS |
 | Outside `src/lib/db` and `src/lib/services` | importing `@/lib/db/client` (type imports are allowed) or `@/lib/db/system` | use `asUser` or a service; `asSystem` skips RLS |
 | `src/lib/services` | importing `@/lib/db/client` (type imports allowed) | go through `asUser` or `asSystem` |
-| All of `src/` outside `src/lib/db` | `sql.raw(...)` and `.unsafe(...)` | both send a string to the database as-is, with no value escaping |
+| All of `src/` outside `src/lib/db` | `.raw` under any name or fixed spelling (`s.raw`, `sql["raw"]`, any `{ raw }` unpacking such as `const { raw } = sql`; `String.raw` stays allowed, `const { raw } = String` doesn't), `.unsafe(...)`, `execute` used any way but `` x.execute(sql`...`) `` with the template written in place (`execute("…")`, `tx["execute"]`, `{ execute }`, `.call` / `.apply` / `.bind`, or passed around as a value), and `import()` with any path that isn't a plain string. These match the names on any object, since lint can't tell which object is Drizzle's | `sql.raw` and `.unsafe()` send a string to the database as-is, with no value escaping, and `execute` does too when given a plain string (it runs it through `sql.raw`). Lint can't see `obj[name]` with a variable name, a name built from pieces (`` sql[`r${x}`] ``, `sql["r" + "aw"]`), `Reflect.get(sql, "raw")`, or `new SQL([new StringChunk(…)])` |
 
 `src/lib/db/generated/**` is ignored by lint (generated code).
 
@@ -32,14 +32,20 @@ prompt on:
   `drop`/`up` rewrite Drizzle migration files. Supabase migrations are the only schema path, so
   none of these is ever needed.
 - `drizzle-kit` with a hosted host (`supabase.co`, `supabase.com`, `pooler.supabase`).
-- Any command containing a hosted Supabase database URL (`postgres://` or `postgresql://` whose
-  host is under `supabase.co`, `supabase.com` or `pooler.supabase`), e.g.
+- Any command that contains both `postgres://` or `postgresql://` and a hosted name
+  (`supabase.co`, `supabase.com` or `pooler.supabase`), anywhere in it, e.g.
   `DATABASE_URL=<hosted> yarn dev` or `yarn test`: the app and the tests connect straight to
-  `DATABASE_URL`.
+  `DATABASE_URL`. No way of writing the password (a raw `@` or `/`, quote marks, spaces) can hide a
+  hosted URL. It also asks when a local URL and a hosted name only happen to share a command.
 
-It can't see a URL inside a shell variable or a file (`.env.local`), so `.env.local` must hold
-only the local URL. Tests: `.claude/hooks/guard-db.drizzle.test.ts` (plus `guard-db.test.ts`
-for the older rules).
+It can't see a URL inside a shell variable or a file the command reads (`.env.local`, or
+`node --env-file=<file>`, which `release-ops/References/onboarding.md` uses), so `.env.local` must
+hold only the local URL. It also misses a hosted URL spelled oddly on purpose: it turns every `\`
+into a space before matching, so `supabase\.co`, a `\` line break inside the host name and
+`postgresql:\/\/` get past it, and so do quotes spliced into a word (`postgres""ql://`,
+`supa""base.co`), `$'…\x2eco'`, and a hosted server given as `PGHOST=`. The hook is there to
+catch mistakes, not deliberate tricks (owner's decision, 2026-10-25). Tests:
+`.claude/hooks/guard-db.drizzle.test.ts` (plus `guard-db.test.ts` for the older rules).
 
 ## The pulled schema (`yarn db:pull`)
 

@@ -96,14 +96,15 @@ on `drizzle-kit` with a hosted host, and on any command carrying a hosted databa
 
 Symptom: `/feed` or `/albums/[id]` throws, or a `db` test fails, with Postgres error `42703`. The
 Drizzle reads (`getFeed`, `getAlbum`) report it as a `DatabaseError` ("Database query failed",
-`code: "42703"`; the SQL text is never kept, [[db-access]]). supabase-js reads and tests show
-PostgREST's text, e.g. `column tracks_1.catalog_number does not exist` (the alias may be
-`albums_1`). Cause: the checked-out code selects `catalog_number` (added by `20261011170000`) but
-your local database hasn't run that migration yet. Fix: `yarn supabase migration up` (only pending
-migrations, keeps data) — **not** `db reset`. Going the other way (older branch, newer DB) is
-harmless: the column is additive and old code never asks for it. The same symptom on a hosted
-environment means `deploy.yml` hasn't run the migration there yet; wait for the deploy, don't push
-by hand.
+`code: "42703"`; the SQL text is never kept, [[db-access]]). No app code reads `catalog_number`
+through supabase-js any more. The supabase-js test `catalog-numbers.data.test.ts` fails at its
+first `expect`; the select's own error (`column tracks.catalog_number does not exist`, or
+`albums.catalog_number` in the album test) isn't printed. Cause: the checked-out code selects
+`catalog_number` (added by `20261011170000`) but your local database hasn't run that migration
+yet. Fix: `yarn supabase migration up` (only pending migrations, keeps data) — **not**
+`db reset`. Going the other way (older branch, newer DB) is harmless: the column is additive and
+old code never asks for it. The same symptom on a hosted environment means `deploy.yml` hasn't
+run the migration there yet; wait for the deploy, don't push by hand.
 
 ## Data / schema tests
 
@@ -121,7 +122,8 @@ by hand.
   `*.parity.data.test.ts`, `*.drizzle.data.test.ts`, `*-row-cap.data.test.ts`,
   `src/lib/admin/artists-links.data.test.ts`) also need `DATABASE_URL` in `.env.local`, set to the
   local stack: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. Each starts with
-  `// @vitest-environment node` (postgres.js needs Node, not jsdom). What each proves:
+  `// @vitest-environment node` (older data tests that reach Drizzle run in jsdom, where
+  postgres.js works too). What each proves:
   [[db-access]] `References/testing.md`.
 - `createAdminClient()` (service role) seeds fixtures; `createTestUser({ role, name })` (role in `app_metadata`, name in `user_metadata`) creates a
   confirmed auth user and returns `{ id, email, signIn, cleanup }`. `signIn()` uses

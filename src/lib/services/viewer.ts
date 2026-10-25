@@ -9,9 +9,12 @@ import { DomainError } from "./errors";
 // A type-only marker: no value carries it, so code outside getClaims() can't
 // write JwtClaims without a cast (yarn typecheck catches that).
 declare const verifiedOnly: unique symbol;
-// Verified JWT claims. Only getClaims() may create one.
-export type JwtClaims = Record<string, unknown> & { sub: string; readonly [verifiedOnly]: true };
-export type Viewer = { userId: string; role: UserRole | null; claims: JwtClaims };
+// Verified JWT claims. Only getClaims() may create one. Read-only, and frozen
+// at runtime, so no code can swap in another user's id after the check.
+export type JwtClaims = Readonly<Record<string, unknown>> & { readonly sub: string; readonly [verifiedOnly]: true };
+// Read-only, and frozen at runtime by getViewer(), so no code can raise a
+// Viewer's role (or change whose it is) after the database has said it.
+export type Viewer = { readonly userId: string; readonly role: UserRole | null; readonly claims: JwtClaims };
 
 // Every Viewer getViewer() has returned. authorize() rejects any other object.
 const issued = new WeakSet<object>();
@@ -35,7 +38,8 @@ export async function getClaims(supabase: SupabaseClient<Database>): Promise<Jwt
   if (!claims || typeof claims.sub !== "string") {
     throw new DomainError("UNAUTHENTICATED", "Sign in to continue.");
   }
-  return claims as JwtClaims;
+  // A frozen copy: the auth library's own object stays out of our hands.
+  return Object.freeze({ ...claims }) as JwtClaims;
 }
 
 // Role comes from the database: admin_set_user_role updates public.users but
@@ -45,7 +49,7 @@ export async function getViewer(supabase: SupabaseClient<Database>): Promise<Vie
   const [row] = await asUser(claims, (tx) =>
     tx.execute<{ role: UserRole | null }>(sql`select public.current_user_role() as role`),
   );
-  const viewer: Viewer = { userId: claims.sub, role: row?.role ?? null, claims };
+  const viewer: Viewer = Object.freeze({ userId: claims.sub, role: row?.role ?? null, claims });
   issued.add(viewer);
   return viewer;
 }

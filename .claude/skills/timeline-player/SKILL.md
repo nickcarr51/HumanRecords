@@ -64,7 +64,7 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 | Feed data (pinned + `sort_at` order, archived hidden, `catalogNumber`; Drizzle via `asUser`) | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Feed search filter (same matches as the old `search_feed` SQL function) | `src/lib/supabase/feed-search.ts` (`searchMatches`) |
 | Album detail data (Drizzle via `asUser`) | `src/lib/supabase/albums.ts` (`getAlbum`) |
-| Shared Drizzle query shapes for feed and album (`ARTIST_NAMES`, `TRACK_WITH`, `DbTrack`, `toFeedTrack`) | `src/lib/supabase/catalog-selects.ts` |
+| Shared Drizzle query shapes for feed and album (`ARTIST_NAMES`, `TRACK_WITH`, `ALBUM_TRACK_WITH`, `DbTrack`, `toFeedTrack`) | `src/lib/supabase/catalog-selects.ts` |
 | Shared artist-name flatteners (`artistNamesOf` for Drizzle rows, `namesFrom` for supabase-js embeds) | `src/lib/supabase/artist-names.ts` |
 | Catalog id stamp (`HS###` album / `HSS###` track) + row line | `src/components/CatalogId/{CatalogId,CatalogLine}.tsx` |
 | Timeline page | `src/app/(app)/feed/page.tsx` |
@@ -87,9 +87,10 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
   (`audioMeter.ts`, `peaks.ts`, `PixelWaveform`, `PlaybackButton`), queue sources and paging (a search
   queue that runs out continues into the main feed after its last release; the view stays on
   the search), pre-signing, Media Session, and `FollowPlayingPage`.
-- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one Drizzle read of
-  `releases` with an optional `searchMatches` filter for `q`, `pinned desc, sort_at desc`, archived
-  hidden, exact-count pagination, `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`,
+- [feed-and-album-data.md](References/feed-and-album-data.md) — `getFeed` (one Drizzle
+  transaction over `releases`, a rows query plus a count query, with an optional `searchMatches`
+  filter for `q`, `pinned desc, sort_at desc`, archived hidden, exact-count pagination,
+  `FEED_PAGE_SIZE`), `getReleaseFeedPage` / `getFeedAfterRelease`,
   and `getAlbum` (tracks in `position` order); the required `catalogNumber` on every shape; position
   ordering and the "Various Artists" label. Also how both pages seed downloaded state
   (`getMyDownloadedTrackIds` + `DownloadsProvider`).

@@ -1,6 +1,6 @@
 ---
 name: db-access
-description: Use when writing or changing a database read or write that touches more than one table, or anything in `src/lib/db/*` or `src/lib/services/*` — Drizzle ORM (`getDb`, `createDb`, `connectionOptions`, `Db`/`Tx`), `asUser` / `asSystem`, `prepareTransaction` and the 10s timeouts (`transaction-setup.ts`), `authorize` / `Grant` / `Action` / `isIssuedGrant` (`policy.ts`), `getViewer` / `getClaims` / `Viewer` / `JwtClaims` / `isIssuedViewer` (`viewer.ts`), `DomainError` / `DatabaseError` / `fromPgError` (`errors.ts`), `listUsers` / `UserRow` (`services/users.ts`), `MAX_ROWS` (`max-rows.ts`), `pgrstTs` (`timestamps.ts`), `relations.ts`, the `authUsers` alias (`auth-schema.ts`), `yarn db:pull` / `drizzle.config.ts` / `generated/schema.ts`, `DATABASE_URL`, the Supabase CA certificate (`supabase-ca.ts`), the database health check (`checkDatabase`, `/api/health/db`), the lint rules on `postgres` / `drizzle-orm/*-js` / `sql.raw` / `.unsafe()`, the guard-hook rules for `drizzle-kit` and hosted database URLs, the slice map (which supabase-js reads and SQL functions move to Drizzle next), or the database access tests (`db-access.data.test.ts`, `*.parity.data.test.ts`, `client.test.ts`, `relations.test.ts`, `health.data.test.ts`). Also when "Missing DATABASE_URL", "DATABASE_URL is not a valid URL", "Database query failed", "table reference \"users\" is ambiguous", "permission denied" from a Drizzle read, a certificate or connection error, a statement timeout (57014), `UNAUTHENTICATED` / `FORBIDDEN` / "Not authorized.", or a red "Site database answers" step appears.
+description: Use when writing or changing a database read or write that touches more than one table, or anything in `src/lib/db/*` or `src/lib/services/*` — Drizzle ORM (`getDb`, `createDb`, `connectionOptions`, `Db`/`Tx`), `asUser` / `asSystem`, `prepareTransaction` and the 10s timeouts (`transaction-setup.ts`), `authorize` / `Grant` / `Action` / `isIssuedGrant` (`policy.ts`), `getViewer` / `getClaims` / `Viewer` / `JwtClaims` / `isIssuedViewer` (`viewer.ts`), `DomainError` / `DatabaseError` / `fromPgError` (`errors.ts`), `listUsers` / `UserRow` (`services/users.ts`), `MAX_ROWS` (`max-rows.ts`), `pgrstTs` (`timestamps.ts`), `relations.ts`, the `authUsers` alias (`auth-schema.ts`), `yarn db:pull` / `drizzle.config.ts` / `generated/schema.ts`, `DATABASE_URL`, the Supabase CA certificate (`supabase-ca.ts`), the database health check (`checkDatabase`, `/api/health/db`), the lint rules on database drivers / `sql.raw` / `execute()` / `.unsafe()`, the guard-hook rules for `drizzle-kit` and hosted database URLs, the slice map (which supabase-js reads and SQL functions move to Drizzle next), or the database access tests (`References/testing.md`). Also when "Missing DATABASE_URL", "DATABASE_URL is not a valid URL", "Database query failed", "table reference \"users\" is ambiguous", "permission denied" from a Drizzle read, a certificate or connection error, a statement timeout (57014), `UNAUTHENTICATED` / `FORBIDDEN` / "Not authorized.", or a red "Site database answers" step appears.
 ---
 
 # Database access: Drizzle, `asUser` / `asSystem`, services
@@ -56,7 +56,7 @@ table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of i
 | Health check: `checkDatabase(db?)` and the public route | `src/lib/db/health.ts`, `src/app/api/health/db/route.ts` |
 | Who is calling: `getClaims`, `getViewer`, `Viewer`, `JwtClaims`, `isIssuedViewer` | `src/lib/services/viewer.ts` |
 | Permission check: `authorize`, `Grant`, `Action`, `isIssuedGrant` | `src/lib/services/policy.ts` |
-| Safe errors: `DomainError`, `DatabaseError`, `fromPgError` | `src/lib/services/errors.ts` |
+| Safe errors: `DomainError`, `DatabaseError`, `fromPgError`, `isPostgresError` | `src/lib/services/errors.ts` |
 | First service: `listUsers(viewer)`, `UserRow` | `src/lib/services/users.ts` |
 | Drizzle reads as the user | `src/lib/supabase/{feed,feed-search,albums,catalog-selects,artist-names}.ts` ([[timeline-player]]) |
 | Callers of `listUsers` | `src/lib/admin/users.ts` (`listAdminUsers`, `getAdminUser`), `src/lib/admin/artists.ts` (`linkedUsersFor`) |
@@ -68,8 +68,9 @@ table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of i
 ## References
 
 - [running-queries.md](References/running-queries.md) — the connection and TLS,
-  `prepareTransaction` and the timeouts, `asUser`, `asSystem` + `authorize` + `Grant`, `getViewer`, how to add a new
-  read or service, relation names, the `auth.users` alias, `pgrstTs`, `MAX_ROWS`, notes for writes.
+  `prepareTransaction` and the timeouts, `asUser`, `asSystem` + `authorize` + `Grant`,
+  `getViewer`, how to add a new read or service, relation names, the `auth.users` alias,
+  `pgrstTs`, `MAX_ROWS`, notes for writes.
 - [errors-and-health.md](References/errors-and-health.md) — `DomainError` / `DatabaseError` /
   `fromPgError` and the fixed messages, what each error message means, the health check.
 - [guard-rails.md](References/guard-rails.md) — `DATABASE_URL` per environment, lint rules, the
@@ -97,6 +98,6 @@ Used by: [[timeline-player]] (`getFeed`, `getAlbum`), [[invites]] (`/admin/users
   ([slices.md](References/slices.md)). `fromPgError`'s mapped codes are there for them.
 - `search_feed` and `admin_list_users` stay in the database with no app callers (the parity
   tests use them); a later cleanup migration drops them.
-- The hosted rollout checks (pooler certificate, role timeouts, time zone, max rows) are listed in
-  the slice 1 plan, Task 7 (`docs/superpowers/plans/2026-10-23-drizzle-services-slice1.md`,
-  gitignored, local).
+- The hosted rollout checks (a)-(h) (pooler certificate, role timeouts, time zone, max rows,
+  `DATABASE_URL` in Vercel) are in [[release-ops]] `References/environments.md`, "Hosted database
+  checks".

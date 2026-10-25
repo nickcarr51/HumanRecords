@@ -59,9 +59,7 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 - DB tests: `yarn supabase start` first, with the local `DATABASE_URL` in `.env.local`, then
   `yarn test --run src/lib/supabase src/lib/db src/lib/services src/lib/admin`
   (`test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`).
-- Everything: `yarn test --run`; also `yarn lint` and `yarn build`. (A pre-existing
-  `tsc --noEmit` error in `src/lib/auth/actions.test.ts` is not a build failure; Next's
-  build excludes tests.)
+- Everything: `yarn test --run`; also `yarn lint` and `yarn build`.
 
 ## Deliberately not tested
 

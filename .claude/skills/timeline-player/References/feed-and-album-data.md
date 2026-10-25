@@ -5,7 +5,8 @@ Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/feed-search.ts`, `src/lib/s
 `feed.data.test.ts`, `feed-query.data.test.ts`, `feed-after-release.data.test.ts`,
 `albums.data.test.ts`, `artist-names.test.ts`, `catalog-numbers.data.test.ts`, and from the Drizzle
 move `feed-drizzle.parity.data.test.ts`, `feed-row-cap.data.test.ts`,
-`albums.drizzle.data.test.ts`, `artist-names.drizzle.test.ts`.
+`albums.drizzle.data.test.ts`, `artist-names.drizzle.test.ts`, and
+`src/lib/db/album-page-query.test.ts` (the album query doesn't ask for `track_art_url`).
 
 Both functions follow the project convention: they take a `SupabaseClient<Database>` as the
 **first argument** (dependency injection), never calling the cookie-based `createClient()`
@@ -79,10 +80,11 @@ An uncredited track yields `artistNames: []` (never a crash); the UI shows
 "Unknown Artist".
 
 **Search (`q`)**: `q` is trimmed; blank = the plain feed. Otherwise `searchMatches(tx, q)`
-(`feed-search.ts`) is added to the same filter, so search and the plain feed share one query,
-one order and one count and can never disagree. It matches, case-insensitively, track titles,
-album titles and credited artist names: a single through its live track (title or track artist);
-an album through its title, an album artist, or any live track. Archived tracks never match.
+(`feed-search.ts`) is added to the same filter, so search and the plain feed share one filter
+(for the rows and the count) and one order, so they can never disagree. It matches,
+case-insensitively, track titles, album titles and credited artist names: a single through its
+live track (title or track artist); an album through its title, an album artist, or any live
+track. Archived tracks never match.
 `%`, `_` and `\` in `q` are literal (`escapeLike`). It is a translation of the `search_feed` SQL
 function, which still exists but has no app callers ([[catalog-schema]] `References/functions.md`);
 `feed-drizzle.parity.data.test.ts` proves both match the same releases in the same order.
@@ -103,8 +105,8 @@ then capped at `MAX_QUERY_LENGTH` (200); a non-string `q` is treated as blank.
 - `getReleaseFeedPage(supabase, ref, pageSize?)` → the main-feed page (1-based) a release is
   on (looked up by `album_id` or `track_id`), or `null` if archived/missing. It reads one table
   (`releases`), so under the rule it stays on supabase-js. Counts live releases ordered ahead of
-  it with `or()`: pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is wrapped in double
-  quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
+  it with `or()`: pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is
+  wrapped in double quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
   `floor(ahead / pageSize) + 1`.
 - `getFeedAfterRelease(supabase, ref, pageSize?)` → `FeedAfterRelease` (`{ items, page, hasMore }`)
   `| null`: the items after the release on its main-feed page (never the search), or the whole next
@@ -120,12 +122,18 @@ then capped at `MAX_QUERY_LENGTH` (200); a non-string `q` is treated as blank.
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
 - Then, as the signed-in user (`asUser`), `tx.query.albums.findFirst` by id with `columns` id,
   `catalogNumber`, title, `albumArtUrl` and the nested `releases` (`archivedAt`), `albumArtists`
-  (`ARTIST_NAMES`) and `trackAlbums` (`position` → `track` as `TRACK_WITH`). Returns `null` for a
-  missing album **and for an archived one**, even for label members. No visible release is also
-  `null` (RLS hides an archived release from listeners, so `releases` comes back empty; every
-  album has a release). Archived tracks are skipped from `tracks`.
-- Same nested rows as the feed's album branch (`catalog-selects.ts`); tracks sorted by
-  `track_albums.position`, so the album page and the feed's expanded album row always agree.
+  (`ARTIST_NAMES`) and `trackAlbums` (`position` → `track` as `ALBUM_TRACK_WITH`: id,
+  `catalogNumber`, title, `archivedAt`, `trackArtists`, no `trackArtUrl`, the same columns the album
+  query asked for before Drizzle). The app no longer receives `trackArtUrl`, but the database still
+  reads the whole `tracks` row, because Drizzle reads one linked row with `select *`. The query is
+  `findAlbum(tx, id)`, exported from `albums.ts` so a test can check the SQL `getAlbum` sends.
+  Returns `null` for a missing album **and for an archived one**, even for label members. No
+  visible release is also `null` (RLS hides an archived release from listeners, so `releases`
+  comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
+- The same nested artist rows as the feed's album branch (`catalog-selects.ts`), and the same
+  track columns apart from `trackArtUrl` (the feed's album tracks use `TRACK_WITH`, the album
+  page `ALBUM_TRACK_WITH`); tracks sorted by `track_albums.position`, so the album page and the
+  feed's expanded album row always agree.
 - `albumArtUrl` is returned but **not rendered** by the album page yet (it is an unsigned R2
   key; see routing-and-auth.md).
 
@@ -145,9 +153,10 @@ Both pages show which tracks the user already downloaded:
 ## `catalog-selects.ts` and `artist-names.ts`
 
 - `ARTIST_NAMES` (`position` → `artist.name`), `TRACK_WITH` (the track columns plus
-  `trackArtists`), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` — the Drizzle
-  `columns`/`with` shapes `getFeed` and `getAlbum` share. Album tracks use the same `TRACK_WITH`,
-  so they also fetch `trackArtUrl`, which the feed doesn't show for them.
+  `trackArtists`), `ALBUM_TRACK_WITH` (the same without `trackArtUrl`, for the album page's
+  tracks), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` (takes either) — the
+  Drizzle `columns`/`with` shapes `getFeed` and `getAlbum` share. The feed's album tracks use
+  `TRACK_WITH`, so they also fetch `trackArtUrl`, which the feed doesn't show for them.
 - `ArtistLink = { position?: number | null; artist: { name: string } | null }` — a Drizzle link
   row (singular `artist`). `artistNamesOf(links)` — `byPosition` → names → drop nulls →
   de-dupe.

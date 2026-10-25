@@ -1,3 +1,4 @@
+import "server-only";
 import { DrizzleQueryError } from "drizzle-orm";
 
 export type DomainErrorCode = "UNAUTHENTICATED" | "FORBIDDEN" | "INVALID" | "NOT_FOUND" | "RETRY" | "CONFLICT";
@@ -44,8 +45,20 @@ const BY_PG_CODE: Record<string, { code: DomainErrorCode; message: string }> = {
 // Postgres error codes are five digits or capital letters.
 const PG_CODE = /^[0-9A-Z]{5}$/;
 
+// True for an error the database itself sent back. postgres.js copies every
+// field of the database's report onto its PostgresError, and Postgres always
+// sends a severity (its "S" field, which postgres.js calls severity_local). A
+// Node system error whose code also happens to be five capital letters
+// (EPIPE, EPERM) has no severity, so it doesn't count. Matched by that field,
+// not by the class or its name: the production build renames the class (its
+// `name` there is a short made-up one, e.g. "o").
+export function isPostgresError(value: unknown): boolean {
+  return typeof value === "object" && value !== null && typeof Reflect.get(value, "severity_local") === "string";
+}
+
+// The code of an error the database itself sent back.
 function pgCodeOf(value: unknown): string | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
+  if (typeof value !== "object" || value === null || !isPostgresError(value)) return undefined;
   const code: unknown = Reflect.get(value, "code");
   return typeof code === "string" && PG_CODE.test(code) ? code : undefined;
 }
@@ -64,10 +77,11 @@ function isDrizzleQueryError(e: unknown): e is { query: string; params: unknown;
 // - A DomainError comes back unchanged.
 // - A database error becomes a DomainError with a fixed message when its
 //   Postgres error code has a plain meaning, and a DatabaseError otherwise.
-//   A database error is one with a Postgres error code (on the error, or on
-//   its `cause`), or any Drizzle query error, even one with no code (e.g. the
-//   connection dropped mid-query), because its message holds the SQL text.
-// - Anything else (no Postgres error code, no Drizzle query attached) comes
+//   A database error is one the database itself sent back (isPostgresError:
+//   the error itself, or its `cause`), or any Drizzle query error, even one
+//   with no code (e.g. the connection dropped mid-query), because its message
+//   holds the SQL text.
+// - Anything else (not from the database, no Drizzle query attached) comes
 //   back unchanged.
 export function fromPgError(e: unknown): unknown {
   if (e instanceof DomainError) return e;

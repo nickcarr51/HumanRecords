@@ -42,7 +42,7 @@ Concurrent opposite moves can deadlock (`40P01`); callers should show a "try aga
 
 ## Search and ordering
 
-Search shares the feed's single query: `getFeed` adds `searchMatches(tx, q)`
+Search shares the feed's filter (rows and count): `getFeed` adds `searchMatches(tx, q)`
 (`src/lib/supabase/feed-search.ts`) to its filter and keeps the same
 `pinned desc, sort_at desc, id desc` order and count, so search results are always in feed order.
 A blank `q` adds no filter. (Before Drizzle slice 1 the `search_feed` SQL function returned

@@ -45,6 +45,37 @@ describe("authorize (real signed-in users)", () => {
     );
   });
 
+  it("an issued Viewer can't be changed: not its role, its user id or its claims", async () => {
+    const viewer = await viewerWith("listener");
+    expect(Object.isFrozen(viewer)).toBe(true);
+    expect(Object.isFrozen(viewer.claims)).toBe(true);
+    expect(() => {
+      // @ts-expect-error a Viewer is read-only
+      viewer.role = "label_member";
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error a Viewer is read-only
+      viewer.userId = "someone-else";
+    }).toThrow(TypeError);
+    expect(() => {
+      // @ts-expect-error JwtClaims is read-only
+      viewer.claims.sub = "someone-else";
+    }).toThrow(TypeError);
+    expect(viewer.role).toBe("listener");
+    expect(() => authorize(viewer, "users.list")).toThrow(
+      expect.objectContaining({ name: "DomainError", code: "FORBIDDEN" }),
+    );
+  });
+
+  it("an issued Grant can't be changed", async () => {
+    const grant = authorize(await viewerWith("label_member"), "users.list");
+    expect(Object.isFrozen(grant)).toBe(true);
+    expect(() => {
+      // @ts-expect-error a Grant is read-only
+      grant.action = "users.list";
+    }).toThrow(TypeError);
+  });
+
   it("refuses a copy of a real label member's Viewer", async () => {
     const viewer = await viewerWith("label_member");
     expect(() => authorize({ ...viewer }, "users.list")).toThrow(

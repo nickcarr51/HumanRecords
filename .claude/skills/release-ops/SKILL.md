@@ -50,7 +50,8 @@ the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.
 ## References
 
 - [environments.md](References/environments.md) — the environments table, Vercel env-var
-  matrix, hosted Auth settings (Resend SMTP, rate limits), Sentry.
+  matrix, the hosted database checks (a)-(h), hosted Auth settings (Resend SMTP, rate limits),
+  Sentry.
 - [pipeline.md](References/pipeline.md) — CI jobs, deploy flow, GitHub environments, branch
   rules, approving a prod deploy, failures, scheduled-workflow pitfalls.
 - [migrations.md](References/migrations.md) — add-only rule, expand/contract worked example,

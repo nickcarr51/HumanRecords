@@ -52,6 +52,32 @@ The prod R2 token lives only in Vercel Production. The backup token lives only i
 Not an env var: night mode. The root layout (`src/app/layout.tsx`) reads the `hs-theme` cookie
 (`src/lib/theme/mode-cookie.ts`) on every request; no Vercel config is involved.
 
+## Hosted database checks (owner, read-only; local tests can't prove these)
+
+For each hosted project, before the first deploy that uses `DATABASE_URL` and after it. Do (b),
+(c) and (g) before the PR that first uses `DATABASE_URL` (into `develop`, then `develop` → `main`),
+(h) before each merge, and (a), (d)-(f) right after each deploy.
+
+- **(a)** The pooler's certificate chains to the embedded CA (`src/lib/db/supabase-ca.ts`,
+  Supabase Root 2021). Proven when that site's `/api/health/db` answers 200: the app checks the
+  certificate before the health check's first query, so one that doesn't chain fails the `query`
+  check.
+- **(b)** Role timeouts. In the project's SQL editor:
+  `select rolname, rolconfig from pg_roles where rolname in ('authenticated', 'authenticator', 'postgres');`
+  The 10s per-transaction timeouts assume `authenticated`/`authenticator` have about 8s and
+  `postgres` only the 2-minute global cap (`src/lib/db/transaction-setup.ts`).
+- **(c)** Time zone: `show timezone;` must be `UTC`, as locally. `pgrstTs` reproduces PostgREST's
+  date strings, and their `+00:00` ending depends on it.
+- **(d)** The pooler login skips RLS (`asSystem` relies on it).
+- **(e)** It can read `auth.users` (`listUsers` relies on it).
+- **(f)** It can switch to `authenticated` (`asUser` relies on it). (d)-(f) are also proven by
+  `/api/health/db`: its `bypassesRls`, `readsAuthUsers` and `switchesToAuthenticated` checks run as
+  the same login the app uses, so a 200 proves all three.
+- **(g)** The dashboard's API "Max rows" setting is 1000 (`MAX_ROWS` in `src/lib/db/max-rows.ts`
+  matches it).
+- **(h)** `DATABASE_URL` is set in that Vercel environment (Preview for develop, Production) before
+  the merge: the deploy's "Site database answers" step fails the run without it.
+
 ## Hosted Auth settings (both Supabase projects; match `config.toml`)
 
 - Sign-up OFF (Authentication → "Allow new users to sign up").

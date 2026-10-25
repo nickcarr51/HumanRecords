@@ -7,6 +7,7 @@ export type Action = "users.list";
 // write a Grant without a cast (yarn typecheck catches that).
 declare const grantOnly: unique symbol;
 // Only authorize() can make one, so asSystem() can't run without a policy check.
+// Frozen at runtime too, so its action can't be changed after the check.
 export type Grant = { readonly action: Action; readonly [grantOnly]: true };
 
 const RULES: Record<Action, { allow: (v: Viewer) => boolean; message: string }> = {
@@ -26,7 +27,7 @@ export function authorize(viewer: Viewer, action: Action): Grant {
   if (!isIssuedViewer(viewer)) throw new DomainError("FORBIDDEN", "Not authorized.");
   const rule = RULES[action];
   if (!rule.allow(viewer)) throw new DomainError("FORBIDDEN", rule.message);
-  const grant = { action } as Grant;
+  const grant = Object.freeze({ action }) as Grant;
   issued.add(grant);
   return grant;
 }

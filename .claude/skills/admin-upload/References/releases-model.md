@@ -113,8 +113,9 @@ Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); 
   `limit`/`offset`, and a `count()` with the same filter in the same transaction
   (`total`/`totalPages`, `hasMore = page < totalPages`). `toFeedItem` maps single → `kind:"track"`,
   album → `kind:"album"`; a release whose target is null is skipped.
-- `getAlbum` (`albums.ts`): `tx.query.albums.findFirst` with the same nested rows; tracks ordered
-  by `track_albums.position`.
+- `getAlbum` (`albums.ts`): `tx.query.albums.findFirst` (in `findAlbum`) with the same nested
+  rows, except that album tracks leave out `trackArtUrl` (`ALBUM_TRACK_WITH`); tracks ordered by
+  `track_albums.position`.
 - `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS (PostgREST can't order an
   embed by a column of the link table in that select shape; the Drizzle reads reuse it).
   `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the remaining supabase-js

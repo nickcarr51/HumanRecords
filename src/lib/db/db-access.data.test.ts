@@ -72,9 +72,13 @@ function containsText(value: unknown, text: string, seen = new Set<unknown>()): 
   return Object.getOwnPropertyNames(value).some((key) => containsText(Reflect.get(value, key), text, seen));
 }
 
-// A stand-in database that fails the test if anything touches it.
+// A stand-in database that fails the test if anything touches it. It wraps a
+// real Drizzle instance (so no cast is needed) whose client never connects:
+// postgres.js opens a connection only on the first query, and every property
+// read on the wrapper throws first.
 function untouchableDb(): Db {
-  return new Proxy({} as Db, {
+  const neverConnected = createDb(postgres("postgresql://postgres:postgres@127.0.0.1:1/postgres", { max: 1 }));
+  return new Proxy(neverConnected, {
     get() {
       throw new Error("the database was used");
     },
@@ -149,13 +153,17 @@ describe("asUser", () => {
       tx.execute(sql`select id from public.no_such_table_wave4 where id = ${"needle-value"}`),
     ).catch((e: unknown) => e);
     expect(caught).toBeInstanceOf(DatabaseError);
-    expect(caught).toMatchObject({ name: "DatabaseError", message: "Database query failed", code: "42P01" });
-    expect((caught as Error).cause).toBeUndefined();
+    // The values sent with the query are kept; the query text isn't.
+    expect(caught).toMatchObject({
+      name: "DatabaseError",
+      message: "Database query failed",
+      code: "42P01",
+      params: ["needle-value"],
+    });
+    expect(caught).not.toHaveProperty("cause");
     for (const text of ["select id", "from public", "no_such_table_wave4", "where id"]) {
       expect(containsText(caught, text)).toBe(false);
     }
-    // The values sent with the query are kept; the query text isn't.
-    expect((caught as DatabaseError).params).toEqual(["needle-value"]);
   });
 
   it("a refused query gives the fixed permission message, not the database's text", async () => {
@@ -193,11 +201,31 @@ describe("asSystem", () => {
   it("refuses a real grant used for a different job, before any database access", async () => {
     const grant = authorize(await getViewer(await label.signIn()), "users.list");
     const fn = vi.fn(async () => 1);
+    // The cast stands in for a second job: "users.list" is the only Action until slice 2 adds one.
     await expect(asSystem(grant, "users.delete" as unknown as Action, fn, untouchableDb())).rejects.toMatchObject({
       name: "DomainError",
       code: "FORBIDDEN",
     });
     expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a failed query's error has a fixed message and no SQL text anywhere", async () => {
+    const grant = authorize(await getViewer(await label.signIn()), "users.list");
+    const caught = await asSystem(grant, "users.list", (tx) =>
+      tx.execute(sql`select id from public.no_such_table_wave4 where id = ${"needle-value"}`),
+    ).catch((e: unknown) => e);
+    expect(caught).toBeInstanceOf(DatabaseError);
+    // The values sent with the query are kept; the query text isn't.
+    expect(caught).toMatchObject({
+      name: "DatabaseError",
+      message: "Database query failed",
+      code: "42P01",
+      params: ["needle-value"],
+    });
+    expect(caught).not.toHaveProperty("cause");
+    for (const text of ["select id", "from public", "no_such_table_wave4", "where id"]) {
+      expect(containsText(caught, text)).toBe(false);
+    }
   });
 
   it("leaves no settings on the connection after the callback throws", async () => {

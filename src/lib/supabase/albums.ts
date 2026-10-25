@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { albums } from "@/lib/db/generated/schema";
+import type { Tx } from "@/lib/db/client";
 import { asUser } from "@/lib/db/user";
 import { getClaims } from "@/lib/services/viewer";
 import type { Database } from "./database.types";
 import { artistNamesOf, byPosition } from "./artist-names";
-import { ARTIST_NAMES, TRACK_WITH, toFeedTrack } from "./catalog-selects";
+import { ALBUM_TRACK_WITH, ARTIST_NAMES, toFeedTrack } from "./catalog-selects";
 import type { FeedTrack } from "./feed";
 
 export type AlbumDetail = {
@@ -20,6 +21,20 @@ export type AlbumDetail = {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// The album page's query. Album tracks use ALBUM_TRACK_WITH, which leaves out
+// trackArtUrl. Exported so a test can check the query getAlbum really sends.
+export function findAlbum(tx: Pick<Tx, "query">, id: string) {
+  return tx.query.albums.findFirst({
+    columns: { id: true, catalogNumber: true, title: true, albumArtUrl: true },
+    where: eq(albums.id, id),
+    with: {
+      releases: { columns: { archivedAt: true } },
+      albumArtists: ARTIST_NAMES,
+      trackAlbums: { columns: { position: true }, with: { track: ALBUM_TRACK_WITH } },
+    },
+  });
+}
+
 export async function getAlbum(
   supabase: SupabaseClient<Database>,
   id: string,
@@ -29,17 +44,7 @@ export async function getAlbum(
   if (!UUID_RE.test(id)) return null;
 
   const claims = await getClaims(supabase);
-  const data = await asUser(claims, (tx) =>
-    tx.query.albums.findFirst({
-      columns: { id: true, catalogNumber: true, title: true, albumArtUrl: true },
-      where: eq(albums.id, id),
-      with: {
-        releases: { columns: { archivedAt: true } },
-        albumArtists: ARTIST_NAMES,
-        trackAlbums: { columns: { position: true }, with: { track: TRACK_WITH } },
-      },
-    }),
-  );
+  const data = await asUser(claims, (tx) => findAlbum(tx, id));
   if (!data) return null;
 
   // An archived album is gone for everyone, label members included (they

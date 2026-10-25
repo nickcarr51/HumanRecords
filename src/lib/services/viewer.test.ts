@@ -3,9 +3,14 @@ import { getClaims } from "./viewer";
 
 type Client = Parameters<typeof getClaims>[0];
 
+// A stand-in client whose getClaims() gives back `result`.
+function clientReturning(result: { data: { claims: Record<string, unknown> } | null; error: Error | null }) {
+  return { auth: { getClaims: async () => result } } as unknown as Client;
+}
+
 // A stand-in client whose getClaims() reports an auth error.
 function clientWithAuthError(error: Error) {
-  return { auth: { getClaims: async () => ({ data: null, error }) } } as unknown as Client;
+  return clientReturning({ data: null, error });
 }
 
 afterEach(() => {
@@ -32,5 +37,20 @@ describe("getClaims when the auth library reports an error", () => {
     const error = Object.assign(new Error("bad signature"), { name: "AuthInvalidJwtError" });
     await expect(getClaims(clientWithAuthError(error))).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
     expect(log.mock.calls).toEqual([["Session check failed: AuthInvalidJwtError (status none)"]]);
+  });
+});
+
+describe("getClaims when the session is valid", () => {
+  it("returns a frozen copy of the claims, not the auth library's own object", async () => {
+    const original = { sub: "u1", role: "authenticated" };
+    const claims = await getClaims(clientReturning({ data: { claims: original }, error: null }));
+    expect(claims).toEqual(original);
+    expect(claims).not.toBe(original);
+    expect(Object.isFrozen(claims)).toBe(true);
+    expect(() => {
+      // @ts-expect-error JwtClaims is read-only
+      claims.sub = "someone-else";
+    }).toThrow(TypeError);
+    expect(claims.sub).toBe("u1");
   });
 });

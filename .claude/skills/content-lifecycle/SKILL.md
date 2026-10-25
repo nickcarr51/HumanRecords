@@ -47,7 +47,7 @@ movable feed position (`move_release` swaps it).
 - [archive-and-restore.md](References/archive-and-restore.md) — what archiving does per
   object, who still sees archived rows, restore rules, why not hard delete.
 - [r2-cleanup-queue.md](References/r2-cleanup-queue.md) — columns, when rows are written and
-  removed, the future job's rules, service-role only.
+  removed, the future job's rules; only the service role, definer functions or `asSystem` reach it.
 - [ordering.md](References/ordering.md) — `pinned`, `sort_at`, `created_at`, the default
   trigger, `move_release` (swap, tie spreading, group edges, deadlock retry).
 - [artist-delete.md](References/artist-delete.md) — the `restrict` FK, `23503`, the admin

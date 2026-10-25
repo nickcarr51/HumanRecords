@@ -74,9 +74,12 @@ deployments -> Approve. Reject to stop; nothing has changed yet.
   with a new migration (never edit an applied one) and merge again.
 - A CI `migrations` failure is a rule violation, not flakiness.
 - "Site database answers" fails (deploy or daily health): the app can't reach its database.
-  Check the server log line `Database health check failed: <check>` in Vercel: `query` =
-  `DATABASE_URL` missing/wrong, TLS or the pooler; `bypassesRls` / `readsAuthUsers` /
-  `switchesToAuthenticated` = the hosted login role lost a permission the app relies on.
+  Check the server log line `Database health check failed: <check> (<name and code>)` in Vercel:
+  `query` = `DATABASE_URL` missing/wrong, TLS or the pooler; `bypassesRls` / `readsAuthUsers` /
+  `switchesToAuthenticated` = the hosted login role lost a permission the app relies on. The part
+  in brackets narrows it down, e.g. `PostgresError 28P01` = wrong password, `Error ECONNREFUSED` =
+  nothing answers, plain `Error` = `DATABASE_URL` missing or not a valid URL ([[db-access]]
+  `References/errors-and-health.md`).
 
 ## Backdated-migration false alarm
 

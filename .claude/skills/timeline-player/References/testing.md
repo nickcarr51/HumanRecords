@@ -61,7 +61,8 @@ Added with the Drizzle move (slice 1), unchanged older tests above still the mai
 `createdAt` is PostgREST's exact string; past-the-end totals; signed out → `UNAUTHENTICATED`),
 `feed-row-cap.data.test.ts` (at most `MAX_ROWS` rows, exact total), `albums.drizzle.data.test.ts`
 (track and artist position order, archived tracks dropped, signed out → `UNAUTHENTICATED`) and
-`artist-names.drizzle.test.ts` (unit: `artistNamesOf`). The layer's own tests: [[db-access]]
+`artist-names.drizzle.test.ts` (unit: `artistNamesOf`), and `src/lib/db/album-page-query.test.ts`
+(unit: the album query doesn't ask for `track_art_url`). The layer's own tests: [[db-access]]
 `References/testing.md`.
 `src/lib/supabase/catalog-numbers.data.test.ts` (using `release-admin-fixtures.ts`) proves
 `catalog_number` is assigned on insert, increasing, survives a title edit and rejects a
@@ -150,8 +151,7 @@ If you add feature logic to these components, add tests for the logic (not just 
   `yarn test --run src/lib/supabase/feed src/lib/supabase/albums src/lib/supabase/artist-names src/lib/supabase/catalog-numbers.data.test.ts`
 - Everything: `yarn test --run` (data tests fail on connection if Supabase is down — that's
   environment, not a regression).
-- Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files,
-  so a pre-existing `tsc --noEmit` error in `actions.test.ts` does not break the build).
+- Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files).
 - Playback itself (desktop live meter, touch waveform with real peaks, lock screen) needs a real
   browser against a bucket with the CORS `GET` rule applied (desktop playback is CORS mode; the
   touch peaks fetch is cross-origin): `yarn dev` + the local bucket (`infra/r2/README.md`).

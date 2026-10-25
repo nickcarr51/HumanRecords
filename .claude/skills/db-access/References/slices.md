@@ -15,7 +15,7 @@ the plan next to it (gitignored, local).
 | Slice | SQL functions moved into TypeScript | supabase-js code moved to Drizzle |
 |---|---|---|
 | **1 (done)** | `search_feed`, `admin_list_users` | `getFeed`, `getAlbum` |
-| 2 | `admin_delete_artist`, `admin_set_user_role` (first writes) | `src/lib/admin/artists.ts` (`listAdminArtists`, `getAdminArtist`, `loadLinkTargets`, `getCreditCounts`); `src/lib/auth/invite.ts` (`getInviteGreeting`); the table parts of `createUser` and `updateUserProfile` (`src/lib/admin/users-actions.ts`; creating and editing the auth user stays on Supabase's Auth API); `scripts/invite-users.mts`; the unused `src/lib/supabase/artists.ts` |
+| 2 | `admin_delete_artist`, `admin_set_user_role` (first writes) | `src/lib/admin/artists.ts` (`listAdminArtists`, `getAdminArtist`, `loadLinkTargets`, `getCreditCounts`); `src/lib/auth/invite.ts` (`getInviteGreeting`); the table parts of `createUser` and `updateUserProfile` (`src/lib/admin/users-actions.ts`; creating and editing the auth user stays on Supabase's Auth API); the table parts of `redeemInvite` (`src/lib/auth/actions.ts`; signing in stays on the Auth API); `scripts/invite-users.mts`; the unused `src/lib/supabase/artists.ts` |
 | 3 | `archive_track`, `restore_track`, `replace_track_audio` (+ `release_for_track`) | `getTrackDownloadUrl` (`src/lib/storage/actions.ts`) |
 | 4 | `archive_release`, `restore_release`, `move_release` | `getAdminReleases`, `getAdminRelease` (`src/lib/admin/releases.ts`) |
 | 5 | `publish_release`, `update_release`, `add_album_track` (+ `resolve_artist_refs`) | — |
@@ -34,14 +34,15 @@ Stay in SQL permanently: the triggers `handle_new_user`, `sync_user_role_from_ap
 | `src/lib/auth/invite.ts` `getInviteGreeting` | `findUnusedInvite` (`invites`) then a `users` lookup | 2 |
 | `src/lib/admin/users-actions.ts` `createUser` | Auth API `createUser` (the trigger writes `users`), then `upsertInvite` (`invites`); not atomic | 2 (table parts) |
 | `src/lib/admin/users-actions.ts` `updateUserProfile` | Auth API update, then `users.update` | 2 (table parts) |
+| `src/lib/auth/actions.ts` `redeemInvite` | `claimInvite` (`invites`), then the Auth API (`getUserById`, `generateLink`, `verifyOtp`, which read `auth.users`), then `restoreInvite` (`invites`) if signing in fails; not atomic | 2 (table parts) |
 | `scripts/invite-users.mts` | Auth API list/create plus `users` select/update | 2 |
 | `src/lib/supabase/artists.ts` `getArtists`, `getArtist` (retired `/artists`, not live) | `track_artists(count)`; `track:tracks(… track_albums(albums(title)))` | 2 |
 | `src/lib/storage/actions.ts` `getTrackDownloadUrl` | `tracks` embedding `track_artists ( position, artists ( name ) )`, then an upsert into `downloads` (service client) | 3 |
 | `src/lib/admin/releases.ts` `getAdminReleases`, `getAdminRelease` | one embedded select over `releases`, `tracks`, `track_artists`, `artists`, `albums`, `album_artists`, `track_albums` | 4 |
 
-Not on the list because they touch one table: `getReleaseFeedPage` (`releases`; it then calls the
-Drizzle `getFeed`), `getMyDownloadedTrackIds` (`downloads`), `getCurrentRole`
-(`current_user_role()`), the invite store functions (`invites`), `setPinned` (`releases`), and the
-artist create/update actions (`artists`). Every admin write in `release-actions.ts`,
-`actions.ts`, `artists-actions.ts` and `users-actions.ts` that calls `rpc(...)` is a SQL function
-in the slice map above.
+Not on the list because they touch one table: `getReleaseFeedPage` (`releases` only;
+`getFeedAfterRelease` then calls the Drizzle `getFeed`), `getMyDownloadedTrackIds`
+(`downloads`), `getCurrentRole` (`current_user_role()`), the invite store functions
+(`invites`), `setPinned` (`releases`), and the artist create/update actions (`artists`). Every
+admin write in `release-actions.ts`, `actions.ts`, `artists-actions.ts` and `users-actions.ts`
+that calls `rpc(...)` is a SQL function in the slice map above.

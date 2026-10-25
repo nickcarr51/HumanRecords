@@ -35,10 +35,11 @@ and `revalidatePath('/admin/users')` on success.
 Both functions are `security definer`, `set search_path = public`, execute revoked from
 `public`/`anon`, granted to `authenticated`.
 - `admin_list_users()` → `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`
-  (users ⟕ auth.users ⟕ invites, newest first). Raises `42501` unless `label_member`. No app
-  callers since Drizzle slice 1: `listUsers` returns the same columns in the same order (proved by
-  `users.parity.data.test.ts`). `banned_until` (added in `20261010120500`) is what
-  `toAdminUserRow` turns into `deactivated` (a ban that hasn't expired yet).
+  (`users` joined to `auth.users`, plus each user's `invites` row if there is one, newest
+  first). Raises `42501` unless `label_member`. No app callers since Drizzle slice 1:
+  `listUsers` returns the same columns in the same order (proved by `users.parity.data.test.ts`).
+  `banned_until` (added in `20261010120500`) is what `toAdminUserRow` turns into `deactivated` (a
+  ban that hasn't expired yet).
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
   `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only.
 

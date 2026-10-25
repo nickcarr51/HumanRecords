@@ -59,13 +59,15 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
   reached), it logs one line, `Session check failed: <error name> (status <status|none>)`, never
   the token or the message, then throws the same `UNAUTHENTICATED`.
 - `JwtClaims` carries a type-only marker, so code outside `getClaims` can't produce one without a
-  cast (`yarn typecheck` catches a hand-built object).
+  cast (`yarn typecheck` catches a hand-built object). It is read-only, and `getClaims` returns a
+  frozen copy (`Object.freeze`), so no code can swap in another user's id afterwards.
 - `getViewer(supabase)` → `{ userId, role, claims }`. The role comes from the database
   (`select public.current_user_role()` through `asUser`), not the token: `admin_set_user_role`
   updates `public.users` but not `app_metadata`, so the token's copy can be stale. Unlike
   `getSessionUser()` ([[auth]]), it throws `UNAUTHENTICATED` when signed out instead of returning
-  `null`. Every Viewer it returns is remembered in a private list (a `WeakSet`) that
-  `isIssuedViewer` checks.
+  `null`. Every Viewer it returns is frozen (read-only type plus `Object.freeze`, so its role and
+  user id can't be changed) and remembered in a private list (a `WeakSet`) that `isIssuedViewer`
+  checks.
 
 ## `asSystem(grant, action, fn, db?)` — admin access after a permission check
 
@@ -74,8 +76,8 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
     return (a hand-built or copied object);
   - then applies the rule for `action` (`RULES`). Today there is one action, `users.list`, label
     members only; anyone else gets `FORBIDDEN` "Only label members can list users.";
-  - on success it returns a `Grant` and remembers it in a private list (a `WeakSet`) that
-    `isIssuedGrant` checks.
+  - on success it returns a frozen `Grant` (`Object.freeze`) and remembers it in a private list
+    (a `WeakSet`) that `isIssuedGrant` checks.
     `Grant` also has a type-only marker, so a hand-built one fails typecheck.
 - `asSystem` throws `DomainError("FORBIDDEN", "Not authorized.")` before any database access when
   the grant wasn't issued by `authorize` or `grant.action !== action`. The optional `db` (tests
@@ -85,8 +87,9 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
 - Only `src/lib/services/*` (and `src/lib/db`) may import it; lint enforces it.
 
 Caller: `listUsers(viewer)` (`src/lib/services/users.ts`), which replaced the `admin_list_users`
-SQL function: `users` ⋈ `auth.users` ⟕ `invites`, newest first, at most `MAX_ROWS`, returning
-`UserRow[]` (`AdminListRow` in `src/lib/admin/users.ts` is an alias). Its callers:
+SQL function: `users` joined to `auth.users`, plus each user's `invites` row if there is one,
+newest first, at most `MAX_ROWS`, returning `UserRow[]` (`AdminListRow` in
+`src/lib/admin/users.ts` is an alias). Its callers:
 `listAdminUsers` and `getAdminUser` (`src/lib/admin/users.ts`) and `linkedUsersFor`
 (`src/lib/admin/artists.ts`, used by `listAdminArtists`, `getAdminArtist`, `loadLinkTargets`).
 Each admin list call makes two transactions: `getViewer` (through `asUser`) and `listUsers`
@@ -113,7 +116,7 @@ Each admin list call makes two transactions: `getViewer` (through `asUser`) and 
   `trackAlbums.track` / `album`; `trackArtists.track` / `artist`; `albumArtists.album` /
   `artist`. Note the singular `artist` (PostgREST's embed says `artists`). Shared `columns`/`with`
   shapes for the catalog live in `src/lib/supabase/catalog-selects.ts` (`ARTIST_NAMES`,
-  `TRACK_WITH`).
+  `TRACK_WITH`, `ALBUM_TRACK_WITH`).
 - A nested read reads every column of a table it joins one-to-one (the generated SQL is
   `select * from "tracks"` inside). Revoking a column from `authenticated` would make such an
   `asUser` read fail with "permission denied"; change a grant only together with the matching
@@ -133,7 +136,10 @@ Each admin list call makes two transactions: `getViewer` (through `asUser`) and 
   hosted projects the dashboard's API "Max rows" setting). Counts stay exact.
 - **Search text**: escape it with `escapeLike` (`src/lib/supabase/artists.ts`) before `ilike`.
 - **No hand-written SQL strings**: the `sql` template tag sends each `${value}` separately from the
-  SQL text; lint bans `sql.raw` and `.unsafe()` (which send a string as-is) outside `src/lib/db`.
+  SQL text. Outside `src/lib/db` lint bans `sql.raw` under any name and `.unsafe()`, which send a
+  string as-is, and any use of `execute` except `` x.execute(sql`...`) `` with the template
+  written in place, since `execute()` also sends a plain string as-is
+  ([guard-rails.md](guard-rails.md)).
 
 ## Notes for writes (slice 2 onward)
 

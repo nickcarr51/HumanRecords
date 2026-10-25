@@ -11,10 +11,18 @@ function containsText(value: unknown, text: string, seen = new Set<unknown>()): 
   return Object.getOwnPropertyNames(value).some((key) => containsText(Reflect.get(value, key), text, seen));
 }
 
+// A stand-in for the error postgres.js makes from the database's own report:
+// it carries the report's fields, including severity_local and the Postgres
+// error code. Its name is "o", as in the production build, which renames the
+// class, so these tests prove the name doesn't matter.
+function pgError(message: string, code: string) {
+  return Object.assign(new Error(message), { name: "o", severity_local: "ERROR", severity: "ERROR", code });
+}
+
 // A stand-in for Drizzle's query error: its message is the query text, and
 // the postgres.js error (with the Postgres error code) is its cause.
 function drizzleStyleError(pgCode: string) {
-  const pg = Object.assign(new Error("permission denied for table secret_stuff"), { code: pgCode });
+  const pg = pgError("permission denied for table secret_stuff", pgCode);
   return Object.assign(new Error("Failed query: select * from secret_stuff where id = $1\nparams: abc"), {
     query: "select * from secret_stuff where id = $1",
     params: ["abc"],
@@ -30,7 +38,7 @@ describe("fromPgError", () => {
     ["40P01", "RETRY", "The database was busy; please try again."],
     ["23503", "CONFLICT", "That item is still in use."],
   ])("turns Postgres error code %s into %s with a fixed message", (pgCode, code, message) => {
-    const mapped = fromPgError(Object.assign(new Error("the database's own words"), { code: pgCode }));
+    const mapped = fromPgError(pgError("the database's own words", pgCode));
     expect(mapped).toBeInstanceOf(DomainError);
     expect(mapped).toMatchObject({ code, message });
   });
@@ -63,7 +71,7 @@ describe("fromPgError", () => {
   });
 
   it("gives a DatabaseError with no values when the error carried none", () => {
-    const mapped = fromPgError(Object.assign(new Error("server closed"), { code: "XX000" }));
+    const mapped = fromPgError(pgError("server closed", "XX000"));
     expect(mapped).toMatchObject({ name: "DatabaseError", code: "XX000", params: undefined });
   });
 
@@ -80,6 +88,12 @@ describe("fromPgError", () => {
     expect(containsText(mapped, "select *")).toBe(false);
   });
 
+  it("gives a DatabaseError with no code for a Drizzle query error whose cause is a Node system error", () => {
+    const cause = Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+    const mapped = fromPgError(new DrizzleQueryError("select * from secret_stuff", [], cause));
+    expect(mapped).toMatchObject({ name: "DatabaseError", code: undefined });
+  });
+
   it("recognises a Drizzle query error by its shape too (query text and params)", () => {
     const e = Object.assign(new Error("Failed query: select * from secret_stuff\nparams: "), {
       query: "select * from secret_stuff",
@@ -93,6 +107,9 @@ describe("fromPgError", () => {
   it.each([
     ["a plain Error", new Error("boom")],
     ["an Error whose code isn't a Postgres error code", Object.assign(new Error("refused"), { code: "ECONNREFUSED" })],
+    ["a Node system error whose code looks like a Postgres one", Object.assign(new Error("write EPIPE"), { code: "EPIPE" })],
+    ["a Postgres-looking code on an error the database didn't send (no severity)", Object.assign(new Error("x"), { code: "42501" })],
+    ["an error named PostgresError with no severity", Object.assign(new Error("x"), { name: "PostgresError", code: "42501" })],
     ["a string", "boom"],
     ["null", null],
   ])("passes %s through unchanged", (_label, e) => {

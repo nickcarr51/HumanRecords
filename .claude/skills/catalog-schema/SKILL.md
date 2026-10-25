@@ -16,7 +16,8 @@ supabase-js (since slice 1, 2026-10): see [[db-access]].
 **The `authenticated` role can read the catalog and write nothing — except label members writing `artists`.** Every table has RLS on,
 every table has an `authenticated … for select` policy: `using (true)` for most, except
 `downloads` (owner-only), `releases`/`tracks` (archived rows hidden unless the caller is a label
-member), and `r2_cleanup_queue` (no policies at all; service role only). See
+member), and `r2_cleanup_queue` (no policies at all; only the service role, definer functions, or
+`asSystem`, which no app code uses for it yet). See
 `References/rls-model.md`. And **no table has a write policy except `artists`** (label-member insert/update,
 for `/admin/artists`). Every other write goes through one of
 two routes: a `security definer` SQL function that checks the caller itself
@@ -43,7 +44,7 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | `pinned`/`sort_at`/`archived_at`, `keep_created_at`, live-only read policies | `…20261010120000_feed_order_and_archive.sql` |
 | `move_release` (admin reorder) | `…20261010120100_move_release.sql` |
 | `search_feed` (feed search) | `…20261010120200_search_feed.sql` |
-| `r2_cleanup_queue` (service-only) | `…20261010120300_r2_cleanup_queue.sql` |
+| `r2_cleanup_queue` (service role, definer functions or `asSystem` only) | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
 | `admin_list_users` returns `banned_until` | `…20261010120500_admin_list_users_banned_until.sql` |
 | `artists` label-member insert/update policies, `admin_delete_artist` | `…20261010130000_artists_admin_writes.sql` |

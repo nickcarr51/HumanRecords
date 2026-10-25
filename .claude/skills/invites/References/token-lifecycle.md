@@ -40,8 +40,10 @@ Mapping lives in `toAdminUserRow` (`used_at` wins, then `token`).
 callers pass `process.env.SITE_URL` (the users page via `listAdminUsers`). Undefined throws
 "SITE_URL is not set". It is never derived from the request host, so a card written during
 local testing can't silently point elsewhere. Local value: `http://127.0.0.1:3000`. Hosted:
-set per Vercel environment (pending). A card pointing at the wrong domain means the link was
-generated while `SITE_URL` had a different value; Regenerate after fixing it.
+set in Vercel Preview (develop) and Production ([[release-ops]] `References/environments.md`;
+Production's points at `https://services.humanrecords.co` since the 2026-10-09 domain
+cut-over). A card pointing at the wrong domain means the link was generated while `SITE_URL` had
+a different value; Regenerate after fixing it.
 
 ## Role triggers (migration `20261002120000`)
 

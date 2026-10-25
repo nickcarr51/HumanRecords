@@ -3,8 +3,9 @@
 Invite-only web repository for Human Records' music. Long-term there are
 three user tiers — listener, artist, label member — with artists and
 label members getting dashboard access (label members get additional
-dashboard features). None of that auth/role logic exists yet; it's noted
-here so future work doesn't contradict it.
+dashboard features). Roles and the label-member admin gate exist (see the
+`auth` and `invites` skills); the artist and label-member dashboards don't
+yet. This is noted here so future work doesn't contradict it.
 
 ## Stack
 

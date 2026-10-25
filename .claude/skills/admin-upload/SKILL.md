@@ -31,7 +31,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 |---|---|
 | Releases table, positions, unique artist names, backfill, `current_user_role()` | `supabase/migrations/20260929120000_create_releases.sql` |
 | `resolve_artist_refs()` + `publish_release()` (the one write path) | `supabase/migrations/20260929120100_publish_release.sql` |
-| Local seed: positions, 2 releases, real test accounts | `supabase/seed.sql` |
+| Local seed: positions, 2 releases, three `@example.com` test accounts | `supabase/seed.sql` |
 | Generated DB types (releases, position columns, RPCs) | `src/lib/supabase/database.types.ts` |
 | Position ordering, name flattening, "Various Artists" | `src/lib/supabase/artist-names.ts` |
 | Feed data (releases, pinned first, then `sort_at`) | `src/lib/supabase/feed.ts` (`getFeed`) |

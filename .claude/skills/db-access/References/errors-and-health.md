@@ -19,13 +19,20 @@ and rethrow every error through it:
 - A `DomainError` comes back unchanged (e.g. `UNAUTHENTICATED`, or a `FORBIDDEN` from your own
   service code).
 - A database error becomes a `DomainError` with a fixed message when its Postgres code has a plain
-  meaning, and a `DatabaseError` otherwise. "Database error" means: a Postgres code (five digits or
-  capital letters) on the error or on its `cause` (Drizzle wraps the driver's error), **or** any
-  Drizzle query error even without a code (`DrizzleQueryError`, matched by class or by its shape: a
-  string `query` plus `params`), because its message holds the SQL text.
-- Anything else (no Postgres code, no Drizzle query attached) comes back unchanged. That includes
-  a failure to connect before the first query, which arrives as the driver's or Node's own error
-  (its `code` is something like `ECONNREFUSED`, not a Postgres code).
+  meaning, and a `DatabaseError` otherwise. "Database error" means: the database's own error
+  report, which postgres.js raises as a `PostgresError` with a Postgres code (five digits or capital
+  letters), as the error or as its `cause` (Drizzle wraps the driver's error), **or** any Drizzle
+  query error even without a code (`DrizzleQueryError`, matched by class or by its shape: a string
+  `query` plus `params`), because its message holds the SQL text.
+  A `PostgresError` is recognised by its `severity_local` field (Postgres's "S" field, which it
+  always sends), never by its class or name: the production build renames the class, so its name
+  there is a short made-up one (`o` in the current build).
+- Anything else (not from the database, no Drizzle query attached) comes back unchanged. That
+  includes a network failure before the first query (refused, timed out, or a certificate that
+  doesn't chain), which arrives as the driver's or Node's own error (its `code` is something like
+  `ECONNREFUSED`, not a Postgres code), and a Node system error whose code happens to be five
+  capital letters (`EPIPE`, `EPERM`). A login the database itself refuses (e.g. `28P01`, wrong
+  password) is a `PostgresError`, so it becomes a `DatabaseError`.
 
 | Postgres code | Becomes | Message |
 |---|---|---|
@@ -71,12 +78,22 @@ the first failure:
 | `readsAuthUsers` | `select exists(select 1 from auth.users limit 1)` | the login role can read `auth.users` (`listUsers` does); reads no user data |
 | `switchesToAuthenticated` | `set local role authenticated; select 1` | the login role can become `authenticated` (`asUser` does on every query) |
 
-It returns `{ ok: true }` or `{ ok: false, failed: <check> }`, never the error itself.
+It returns `{ ok: true }` or `{ ok: false, failed: <check>, error: <name and code> }`, never the
+error itself. `error` is the failing error's `name` plus its `code`, read from its `cause` when
+that is an object (Drizzle wraps a failed query in an error named just `Error`; a string `cause`
+is ignored). An error the database
+sent back is always reported as `PostgresError`, since the production build renames postgres.js's
+class. Examples: `PostgresError 28P01` (wrong password), `PostgresError 42501` (a missing
+permission), `Error ECONNREFUSED` (nothing answers), `Error` plus Node's certificate error code (a
+certificate that doesn't chain), `CheckFailed` (the login role doesn't skip RLS), or just `Error`
+(our own `Missing DATABASE_URL` / `DATABASE_URL is not a valid URL`). Never the message, which can
+hold the query text or the database address: a name that isn't 1 to 64 plain letters becomes
+`unknown`, and a code that isn't 1 to 64 capital letters, digits or `_` is left out.
 
 The route (`src/app/api/health/db/route.ts`, `dynamic = "force-dynamic"`, never cached) is public
 on purpose: `/api` is not in `PROTECTED_PREFIXES`, so signed-out requests reach it. It answers 200
-`{ ok: true }`, or 503 `{ ok: false }` and logs `Database health check failed: <check>` on the
-server. No data, version or detail leaves it.
+`{ ok: true }`, or 503 `{ ok: false }` and logs `Database health check failed: <check> (<name and
+code>)` on the server. No data, version or detail leaves it.
 
 Who calls it ([[release-ops]]):
 - `deploy.yml`, step **"Site database answers"** after the Vercel hook: polls
