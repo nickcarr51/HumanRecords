@@ -1,15 +1,24 @@
 # Reference: Feed + album data layer
 
-Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/albums.ts`,
-`src/lib/supabase/artist-names.ts`. Tests: `feed.data.test.ts`, `albums.data.test.ts`,
-`artist-names.test.ts`, `catalog-numbers.data.test.ts`.
+Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/feed-search.ts`, `src/lib/supabase/albums.ts`,
+`src/lib/supabase/catalog-selects.ts`, `src/lib/supabase/artist-names.ts`. Tests:
+`feed.data.test.ts`, `feed-query.data.test.ts`, `feed-after-release.data.test.ts`,
+`albums.data.test.ts`, `artist-names.test.ts`, `catalog-numbers.data.test.ts`, and from the Drizzle
+move `feed-drizzle.parity.data.test.ts`, `feed-row-cap.data.test.ts`,
+`albums.drizzle.data.test.ts`, `artist-names.drizzle.test.ts`, and
+`src/lib/db/album-page-query.test.ts` (the album query doesn't ask for `track_art_url`).
 
 Both functions follow the project convention: they take a `SupabaseClient<Database>` as the
 **first argument** (dependency injection), never calling the cookie-based `createClient()`
-themselves. That makes them unit-testable against local Supabase and reusable by server
-components. See [[catalog-schema]] for the underlying tables and RLS (including
-`catalog_number` and its `keep_catalog_number` trigger), and [[admin-upload]]
-for the `releases` table and `position` columns this reads.
+themselves. That makes them testable against local Supabase and reusable by server components.
+Since Drizzle slice 1 (2026-10) they use that client only to verify the session
+(`getClaims(supabase)`); the queries run through Drizzle with `asUser`, as the signed-in user, so
+the same RLS policies apply ([[db-access]]). A signed-out client gets
+`DomainError("UNAUTHENTICATED")` instead of empty results (the middleware and the `(app)` layout
+normally redirect first). Any database error comes back as a safe `DomainError` or
+`DatabaseError`, never with the SQL text. See [[catalog-schema]] for the underlying tables and RLS
+(including `catalog_number` and its `keep_catalog_number` trigger), and [[admin-upload]] for the
+`releases` table and `position` columns this reads.
 
 ## Shapes (all carry a required `catalogNumber`)
 
@@ -38,54 +47,66 @@ it onto `PlayerTrack.catalogNumber?` for the player bar.
 Returns the timeline (pinned first, then newest `sort_at`; archived hidden) as the `FeedItem`
 discriminated union above.
 
-How it works:
+How it works (one transaction through `asUser`):
 
-1. **One query on `releases`** (`RELEASE_SELECT`), embedding the target via its foreign key:
-   `id, kind, created_at, pinned, sort_at,
-   track:tracks(id, catalog_number, title, track_art_url, archived_at, track_artists(position, artists(name)))` for a
-   single, and `album:albums(id, catalog_number, title, album_art_url, album_artists(position,
-   artists(name)), track_albums(position, tracks(id, catalog_number, title, archived_at, track_artists(position,
-   artists(name)))))` for an album. Only things with a `releases` row appear — an album's
-   tracks are never their own feed row because they have no release of their own. A single whose track is archived is dropped in `toFeedItem`, and so is an album with zero live tracks (all archived, or none); the feed never returns an empty album.
-2. `.is("archived_at", null)` (label members can read archived rows via RLS, so the filter is
-   explicit), then ordered `pinned desc, sort_at desc, id desc` (id breaks ties so pages are
-   stable). `RELEASE_SELECT` includes `pinned, sort_at` because PostgREST orders an RPC result
-   (`search_feed`, chained later) only by projected columns.
-3. **Pagination in SQL**: `.range(from, from + pageSize - 1)` with `from = (page-1)*pageSize`, and
-   `count: 'exact'` → `total`/`totalPages`; `hasMore = page < totalPages`. A page past the end makes
-   PostgREST fail with `PGRST103`; `getFeed` then runs a count-only query on the same source and
-   returns `items: []` with the real `total`/`totalPages` so the page can redirect to the last page.
-4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"`
-   item, copying `catalog_number` → `catalogNumber` at every level. A release whose embedded target is null (hidden/removed) is skipped (so a page can
-   have fewer than `pageSize` items). Archived album tracks (`archived_at` set) are dropped. Dropping an item (empty album, archived single) makes that page come back short, so admin actions must keep data consistent: archiving an album's last live track must archive the release too.
-5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list
-   is in credit order via `namesFrom`.
+1. **The filter**: `archived_at is null` (`isNull(releases.archivedAt)`; label members can read
+   archived rows through RLS, so the filter is explicit), plus `searchMatches(tx, q)` when `q` is
+   not blank (below).
+2. **The rows query**: `tx.query.releases.findMany` with that filter, ordered
+   `pinned desc, sort_at desc, id desc` (id breaks ties so pages are stable),
+   `limit: Math.min(pageSize, MAX_ROWS)` and `offset: (page-1)*pageSize`, and the nested rows in
+   `RELEASE_WITH`: `track` (`TRACK_WITH`: id, `catalogNumber`, title, `trackArtUrl`, `archivedAt`,
+   `trackArtists` → `artist.name` with `position`) for a single, and `album` (id,
+   `catalogNumber`, title, `albumArtUrl`, `albumArtists`, `trackAlbums` with `position` → `track`
+   as `TRACK_WITH`) for an album. `createdAt` is selected with `pgrstTs`, so it is exactly the
+   string supabase-js returned before. Only things with a `releases` row appear — an album's
+   tracks are never their own feed row because they have no release of their own.
+3. **The count query**: `select count(*)` from `releases` with the same filter → `total`,
+   `totalPages = max(1, ceil(total / pageSize))`, `hasMore = page < totalPages`. Both queries are
+   sent at once in the same transaction. A page past the end simply comes back with `items: []`
+   and the real totals, so the page can redirect to the last page. `MAX_ROWS` (1000, the cap
+   PostgREST put on every supabase-js read) only matters for an unusual `FEED_PAGE_SIZE`; the
+   count stays exact.
+4. `toFeedItem` maps `kind:"single"` → a `"track"` item and `kind:"album"` → an `"album"` item
+   (the Drizzle rows are already camelCase). A single whose track is archived is dropped, and so
+   is an album with zero live tracks (all archived, or none); the feed never returns an empty
+   album. A release whose target is null (hidden/removed) is skipped. So a page can have fewer
+   than `pageSize` items, and admin actions must keep data consistent: archiving an album's last
+   live track must archive the release too.
+5. Album tracks are sorted by `track_albums.position` with `byPosition`; every artist list is in
+   credit order via `artistNamesOf`.
 
 An uncredited track yields `artistNames: []` (never a crash); the UI shows
 "Unknown Artist".
 
-**Search (`q`)**: `q` is trimmed; blank = the plain feed. Otherwise the source is the `search_feed`
-RPC (see [[catalog-schema]]) instead of the `releases` table, with the same select, archived filter,
-order and range applied by one shared function (`releaseQuery` + the chain in `getFeed`), so search
-and the plain feed can never disagree on order.
+**Search (`q`)**: `q` is trimmed; blank = the plain feed. Otherwise `searchMatches(tx, q)`
+(`feed-search.ts`) is added to the same filter, so search and the plain feed share one filter
+(for the rows and the count) and one order, so they can never disagree. It matches,
+case-insensitively, track titles, album titles and credited artist names: a single through its
+live track (title or track artist); an album through its title, an album artist, or any live
+track. Archived tracks never match.
+`%`, `_` and `\` in `q` are literal (`escapeLike`). It is a translation of the `search_feed` SQL
+function, which still exists but has no app callers ([[catalog-schema]] `References/functions.md`);
+`feed-drizzle.parity.data.test.ts` proves both match the same releases in the same order.
 
 `pageSize` defaults to `feedPageSize()`: the optional `FEED_PAGE_SIZE` env var if it is a positive
 integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging
 (`src/lib/supabase/feed-page-size.test.ts`).
 
 Input hardening in `getFeed` (the server action calls it with user input): `page` is floored and
-falls back to 1 unless it is finite and within `MAX_PAGE` (100 000; PostgREST rejects an
-exponent-notation offset like `1e22`); `q` is trimmed then capped at `MAX_QUERY_LENGTH` (200);
-a non-string `q` is treated as blank.
+falls back to 1 unless it is finite and within `MAX_PAGE` (100 000; Postgres rejects an
+exponent-notation offset: page `1e22` would send `2e+23`, not a valid integer); `q` is trimmed
+then capped at `MAX_QUERY_LENGTH` (200); a non-string `q` is treated as blank.
 
 ## `getReleaseFeedPage` / `getFeedAfterRelease`
 
 - `ReleaseRef` = `{ kind: "album", albumId } | { kind: "single", trackId }` (the same ids a
   `FeedItem` carries: an album item's `id` is the album id, a single's is its track id).
 - `getReleaseFeedPage(supabase, ref, pageSize?)` → the main-feed page (1-based) a release is
-  on (looked up by `album_id` or `track_id`), or `null` if archived/missing. Counts live releases ordered ahead of it with `or()`:
-  pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is wrapped in double
-  quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
+  on (looked up by `album_id` or `track_id`), or `null` if archived/missing. It reads one table
+  (`releases`), so under the rule it stays on supabase-js. Counts live releases ordered ahead of
+  it with `or()`: pinned ones first, then `sort_at.gt`, then the `id.gt` tie-break; `sort_at` is
+  wrapped in double quotes because its `:` and `+` are reserved in PostgREST `or()` syntax. Page =
   `floor(ahead / pageSize) + 1`.
 - `getFeedAfterRelease(supabase, ref, pageSize?)` → `FeedAfterRelease` (`{ items, page, hasMore }`)
   `| null`: the items after the release on its main-feed page (never the search), or the whole next
@@ -99,11 +120,20 @@ a non-string `q` is treated as blank.
 
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
-- Selects `id, catalog_number, title, album_art_url, releases(archived_at), album_artists(position, artists(name)),
-  track_albums(position, tracks(id, catalog_number, title, archived_at, track_artists(position, artists(name))))`
-  with `.maybeSingle()`; returns `null` for a missing album **and for an archived one**, even for label members. A missing release is also `null` (RLS hides an archived release from listeners, so the embed comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
-- Same embeds as the feed's album branch; tracks sorted by `track_albums.position`, so the
-  album page and the feed's expanded album row always agree.
+- Then, as the signed-in user (`asUser`), `tx.query.albums.findFirst` by id with `columns` id,
+  `catalogNumber`, title, `albumArtUrl` and the nested `releases` (`archivedAt`), `albumArtists`
+  (`ARTIST_NAMES`) and `trackAlbums` (`position` → `track` as `ALBUM_TRACK_WITH`: id,
+  `catalogNumber`, title, `archivedAt`, `trackArtists`, no `trackArtUrl`, the same columns the album
+  query asked for before Drizzle). The app no longer receives `trackArtUrl`, but the database still
+  reads the whole `tracks` row, because Drizzle reads one linked row with `select *`. The query is
+  `findAlbum(tx, id)`, exported from `albums.ts` so a test can check the SQL `getAlbum` sends.
+  Returns `null` for a missing album **and for an archived one**, even for label members. No
+  visible release is also `null` (RLS hides an archived release from listeners, so `releases`
+  comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
+- The same nested artist rows as the feed's album branch (`catalog-selects.ts`), and the same
+  track columns apart from `trackArtUrl` (the feed's album tracks use `TRACK_WITH`, the album
+  page `ALBUM_TRACK_WITH`); tracks sorted by `track_albums.position`, so the album page and the
+  feed's expanded album row always agree.
 - `albumArtUrl` is returned but **not rendered** by the album page yet (it is an unsigned R2
   key; see routing-and-auth.md).
 
@@ -120,13 +150,21 @@ Both pages show which tracks the user already downloaded:
 - Album page also exports `generateMetadata` and uses `cache(loadAlbum)`, so the title and the page share one
   `getAlbum` query per request. Feed title is `Feed`.
 
-## `artist-names.ts`
+## `catalog-selects.ts` and `artist-names.ts`
 
-- `ArtistNameRel = Array<{ position?: number | null; artists: { name: string } | null }> | null`
-  — the shape of a `… ( position, artists ( name ) )` embed. The `as unknown as` casts at
-  the call sites bridge PostgREST's loose embed typing.
-- `byPosition(rows)` — non-mutating sort by `position`. Done in JS because the nested embeds
-  can't be ordered by a link-table column in this select shape.
-- `namesFrom(rel)` — `byPosition` → names → drop nulls → de-dupe.
+- `ARTIST_NAMES` (`position` → `artist.name`), `TRACK_WITH` (the track columns plus
+  `trackArtists`), `ALBUM_TRACK_WITH` (the same without `trackArtUrl`, for the album page's
+  tracks), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` (takes either) — the
+  Drizzle `columns`/`with` shapes `getFeed` and `getAlbum` share. The feed's album tracks use
+  `TRACK_WITH`, so they also fetch `trackArtUrl`, which the feed doesn't show for them.
+- `ArtistLink = { position?: number | null; artist: { name: string } | null }` — a Drizzle link
+  row (singular `artist`). `artistNamesOf(links)` — `byPosition` → names → drop nulls →
+  de-dupe.
+- `byPosition(rows)` — non-mutating sort by `position`. Done in JS because PostgREST embeds can't
+  be ordered by a link-table column in that select shape; the Drizzle reads reuse it for the same
+  rule.
+- `ArtistNameRel` and `namesFrom(rel)` — the same rules for a supabase-js
+  `… ( position, artists ( name ) )` embed. Only `getTrackDownloadUrl`
+  (`src/lib/storage/actions.ts`, still supabase-js) uses them now, bridged with `as unknown`.
 - `albumArtistLabel(names)` — joins names, or `"Various Artists"` when an album has no album
   artists. Display-only (used by `AlbumRow` and the album page); nothing is stored.

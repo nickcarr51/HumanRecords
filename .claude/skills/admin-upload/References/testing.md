@@ -18,7 +18,10 @@ pinned first then `sort_at`, with tracks + credits in position order; tracks wit
 uncredited single → `artistNames: []`; pagination with `hasMore`; album tracks by position
 not title. The feed tests give `releases.created_at` values that **contradict** track
 creation order, so they'd fail if ordering came from `tracks.created_at`.
-`artist-names.test.ts` (unit): `byPosition`, `namesFrom`, `albumArtistLabel`.
+`artist-names.test.ts` (unit): `byPosition`, `namesFrom`, `albumArtistLabel`;
+`artist-names.drizzle.test.ts` (unit): `artistNamesOf`. Since the Drizzle move (slice 1) these
+reads also have `feed-drizzle.parity.data.test.ts`, `feed-row-cap.data.test.ts` and
+`albums.drizzle.data.test.ts` ([[timeline-player]] `References/testing.md`).
 `artists.data.test.ts` / `catalog-relations.test.ts` were only updated to pass `position`.
 
 **Access control** — `src/lib/auth/role.test.ts` (getCurrentRole: value, null on error, null
@@ -53,12 +56,10 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 ## Running
 
 - Unit only (no DB; `src/lib/admin/releases.data.test.ts` needs local Supabase, so `src/lib/admin` is listed file by file): `yarn test --run src/components/Upload src/lib/admin/{actions,release-actions,rules,users,users-actions}.test.ts src/lib/auth src/lib/storage src/app src/components/AppShell`
-- DB tests: `yarn supabase start` first, then
-  `yarn test --run src/lib/supabase`
-  (`test-helpers.ts` refuses non-local URLs).
-- Everything: `yarn test --run`; also `yarn lint` and `yarn build`. (A pre-existing
-  `tsc --noEmit` error in `src/lib/auth/actions.test.ts` is not a build failure; Next's
-  build excludes tests.)
+- DB tests: `yarn supabase start` first, with the local `DATABASE_URL` in `.env.local`, then
+  `yarn test --run src/lib/supabase src/lib/db src/lib/services src/lib/admin`
+  (`test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`).
+- Everything: `yarn test --run`; also `yarn lint` and `yarn build`.
 
 ## Deliberately not tested
 

@@ -1,6 +1,6 @@
 ---
 name: release-ops
-description: Use when working on CI or GitHub Actions (`.github/workflows/*`), deploys, Vercel, migrations reaching develop or prod, nightly backups, restore or the restore drill, health checks, the three environments, per-environment R2 buckets, Resend/SMTP auth email, Sentry, the domain cut-over, NFC card writing, or onboarding the first prod users. Also when a PR check fails ("backdated migration"), a deploy waits for approval, a scheduled workflow stopped running, or Supabase free pauses.
+description: Use when working on CI or GitHub Actions (`.github/workflows/*`), deploys, Vercel, migrations reaching develop or prod, nightly backups, restore or the restore drill, health checks, the three environments, per-environment R2 buckets, Resend/SMTP auth email, Sentry, the domain cut-over, NFC card writing, or onboarding the first prod users, the app's `DATABASE_URL` (each project's transaction pooler URL in Vercel; verified TLS with the embedded Supabase CA certificate), the database health check (`/api/health/db`, the "Site database answers" steps in `deploy.yml` and `health.yml`), the guard-hook rules for `drizzle-kit` and hosted database URLs, or the CI `types` job's `yarn db:pull` schema diff. Also when a PR check fails ("backdated migration"), a deploy waits for approval, a scheduled workflow stopped running, or Supabase free pauses.
 ---
 
 # Release Ops: environments, pipeline, backups
@@ -26,10 +26,10 @@ the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.
 
 | Concern | Where |
 |---|---|
-| PR checks: `app`, `test`, `migrations`, `types`, `main-source` | `.github/workflows/ci.yml` |
-| Deploy: `plan` → `backup` (main) → `release` (migrate + Vercel hook) | `.github/workflows/deploy.yml` |
+| PR checks: `app`, `test`, `migrations`, `types` (incl. the `yarn db:pull` schema diff), `main-source` | `.github/workflows/ci.yml` |
+| Deploy: `plan` → `backup` (main) → `release` (migrate + Vercel hook + poll `/api/health/db`) | `.github/workflows/deploy.yml` |
 | Nightly prod dump to the backups bucket (also called by deploy) | `.github/workflows/backup.yml` |
-| Daily pings of both Supabase projects + both `/login` pages | `.github/workflows/health.yml` |
+| Daily pings of both Supabase projects, both `/login` pages and both `/api/health/db` (the app's own database connection, [[db-access]]) | `.github/workflows/health.yml` |
 | Weekly restore of the newest backup | `.github/workflows/restore-drill.yml` |
 | Security-only dependency PRs | `.github/dependabot.yml` |
 | Disable Vercel auto-deploy for `main`/`develop` | `vercel.json` |
@@ -37,20 +37,21 @@ the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.
 | Newest-backup picker; drill assertions | `scripts/latest-backup.mts`, `scripts/restore-check.mts` |
 | Seed the local R2 bucket | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
 | Develop-only account creation | `scripts/invite-users.mts` (+ gitignored `scripts/users.local.json`, template `users.example.json`) |
-| Hosted-data guard hook | `.claude/hooks/guard-db.sh` (wired in `.claude/settings.json`) |
+| Hosted-data guard hook (Supabase/R2/prod names, plus `drizzle-kit push\|migrate\|drop\|up`, `drizzle-kit` with a hosted host, and any command with a hosted database URL) | `.claude/hooks/guard-db.sh` (wired in `.claude/settings.json`) |
 | Seed split | `supabase/seed.sql`, gitignored `supabase/seed.local.sql` ([[catalog-schema]]) |
 | R2 CORS per bucket (`GET`/`HEAD`/`PUT`, applied to all three buckets 2026-10-11) | `infra/r2/cors.{local,dev,prod}.json`, status table in `infra/r2/README.md` |
 | Sentry (errors only) | `instrumentation-client.ts`, `src/instrumentation.ts`, `sentry.{server,edge}.config.ts`, `src/lib/observability/errors-only-integrations.ts`, `withSentryConfig` in `next.config.ts` |
 | Typecheck | `yarn typecheck` (CI runs it) |
 | Secrets: DB URLs + Vercel hooks | GitHub environment secrets (`develop`, `production-release`; prod DB URL also in `production-preflight`) |
 | Secrets: backup R2 token | GitHub secrets (`BACKUP_R2_*`), never on a laptop |
-| Secrets: app (`R2_*`, Supabase keys, `SITE_URL`, Sentry) | Vercel env vars per environment; the owner pastes them, never Claude |
+| Secrets: app (`R2_*`, Supabase keys, `DATABASE_URL`, `SITE_URL`, Sentry) | Vercel env vars per environment; the owner pastes them, never Claude |
 | Health-check URLs/keys | GitHub repository variables `{DEV,PROD}_{SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,SITE_URL}` |
 
 ## References
 
 - [environments.md](References/environments.md) — the environments table, Vercel env-var
-  matrix, hosted Auth settings (Resend SMTP, rate limits), Sentry.
+  matrix, the hosted database checks (a)-(h), hosted Auth settings (Resend SMTP, rate limits),
+  Sentry.
 - [pipeline.md](References/pipeline.md) — CI jobs, deploy flow, GitHub environments, branch
   rules, approving a prod deploy, failures, scheduled-workflow pitfalls.
 - [migrations.md](References/migrations.md) — add-only rule, expand/contract worked example,
@@ -63,7 +64,8 @@ the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.
 ## Depends on
 
 [[catalog-schema]] (migrations, seed, types), [[media-storage]] (buckets, tokens, CORS),
-[[auth]] (hosted settings, templates), [[invites]] (`/admin/users`, `SITE_URL`, NFC links).
+[[auth]] (hosted settings, templates), [[invites]] (`/admin/users`, `SITE_URL`, NFC links),
+[[db-access]] (`DATABASE_URL`, the health check, the Drizzle hook and lint rules).
 
 ## Known deferrals (as of 2026-10-10)
 

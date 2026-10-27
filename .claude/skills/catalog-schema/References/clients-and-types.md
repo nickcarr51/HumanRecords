@@ -11,6 +11,7 @@
 
 Env vars (`.env.example`): `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 (browser-safe), `SUPABASE_URL` + `SUPABASE_SECRET_KEY` (server-only; never `NEXT_PUBLIC_`).
+Drizzle's `DATABASE_URL` is server-only too ([[db-access]] `References/guard-rails.md`).
 
 ## Data-function convention (dependency injection)
 
@@ -25,14 +26,19 @@ const page = await getFeed(supabase, { page: 1 });
 ```
 
 Why: the same function runs in a page with the cookie client and in a `*.data.test.ts` with a
-signed-in test client, against real Postgres. Other conventions in these modules:
+signed-in test client, against real Postgres. Since Drizzle slice 1, `getFeed` and `getAlbum` use
+that client only to verify the session (`getClaims`); their queries go through Drizzle
+(`asUser`, [[db-access]]). Other conventions in these modules:
 
-- Throw on a Supabase `error` (the route `error.tsx` boundary catches it); return `null` for
-  not-found.
+- supabase-js reads throw the returned `error` (the route `error.tsx` boundary catches it); Drizzle
+  reads throw the safe error `asUser`/`asSystem` produce (`DomainError` or `DatabaseError`). Return
+  `null` for not-found.
 - Guard id params with a UUID regex and return `null` for non-UUIDs — otherwise Postgres raises
   "invalid input syntax for type uuid" → 500.
 - Escape user text before `ilike` with `escapeLike` (`src/lib/supabase/artists.ts`).
-- Map snake_case rows to camelCase view types (`albumArtUrl`, `artistNames`) at the boundary.
+- Return camelCase view types (`albumArtUrl`, `artistNames`). supabase-js rows are snake_case and
+  are mapped at the boundary; Drizzle rows already use the camelCase names of
+  `src/lib/db/generated/schema.ts`.
 
 ## Generated types
 
@@ -65,7 +71,43 @@ So a typed client can read the number but any attempt to insert or update it is 
 mirroring Postgres, which rejects the write at runtime (`428C9`; and the `keep_catalog_number`
 trigger, see [functions.md](functions.md)). The app view types follow the Row shape:
 `catalogNumber: number` is **required** on `FeedItem`/`FeedTrack` (`feed.ts`) and `AlbumDetail`
-(`albums.ts`), and `RELEASE_SELECT` / `getAlbum` select `catalog_number` explicitly. That is
-why a database without the migration breaks those pages with `42703 column tracks_1.catalog_number
-does not exist` — see [local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###`
-happens only in `src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
+(`albums.ts`), and the Drizzle reads behind `getFeed` / `getAlbum` (`TRACK_WITH`,
+`ALBUM_TRACK_WITH` and the album `columns` in `catalog-selects.ts` / `feed.ts` / `albums.ts`)
+select `catalog_number` explicitly.
+That is why a database without the migration breaks those pages with Postgres error `42703` — see
+[local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###` happens only in
+`src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
+
+## Drizzle (since slice 1, 2026-10)
+
+Rule (owner's): a read or write on one table stays supabase-js; more than one table goes through
+Drizzle. Drizzle sits next to supabase-js, not instead of it. The full guide is the
+[[db-access]] skill; the short version:
+
+- `getDb()` (`src/lib/db/client.ts`) connects with `DATABASE_URL` (server-only; local stack URL in
+  `.env.local`, each hosted project's transaction pooler URL in Vercel). Only `src/lib/db` may
+  import it or a database driver (lint).
+- Every query runs in `asUser(claims, fn)` (as the signed-in user, so RLS applies) or
+  `asSystem(grant, action, fn)` (admin access with RLS skipped, only with a `Grant` from
+  `authorize(viewer, action)`, only from `src/lib/services`). Both first set 10s timeouts for the
+  transaction only (`prepareTransaction`).
+- Both pass every error through `fromPgError` (`src/lib/services/errors.ts`): a mapped Postgres
+  code (`42501`, `22023`, `P0002`, `40P01`, `23503`) becomes a `DomainError` with a fixed message,
+  any other database error a `DatabaseError` ("Database query failed", code and values only,
+  never the SQL text). Details: [[db-access]] `References/errors-and-health.md`.
+- Callers so far:
+  - through `asUser`: `getFeed` with `searchMatches` (`src/lib/supabase/feed.ts`,
+    `feed-search.ts`), `getAlbum` (`albums.ts`), and `getViewer` (`src/lib/services/viewer.ts`,
+    the caller's role from `current_user_role()`);
+  - through `asSystem`: `listUsers` (`src/lib/services/users.ts`), called by `listAdminUsers` and
+    `getAdminUser` (`src/lib/admin/users.ts`) and by `linkedUsersFor` (`src/lib/admin/artists.ts`).
+  - Shared query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`,
+    `ALBUM_TRACK_WITH`, `toFeedTrack`);
+    the artist-name mapper `artistNamesOf` is in `artist-names.ts`.
+- After every migration, run `yarn db:pull` (local stack only) next to the `database.types.ts`
+  regeneration above, and commit `src/lib/db/generated/schema.ts`; CI diffs both.
+- A Drizzle nested read (`tx.query.*`) reads every column of a table it joins one-to-one, so
+  revoking a column from `authenticated` breaks `asUser` reads with "permission denied"; change a
+  grant only together with the matching Drizzle query.
+- Not moved yet: several supabase-js reads still embed more than one table; each has an assigned
+  slice ([[db-access]] `References/slices.md`).

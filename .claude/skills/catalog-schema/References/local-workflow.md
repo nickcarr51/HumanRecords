@@ -27,8 +27,8 @@ Auth settings that matter locally: `enable_signup = false` (invite-only), email
 
 Local only — never run against hosted (and never `--include-seed` against a hosted DB; CI rejects it). Creates users through `seed_helpers.seed_user(email, role,
 name)` (a real helper schema, so it is visible to every seed file; role goes into `raw_app_meta_data`, name into `raw_user_meta_data`), which inserts `auth.users` + `auth.identities` (so the trigger makes the
-`public.users` row) with a **random unknown password** — seeded accounts are OTP-only, never a
-password backdoor.
+`public.users` row) with a **random unknown password** — seeded accounts are OTP-only; nobody can
+sign in to them with a password.
 
 | Account | Role |
 |---|---|
@@ -63,7 +63,8 @@ bucket: put the seed MP3s in gitignored `supabase/seed-media/` and run `yarn r2:
    Adding a required column to a populated table? Follow the backfill dance: add nullable →
    `update` → `set not null` (`position` in `20260929120000`, `catalog_number` in `20261011170000`,
    which then adds `generated always as identity` + `setval` so new rows continue the sequence).
-4. Regenerate types (see [clients-and-types.md](clients-and-types.md)).
+4. Regenerate types and re-pull the Drizzle schema (`yarn db:pull`; see
+   [clients-and-types.md](clients-and-types.md)).
 5. Update `seed.sql` if new `not null` columns or tables need local data.
 6. Add/adjust schema tests.
 
@@ -86,17 +87,24 @@ or the dashboard invite + `/admin/users` (production, see [[release-ops]]
 
 The local CLI stays linked to the develop project, so `db push` and any `--linked` /
 `--db-url` / `--project-ref` command reach hosted data. `.claude/hooks/guard-db.sh` (wired in
-`.claude/settings.json`) forces a permission prompt on these; local commands pass through.
+`.claude/settings.json`) forces a permission prompt on these, on `drizzle-kit push|migrate|drop|up`,
+on `drizzle-kit` with a hosted host, and on any command carrying a hosted database URL (e.g.
+`DATABASE_URL=<hosted> yarn test`); local commands pass through ([[db-access]]
+`References/guard-rails.md`).
 
 ### Switched branches and the app or a test now fails with 42703?
 
-Symptom: `/feed` or `/albums/[id]` throws, or a `db` test fails, with
-`column tracks_1.catalog_number does not exist` (SQLSTATE `42703`; the alias may be `albums_1`).
-Cause: the checked-out code selects `catalog_number` (added by `20261011170000`) but your local
-database hasn't run that migration yet. Fix: `yarn supabase migration up` (only pending migrations,
-keeps data) — **not** `db reset`. Going the other way (older branch, newer DB) is harmless: the
-column is additive and old code never asks for it. The same symptom on a hosted environment means
-`deploy.yml` hasn't run the migration there yet; wait for the deploy, don't push by hand.
+Symptom: `/feed` or `/albums/[id]` throws, or a `db` test fails, with Postgres error `42703`. The
+Drizzle reads (`getFeed`, `getAlbum`) report it as a `DatabaseError` ("Database query failed",
+`code: "42703"`; the SQL text is never kept, [[db-access]]). No app code reads `catalog_number`
+through supabase-js any more. The supabase-js test `catalog-numbers.data.test.ts` fails at its
+first `expect`; the select's own error (`column tracks.catalog_number does not exist`, or
+`albums.catalog_number` in the album test) isn't printed. Cause: the checked-out code selects
+`catalog_number` (added by `20261011170000`) but your local database hasn't run that migration
+yet. Fix: `yarn supabase migration up` (only pending migrations, keeps data) — **not**
+`db reset`. Going the other way (older branch, newer DB) is harmless: the column is additive and
+old code never asks for it. The same symptom on a hosted environment means `deploy.yml` hasn't
+run the migration there yet; wait for the deploy, don't push by hand.
 
 ## Data / schema tests
 
@@ -108,7 +116,15 @@ column is additive and old code never asks for it. The same symptom on a hosted 
   `src/**/*.data.test.ts` plus the `dbTests` list. **A new DB-backed test not named
   `*.data.test.ts` must be added to `dbTests`**, or it runs in parallel in `unit`.
 - `test-helpers.ts` **throws at import** unless `NEXT_PUBLIC_SUPABASE_URL` is
-  `127.0.0.1`/`localhost` — these tests create and delete real rows.
+  `127.0.0.1`/`localhost`, and also when `DATABASE_URL` is set to any other host (an unparseable
+  URL counts as non-local) — these tests create and delete real rows.
+- **Drizzle data tests** (`src/lib/db/*.data.test.ts`, `src/lib/services/*.data.test.ts`,
+  `*.parity.data.test.ts`, `*.drizzle.data.test.ts`, `*-row-cap.data.test.ts`,
+  `src/lib/admin/artists-links.data.test.ts`) also need `DATABASE_URL` in `.env.local`, set to the
+  local stack: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. Each starts with
+  `// @vitest-environment node` (older data tests that reach Drizzle run in jsdom, where
+  postgres.js works too). What each proves:
+  [[db-access]] `References/testing.md`.
 - `createAdminClient()` (service role) seeds fixtures; `createTestUser({ role, name })` (role in `app_metadata`, name in `user_metadata`) creates a
   confirmed auth user and returns `{ id, email, signIn, cleanup }`. `signIn()` uses
   `admin.generateLink('magiclink')` + `verifyOtp({ token_hash, type: 'email' })` — the real
@@ -128,7 +144,7 @@ column is additive and old code never asks for it. The same symptom on a hosted 
 ```bash
 yarn supabase start
 yarn supabase migration up                                      # pending migrations first, or expect 42703
-yarn test --run src/lib/supabase                                 # everything under the folder
+yarn test --run src/lib/supabase src/lib/db src/lib/services     # the data layer folders
 yarn vitest run --project db src/lib/supabase/catalog-numbers.data.test.ts   # one db file
 ```
 

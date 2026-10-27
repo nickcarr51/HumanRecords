@@ -5,11 +5,14 @@
 `public.invites`: `user_id` (PK → `auth.users`, cascade; **one row per user**), `token text
 unique` (nullable), `used_at timestamptz` (nullable), `created_by → auth.users` (set null),
 `created_at`, `updated_at`. RLS on, **no policies**, all privileges revoked from `anon` and
-`authenticated`: only the service role (`createServiceClient`) and definer functions touch it.
+`authenticated`: only the service role (`createServiceClient`), definer functions, and Drizzle's
+`asSystem` after `authorize()` (the `listUsers` service, [[db-access]]) touch it.
 
 The token is **plaintext** (32 random bytes, base64url, 43 chars; `INVITE_TOKEN_RE`) so the admin
 page can re-show the URL any time. The no-grants rule is what protects it: a signed-in user
-can't read anyone's token. `admin_list_users()` (label members only) is the one reader.
+can't read anyone's token. `listUsers` (`src/lib/services/users.ts`, label members only) is the one
+place that lists tokens to show them (`admin_list_users()`, which did the same, has no app callers
+now); the store functions below look a token up only to check or claim it.
 
 ## States
 
@@ -37,8 +40,10 @@ Mapping lives in `toAdminUserRow` (`used_at` wins, then `token`).
 callers pass `process.env.SITE_URL` (the users page via `listAdminUsers`). Undefined throws
 "SITE_URL is not set". It is never derived from the request host, so a card written during
 local testing can't silently point elsewhere. Local value: `http://127.0.0.1:3000`. Hosted:
-set per Vercel environment (pending). A card pointing at the wrong domain means the link was
-generated while `SITE_URL` had a different value; Regenerate after fixing it.
+set in Vercel Preview (develop) and Production ([[release-ops]] `References/environments.md`;
+Production's points at `https://services.humanrecords.co` since the 2026-10-09 domain
+cut-over). A card pointing at the wrong domain means the link was generated while `SITE_URL` had
+a different value; Regenerate after fixing it.
 
 ## Role triggers (migration `20261002120000`)
 

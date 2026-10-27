@@ -45,7 +45,9 @@ and that no canvas is created under `prefers-reduced-motion`.
 
 **Data layer** — `src/lib/supabase/feed.data.test.ts` and `albums.data.test.ts`
 (integration, `*.data.test.ts` convention). These require a **local Supabase** running
-(`yarn supabase start`); `test-helpers.ts` refuses non-local URLs. They self-seed rows with
+(`yarn supabase start`) and `DATABASE_URL` in `.env.local` set to the local stack (the reads run
+through Drizzle); `test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or
+`DATABASE_URL`. They self-seed rows with
 `createAdminClient`/`createTestUser`, sign in, exercise real queries, and clean up in
 `afterEach`. Covers: releases pinned first, then `sort_at` with album tracks + credits in `position`
 order; tracks without a release excluded; uncredited single → empty `artistNames`;
@@ -53,6 +55,15 @@ pagination (`pageSize`/`hasMore`) — the tests give `releases.created_at` value
 contradict track creation order, proving ordering comes from `releases`; every item, album
 track and `AlbumDetail` has a `catalogNumber > 0`; `getAlbum`
 positive + null (missing + non-UUID + archived) paths and position (not title) track order; feed pinned/`sort_at` order and archived items hidden; `feed-page-size.test.ts` (unit) for `FEED_PAGE_SIZE`; `feed-query.data.test.ts` for search (`q`), counts/`totalPages` and past-the-end totals; `feed-after-release.data.test.ts` for `getReleaseFeedPage`/`getFeedAfterRelease` (albums and singles, archived → null).
+Added with the Drizzle move (slice 1), unchanged older tests above still the main check:
+`feed-drizzle.parity.data.test.ts` (search matches and order equal the old `search_feed` path for
+`%`, `_`, `\`, case, archived tracks and album matches, as a listener and a label member;
+`createdAt` is PostgREST's exact string; past-the-end totals; signed out → `UNAUTHENTICATED`),
+`feed-row-cap.data.test.ts` (at most `MAX_ROWS` rows, exact total), `albums.drizzle.data.test.ts`
+(track and artist position order, archived tracks dropped, signed out → `UNAUTHENTICATED`) and
+`artist-names.drizzle.test.ts` (unit: `artistNamesOf`), and `src/lib/db/album-page-query.test.ts`
+(unit: the album query doesn't ask for `track_art_url`). The layer's own tests: [[db-access]]
+`References/testing.md`.
 `src/lib/supabase/catalog-numbers.data.test.ts` (using `release-admin-fixtures.ts`) proves
 `catalog_number` is assigned on insert, increasing, survives a title edit and rejects a
 manual renumber — the invariant the required `catalogNumber` fields rely on ([[catalog-schema]]).
@@ -136,12 +147,11 @@ If you add feature logic to these components, add tests for the logic (not just 
 
 - Unit only (no DB): `yarn test --run src/components/Player src/components/Feed src/components/CatalogId`
 - Vitest runs two projects: `unit` (parallel) and `db` (serial; every `*.data.test.ts` plus the `dbTests` list in `vitest.config.mts`). See [[catalog-schema]] `References/local-workflow.md`.
-- Data layer: ensure `yarn supabase start` is up, then
-  `yarn test --run src/lib/supabase/feed.data.test.ts src/lib/supabase/albums.data.test.ts src/lib/supabase/catalog-numbers.data.test.ts`
+- Data layer: ensure `yarn supabase start` is up and `.env.local` has the local `DATABASE_URL`, then
+  `yarn test --run src/lib/supabase/feed src/lib/supabase/albums src/lib/supabase/artist-names src/lib/supabase/catalog-numbers.data.test.ts`
 - Everything: `yarn test --run` (data tests fail on connection if Supabase is down — that's
   environment, not a regression).
-- Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files,
-  so a pre-existing `tsc --noEmit` error in `actions.test.ts` does not break the build).
+- Also gate on `yarn lint` and `yarn build` (Next build type-checks; it excludes test files).
 - Playback itself (desktop live meter, touch waveform with real peaks, lock screen) needs a real
   browser against a bucket with the CORS `GET` rule applied (desktop playback is CORS mode; the
   touch peaks fetch is cross-origin): `yarn dev` + the local bucket (`infra/r2/README.md`).

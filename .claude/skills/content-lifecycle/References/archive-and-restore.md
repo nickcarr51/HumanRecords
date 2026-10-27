@@ -19,9 +19,11 @@ keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md
 - RLS (`releases`, `tracks`): `archived_at is null or current_user_role() = 'label_member'`.
   Listeners never read archived rows; label members do, for the admin pages.
 - Because of that, listener-facing code filters explicitly. Guards that exist: `getFeed`
-  (`.is("archived_at", null)`, archived album tracks dropped), `getAlbum` (`null` for an
-  archived album or one with no visible release, archived tracks skipped), `getTrackStreamUrl` / `getTrackDownloadUrl`
-  ("Track not found."), `search_feed` (archived releases and tracks excluded).
+  (`isNull(releases.archivedAt)` in its Drizzle query, archived singles and album tracks
+  dropped), its search filter `searchMatches` (archived tracks never match), `getAlbum` (`null`
+  for an archived album or one with no visible release, archived tracks skipped),
+  `getTrackStreamUrl` / `getTrackDownloadUrl` ("Track not found."). The `search_feed` SQL
+  function excludes archived releases and tracks too, but the app no longer calls it.
 - A new listener-facing query on `releases` or `tracks` **must** add its own `archived_at`
   filter, or label members will see archived items.
 

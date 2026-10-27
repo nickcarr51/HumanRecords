@@ -15,14 +15,26 @@ Why `getClaims()`: it verifies the JWT signature (locally via JWKS where possibl
 trusting the cookie. Don't use `getSession()` on the server for authorization — it returns the
 cookie contents unverified.
 
-Callers: `(app)/layout.tsx`, `dashboard/page.tsx`, `not-found.tsx`, and every server action in
+Callers: `(app)/layout.tsx`, `dashboard/page.tsx`, `not-found.tsx`, `admin/users/page.tsx`,
+`admin/users/[id]/page.tsx`, `src/lib/feed/actions.ts`, and every server action in
 `src/lib/storage/actions.ts` (uses `claims.sub` as the user id).
+
+## `getClaims(supabase)` / `getViewer(supabase)` (`src/lib/services/viewer.ts`)
+
+The same verified check for the Drizzle reads ([[db-access]]), with two differences: they take the
+caller's supabase client (data functions receive it as their first argument), and they **throw**
+`DomainError("UNAUTHENTICATED", "Sign in to continue.")` when signed out instead of returning
+`null`. `getClaims` returns `JwtClaims` (a type only it can produce); when the auth library
+reports an error it logs `Session check failed: <name> (status <status|none>)`, never the token.
+`getViewer` adds the role, read from the database (`select public.current_user_role()` through
+`asUser`), and returns `{ userId, role, claims }`. Callers: `getFeed`, `getAlbum` (`getClaims`),
+`listAdminUsers`, `getAdminUser` and the `/admin/artists` reads (`getViewer`).
 
 ## App roles
 
 `user_role = listener | artist | label_member`, stored in `public.users.role`. Hidden from
 other members by a column grant; read your own via the `current_user_role()` RPC
-([[catalog-schema]]).
+([[catalog-schema]]), or `getViewer()` for Drizzle code (above).
 
 **`getCurrentRole()`** (`src/lib/auth/role.ts`) — `cache()`-wrapped (one RPC per request even
 when layout and page both call it). Returns the role or `null`, and **never throws**: RPC error
@@ -57,5 +69,5 @@ The trigger used to read role from user-writable `user_metadata`. It now reads o
 | Hosted develop | `node --env-file=.env.develop.local scripts/invite-users.mts --yes` — idempotent: creates missing users via `admin.createUser` (no email sent), fixes wrong roles, skips the rest. Refuses to run without `--yes`; prints the target URL first. |
 | Hosted production | By hand in the Supabase dashboard (decide deliberately; the script is meant for develop). |
 
-The script's `USERS` list is hard-coded (currently a label member and a listener). Edit it to
-add accounts.
+The script's accounts come from gitignored `scripts/users.local.json` (copy
+`scripts/users.example.json`). Edit that file to add accounts.

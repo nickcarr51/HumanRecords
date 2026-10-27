@@ -15,6 +15,23 @@ if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
   );
 }
 
+// The Drizzle tests connect straight to DATABASE_URL, so it must be local too.
+// The error never echoes the URL (it holds the password).
+const databaseUrl = process.env.DATABASE_URL;
+if (databaseUrl) {
+  let host = "";
+  try {
+    host = new URL(databaseUrl).hostname;
+  } catch {
+    // An unparseable URL is not a local one.
+  }
+  if (host !== "127.0.0.1" && host !== "localhost") {
+    throw new Error(
+      "test-helpers.ts refuses to run against a non-local DATABASE_URL — these tests create and delete real data.",
+    );
+  }
+}
+
 export function createAnonClient(): SupabaseClient {
   return createClient(url, publishableKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -72,7 +89,8 @@ export async function createTestUser(opts: {
   }
 
   async function cleanup() {
-    await admin.auth.admin.deleteUser(id);
+    const { error } = await admin.auth.admin.deleteUser(id);
+    if (error) throw error;
   }
 
   return { id, email, signIn, cleanup };

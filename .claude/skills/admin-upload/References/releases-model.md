@@ -2,9 +2,10 @@
 
 Files: `supabase/migrations/20260929120000_create_releases.sql`,
 `supabase/migrations/20260929120100_publish_release.sql`, `supabase/seed.sql`,
-`src/lib/supabase/{feed,albums,artist-names}.ts`. Tests:
+`src/lib/supabase/{feed,feed-search,albums,catalog-selects,artist-names}.ts`. Tests:
 `releases-schema.data.test.ts`, `publish-release.data.test.ts`, `feed.data.test.ts`,
-`albums.data.test.ts`, `artist-names.test.ts`.
+`albums.data.test.ts`, `artist-names.test.ts`, `feed-drizzle.parity.data.test.ts`,
+`albums.drizzle.data.test.ts`, `artist-names.drizzle.test.ts`.
 
 ## Schema (`…120000_create_releases.sql`)
 
@@ -103,17 +104,22 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 
 ## How the read side uses it
 
-- `getFeed` (`feed.ts`): one `releases` select embedding `track:tracks(...)` and
-  `album:albums(... album_artists, track_albums(position, tracks(...)))`, ordered
-  `pinned desc, sort_at desc, id desc` with `archived_at is null`, `.range(from, from + pageSize - 1)`
-  with `count: 'exact'` (`total`/`totalPages`, `hasMore = page < totalPages`; optional `q` searches via
-  `search_feed`, see [[timeline-player]]). `toFeedItem` maps single → `kind:"track"`, album → `kind:"album"`; a release
-  whose embedded target is null is skipped.
-- `getAlbum` (`albums.ts`): same embeds from `albums`; tracks ordered by
+Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); details in
+[[timeline-player]] `References/feed-and-album-data.md`.
+
+- `getFeed` (`feed.ts`): `tx.query.releases.findMany` nesting `track` and `album` (with
+  `albumArtists` and `trackAlbums` → `track`), filtered `archived_at is null` (plus `searchMatches`
+  from `feed-search.ts` when `q` is set), ordered `pinned desc, sort_at desc, id desc`, with
+  `limit`/`offset`, and a `count()` with the same filter in the same transaction
+  (`total`/`totalPages`, `hasMore = page < totalPages`). `toFeedItem` maps single → `kind:"track"`,
+  album → `kind:"album"`; a release whose target is null is skipped.
+- `getAlbum` (`albums.ts`): `tx.query.albums.findFirst` (in `findAlbum`) with the same nested
+  rows, except that album tracks leave out `trackArtUrl` (`ALBUM_TRACK_WITH`); tracks ordered by
   `track_albums.position`.
-- `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS — PostgREST can't
-  order an embed by a column of the link table in this select shape. `namesFrom` uses it,
-  so every artist list is in credit order.
+- `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS (PostgREST can't order an
+  embed by a column of the link table in that select shape; the Drizzle reads reuse it).
+  `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the remaining supabase-js
+  embeds), so every artist list is in credit order.
 - **"Various Artists"**: `albumArtistLabel(names)` returns `"Various Artists"` when an album
   has no `album_artists` rows. Display-only (used by `AlbumRow` and the album page); nothing
   is stored.
