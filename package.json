@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:pull": "rm -rf .drizzle-pull && drizzle-kit pull && mkdir -p src/lib/db/generated && cp .drizzle-pull/schema.ts src/lib/db/generated/",
+    "db:pull": "rm -rf .drizzle-pull && drizzle-kit pull && mkdir -p src/lib/db/generated && cp .drizzle-pull/schema.ts src/lib/db/generated/ && node scripts/normalize-drizzle-schema.mts src/lib/db/generated/schema.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

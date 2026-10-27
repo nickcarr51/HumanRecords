@@ -74,8 +74,8 @@ table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of i
 - [errors-and-health.md](References/errors-and-health.md) — `DomainError` / `DatabaseError` /
   `fromPgError` and the fixed messages, what each error message means, the health check.
 - [guard-rails.md](References/guard-rails.md) — `DATABASE_URL` per environment, lint rules, the
-  guard hook, `yarn db:pull` and the CI diff, the mis-rendered foreign keys in
-  `generated/schema.ts`, Dependabot and esbuild.
+  guard hook, `yarn db:pull` (sorted, policy names only) and the CI diff, the mis-rendered foreign
+  keys in `generated/schema.ts`, Dependabot and esbuild.
 - [slices.md](References/slices.md) — the one-table / many-table rule, the slice map, and every
   many-table supabase-js read or write not moved yet, with its slice.
 - [testing.md](References/testing.md) — every database access test, what it proves, how to run

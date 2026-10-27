@@ -7,7 +7,7 @@
 | `app` | `yarn install --frozen-lockfile`, `yarn lint`, `yarn typecheck`, `yarn build` (dummy env) |
 | `test` | `supabase start` (minimal services), env from `supabase status`, full `yarn test` incl. DB-dependent files; sets `DATABASE_URL` to the CI job's own local stack (the `DB_URL` that `supabase status -o env` prints, not the GitHub environment secret of the same name); no `seed.local.sql` in CI |
 | `migrations` | `scripts/check-migrations.mts origin/<base>`: fails modified/renamed/deleted migrations, a new migration not newer than the base's newest, and `--include-seed` in any workflow |
-| `types` | regenerates `database.types.ts` from the local stack and diffs against the committed file; also runs `yarn db:pull` and diffs `src/lib/db/generated/schema.ts` |
+| `types` | regenerates `database.types.ts` from the local stack and diffs against the committed file; also runs `yarn db:pull` (which sorts its output, so a fresh database matches) and diffs `src/lib/db/generated/schema.ts` |
 | `main-source` | PRs into `main` must come from `develop` |
 
 All are required checks (rulesets on `main` and `develop`: PR required, no force-push, no

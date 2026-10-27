@@ -54,6 +54,7 @@ Unit tests (no database):
 | `src/app/api/health/db/route.test.ts` | the route is never cached; 200 `{ ok: true }`; 503 `{ ok: false }` with one log line naming the check and the error's name and code |
 | `src/lib/supabase/artist-names.drizzle.test.ts` | `artistNamesOf`: position order, missing artists dropped, duplicates removed |
 | `src/lib/admin/users.test.ts` | `getAdminUser` with `getViewer` and `listUsers` mocked; the Viewer from `getViewer` is the one passed to `listUsers` |
+| `scripts/lib/drizzle-schema.test.ts` | `yarn db:pull`'s normalize step: the local and CI pulls of 2026-10-26 (different table, entry, key-column, import and policy order) give one file; a second run changes nothing; the committed `generated/schema.ts` is already sorted and has no policy expressions; unknown shapes throw |
 | `.claude/hooks/guard-db.drizzle.test.ts` | the hook asks before `drizzle-kit push/migrate/drop/up`, `drizzle-kit` with a hosted host, and any command with a hosted database URL, including passwords with a raw `@` or `/`, a space or a quote mark, and (on purpose) a local URL next to a hosted name; allows local URLs and a hosted name with no database URL |
 
 ## Running

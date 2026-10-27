@@ -51,7 +51,17 @@ catch mistakes, not deliberate tricks (owner's decision, 2026-10-25). Tests:
 
 - `yarn db:pull` = `drizzle-kit pull` against the local stack only (`drizzle.config.ts`:
   `127.0.0.1:54322`, `schemaFilter: ["public"]`), into the gitignored `.drizzle-pull/`, then copies
-  only `schema.ts` to `src/lib/db/generated/`. Never hand-edit `generated/`.
+  only `schema.ts` to `src/lib/db/generated/` and sorts it (`scripts/normalize-drizzle-schema.mts`).
+  Never hand-edit `generated/`.
+- **Why it's sorted.** drizzle-kit 0.31.11 lists tables, each table's constraints, indexes and
+  policies, and a composite primary key's columns in the database's storage order (no `ORDER BY`),
+  so a long-lived local database and CI's fresh one give different files from the same migrations.
+  It also keeps a policy's `using` / `withCheck` only for the first policy of each table. The
+  normalize step sorts all of those by name and drops every policy's `using` / `withCheck`, so the
+  file lists policy names only. The real policies are the Supabase migrations; nothing in the app
+  reads them from this file. A composite key's columns are listed alphabetically, not in key order
+  (the database's order is in the migration). A shape the step doesn't know fails `yarn db:pull`.
+  Tests: `scripts/lib/drizzle-schema.test.ts`, including that the committed file is already sorted.
 - Re-run it after every migration, next to the `database.types.ts` regeneration ([[catalog-schema]]
   `References/clients-and-types.md`), and commit the result. CI's `types` job re-pulls and fails on
   any diff ("Drizzle schema matches the committed file").
