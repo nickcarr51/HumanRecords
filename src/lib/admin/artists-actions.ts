@@ -3,11 +3,15 @@
 // Artist admin writes. Every action re-checks the caller's role (the /admin
 // layout doesn't protect server actions). Insert/update use the cookie
 // client, so the label-member RLS policies enforce the role in Postgres too;
-// delete goes through admin_delete_artist (queues the photo key atomically).
+// delete goes through the removeArtist service (it deletes the artist and
+// queues the photo key in one transaction).
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { removeArtist } from "@/lib/services/artists";
+import { DomainError } from "@/lib/services/errors";
+import { getViewer } from "@/lib/services/viewer";
 import { activeLabelMemberId } from "./caller";
 import { filterLinkableUsers, getCreditCounts, loadLinkTargets } from "./artists";
 import {
@@ -95,9 +99,11 @@ export async function deleteArtist(id: string): Promise<ArtistActionResult> {
   if (typeof id !== "string" || !UUID_RE.test(id)) return { error: GONE };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_delete_artist", { target: id });
-  if (error) {
-    if (error.code === "23503") {
+  try {
+    await removeArtist(await getViewer(supabase), id);
+  } catch (err) {
+    const code = err instanceof DomainError ? err.code : undefined;
+    if (code === "CONFLICT") {
       try {
         const { tracks, albums } = await getCreditCounts(supabase, id);
         return { error: creditMessage(tracks, albums) };
@@ -105,9 +111,9 @@ export async function deleteArtist(id: string): Promise<ArtistActionResult> {
         return { error: "This artist still has credits. Remove those credits first." };
       }
     }
-    if (error.code === "P0002") return { error: GONE };
-    if (error.code === "42501") return { error: FORBIDDEN };
-    console.error("admin_delete_artist failed", error);
+    if (code === "NOT_FOUND") return { error: GONE };
+    if (code === "FORBIDDEN") return { error: FORBIDDEN };
+    console.error("Artist delete failed", err);
     return { error: "Couldn't delete. Try again." };
   }
 

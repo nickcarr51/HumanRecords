@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
 const getUser = vi.fn();
@@ -14,11 +15,14 @@ const insert = vi.fn(() => ({ select: () => ({ single: insertSingle }) }));
 const updateSelect = vi.fn();
 const updateEq = vi.fn(() => ({ select: updateSelect }));
 const update = vi.fn(() => ({ eq: updateEq }));
-const rpc = vi.fn();
-const db = { from: () => ({ insert, update }), rpc, auth: { getUser: () => getUser() } };
+const removeArtist = vi.fn();
+const VIEWER = { userId: "u1", role: "label_member" };
+const db = { from: () => ({ insert, update }), auth: { getUser: () => getUser() } };
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => db }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: async () => VIEWER }));
+vi.mock("@/lib/services/artists", () => ({ removeArtist: (...a: unknown[]) => removeArtist(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => redirect(to) }));
 vi.mock("./artists", async (orig) => ({
@@ -38,7 +42,7 @@ beforeEach(() => {
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   insertSingle.mockResolvedValue({ data: { id: A }, error: null });
   updateSelect.mockResolvedValue({ data: [{ id: A }], error: null });
-  rpc.mockResolvedValue({ error: null });
+  removeArtist.mockResolvedValue(undefined);
   getCreditCounts.mockResolvedValue({ tracks: 2, albums: 1 });
   loadLinkTargets.mockResolvedValue({ users: [{ id: U, name: "Ada", email: "ada@x.co" }], links: [] });
 });
@@ -52,7 +56,7 @@ describe("auth gate", () => {
     expect((await searchLinkableUsers("ada")).error).toBe("Only label members can do this.");
     expect(insert).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(removeArtist).not.toHaveBeenCalled();
   });
 });
 
@@ -62,7 +66,7 @@ describe("banned caller", () => {
     expect((await createArtist({ name: "X", bio: "", userId: null })).error).toBe("Only label members can do this.");
     expect((await deleteArtist(A)).error).toBe("Only label members can do this.");
     expect(insert).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(removeArtist).not.toHaveBeenCalled();
   });
 });
 
@@ -135,15 +139,15 @@ describe("updateArtist", () => {
 });
 
 describe("deleteArtist", () => {
-  it("calls admin_delete_artist and redirects to the list", async () => {
+  it("calls removeArtist and redirects to the list", async () => {
     await expect(deleteArtist(A)).rejects.toThrow("NEXT_REDIRECT");
-    expect(rpc).toHaveBeenCalledWith("admin_delete_artist", { target: A });
+    expect(removeArtist).toHaveBeenCalledWith(VIEWER, A);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/artists");
     expect(redirect).toHaveBeenCalledWith("/admin/artists");
   });
 
   it("maps 23503 to the credit message with live counts", async () => {
-    rpc.mockResolvedValue({ error: { code: "23503", message: "fk" } });
+    removeArtist.mockRejectedValue(new DomainError("CONFLICT", "That item is still in use."));
     expect((await deleteArtist(A)).error).toBe(
       "This artist is credited on 2 tracks / 1 album. Remove those credits first.",
     );
@@ -151,11 +155,11 @@ describe("deleteArtist", () => {
   });
 
   it("maps P0002, 42501 and unknown errors", async () => {
-    rpc.mockResolvedValue({ error: { code: "P0002", message: "x" } });
+    removeArtist.mockRejectedValue(new DomainError("NOT_FOUND", "Artist not found."));
     expect((await deleteArtist(A)).error).toBe("That artist no longer exists.");
-    rpc.mockResolvedValue({ error: { code: "42501", message: "x" } });
+    removeArtist.mockRejectedValue(new DomainError("FORBIDDEN", "Only label members can delete artists."));
     expect((await deleteArtist(A)).error).toBe("Only label members can do this.");
-    rpc.mockResolvedValue({ error: { code: "XX000", message: "x" } });
+    removeArtist.mockRejectedValue(new DatabaseError("XX000", undefined));
     expect((await deleteArtist(A)).error).toBe("Couldn't delete. Try again.");
   });
 });
