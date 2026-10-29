@@ -27,8 +27,10 @@ and `revalidatePath('/admin/users')` on success.
   the table."
 - **`issueInvite(userId)`** — Create link, New link, and Regenerate. UUID-validated; upsert.
 - **`setUserRole(userId, role)`** — rejects the caller's own id ("You can't change your own
-  role."), then `rpc('admin_set_user_role')` on the cookie client. SQLSTATEs: `42501` →
-  forbidden, `22023` → own-role, `P0002` → "That user no longer exists."
+  role."), then `changeUserRole(await getViewer(cookie client), userId, role)`
+  (`src/lib/services/users.ts`, since Drizzle slice 2; it replaced `rpc('admin_set_user_role')`).
+  `DomainError` codes: `FORBIDDEN` → forbidden, `INVALID` → own-role, `NOT_FOUND` → "That user
+  no longer exists."; anything else is logged → "Couldn't save the role. Try again."
 
 ## SQL (migration `20261002120100`)
 
@@ -41,10 +43,15 @@ Both functions are `security definer`, `set search_path = public`, execute revok
   `banned_until` (added in `20261010120500`) is what `toAdminUserRow` turns into `deactivated` (a
   ban that hasn't expired yet).
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
-  `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only.
+  `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only. No app
+  callers since Drizzle slice 2: `changeUserRole` does the same (proved by
+  `users-role.parity.data.test.ts`). Both functions stay in the database until a later cleanup
+  migration drops them.
 
-So for `setUserRole`, the role and self-guard checks exist in the action **and** in Postgres. For
-the list, the role check is `authorize()` in the users service.
+So for `setUserRole`, the role and self-guard checks exist in the action **and** in the users
+service (`authorize(viewer, "users.setRole")`, then the own-id check against `viewer.userId`),
+which then updates with `asSystem`, `public.users.role` only. For the list, the role check is
+`authorize()` in the users service. Neither check is in Postgres any more.
 
 ## UI (`src/components/AdminUsers/`)
 

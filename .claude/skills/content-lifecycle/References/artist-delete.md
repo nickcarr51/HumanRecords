@@ -12,13 +12,18 @@ unchanged). `artists.user_id` stays `on delete set null`.
 
 ## Admin flow (built)
 
-- `/admin/artists/[id]` has a Danger zone (`DeleteArtist`) that calls `deleteArtist`, which runs
-  the definer function `admin_delete_artist` (migration `20261010130000`). On `23503` the UI
-  shows `creditMessage` (still credited on N tracks / M albums; remove or reassign those
-  credits first).
+- `/admin/artists/[id]` has a Danger zone (`DeleteArtist`) that calls `deleteArtist`, which calls
+  the `removeArtist` service (`src/lib/services/artists.ts`, `authorize` + `asSystem`,
+  [[db-access]]; it replaced the definer function `admin_delete_artist`, migration
+  `20261010130000`, in Drizzle slice 2; the function still exists until a cleanup migration drops
+  it). On `23503` (which reaches the action as `DomainError` `CONFLICT`) the UI shows
+  `creditMessage` (still credited on N tracks / M albums; remove or reassign those credits
+  first), and nothing is deleted or queued.
 - No credits: the delete succeeds and is the one **hard delete** in the system. The artist's
   `profile_photo_url` key is queued in `r2_cleanup_queue` (`source_table = 'artists'`, reason
-  `archived`) ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
+  `archived`) in the same transaction ([r2-cleanup-queue.md](r2-cleanup-queue.md)).
+  `src/lib/services/artists.parity.data.test.ts` checks the service and the old function give the
+  same result.
 - Credited artists are not archived (artists have no `archived_at`); the admin removes credits
   first, or leaves the artist.
 

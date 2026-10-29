@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), the invite-users script, or artist management at `/admin/artists` (its linked-user lists come from the Drizzle `listUsers` service via `getViewer`). (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), or artist management at `/admin/artists` (its linked-user lists come from the Drizzle `listUsers` service via `getViewer`; delete goes through the Drizzle `removeArtist` service). (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -62,14 +62,14 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Release admin pages | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx` |
 | Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
 | Artist reads: `listAdminArtists`, `getAdminArtist`, `getCreditCounts`, `loadLinkTargets` (artists via supabase-js; linked users via `listUsers` / `getViewer`, [[db-access]]) | `src/lib/admin/artists.ts` |
-| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via the `removeArtist` service, `src/lib/services/artists.ts`, [[db-access]]; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `CONFLICT` on delete → `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
 | Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
 | Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
 | Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
 | Reused list search + pagination (`basePath="/admin/artists"`) | `src/components/SearchInput/`, `src/components/Pagination/` (`pageHref(basePath, query, page)`); see [[artists-read]] |
 | Admin index cards (Upload, Releases, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
-| Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
+| Hosted accounts (develop and production) | `/admin/users` ([[invites]]) |
 
 ## References
 
@@ -122,11 +122,13 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).
-- **ORM**: Drizzle since slice 1 (2026-10), reads only so far ([[db-access]]). The admin writes are
-  still SQL functions behind thin server actions; they move into TypeScript in slices 2-5, and the
-  multi-table admin reads (`src/lib/admin/artists.ts` in slice 2, `src/lib/admin/releases.ts` in
-  slice 4) move to Drizzle ([[db-access]] `References/slices.md`).
-- **Production accounts** are created by hand; `scripts/invite-users.mts` is for develop.
+- **ORM**: Drizzle since slice 1 (2026-10) ([[db-access]]). Artist delete moved off its SQL
+  function in slice 2 (`removeArtist`); the release admin writes are still SQL functions behind
+  thin server actions and move into TypeScript in slices 3-5. The admin reads
+  (`src/lib/admin/artists.ts`, `src/lib/admin/releases.ts`) stay on supabase-js: they change
+  nothing ([[db-access]] `References/slices.md`).
+- **Accounts**, develop and production, are created at `/admin/users` ([[invites]]); the invite
+  script was deleted in slice 2.
 - **R2 CORS** must be applied in Cloudflare before any real browser upload works.
 - **Upload bar sits at 100% during the peaks decode (deferred, owner 2026-10-14):** `uploadDone` fires only after `storePeaks` (decode + PUT), with no "analyzing…" text, and the lane waits on the page-wide decode queue. Details and possible fixes: [[waveform]] Known gaps.
 

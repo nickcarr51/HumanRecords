@@ -1,14 +1,16 @@
 ---
 name: db-access
-description: Use when writing or changing a database read or write that touches more than one table, or anything in `src/lib/db/*` or `src/lib/services/*` — Drizzle ORM (`getDb`, `createDb`, `connectionOptions`, `Db`/`Tx`), `asUser` / `asSystem`, `prepareTransaction` and the 10s timeouts (`transaction-setup.ts`), `authorize` / `Grant` / `Action` / `isIssuedGrant` (`policy.ts`), `getViewer` / `getClaims` / `Viewer` / `JwtClaims` / `isIssuedViewer` (`viewer.ts`), `DomainError` / `DatabaseError` / `fromPgError` (`errors.ts`), `listUsers` / `UserRow` (`services/users.ts`), `MAX_ROWS` (`max-rows.ts`), `pgrstTs` (`timestamps.ts`), `relations.ts`, the `authUsers` alias (`auth-schema.ts`), `yarn db:pull` / `drizzle.config.ts` / `generated/schema.ts`, `DATABASE_URL`, the Supabase CA certificate (`supabase-ca.ts`), the database health check (`checkDatabase`, `/api/health/db`), the lint rules on database drivers / `sql.raw` / `execute()` / `.unsafe()`, the guard-hook rules for `drizzle-kit` and hosted database URLs, the slice map (which supabase-js reads and SQL functions move to Drizzle next), or the database access tests (`References/testing.md`). Also when "Missing DATABASE_URL", "DATABASE_URL is not a valid URL", "Database query failed", "table reference \"users\" is ambiguous", "permission denied" from a Drizzle read, a certificate or connection error, a statement timeout (57014), `UNAUTHENTICATED` / `FORBIDDEN` / "Not authorized.", or a red "Site database answers" step appears.
+description: Use when writing or changing a database write that needs a transaction, a job supabase-js can't do safely (the rule in `References/slices.md`), or anything in `src/lib/db/*` or `src/lib/services/*` — Drizzle ORM (`getDb`, `createDb`, `connectionOptions`, `Db`/`Tx`), `asUser` / `asSystem`, `prepareTransaction` and the 10s timeouts (`transaction-setup.ts`), `authorize` / `Grant` / `Action` / `isIssuedGrant` (`policy.ts`), `getViewer` / `getClaims` / `Viewer` / `JwtClaims` / `isIssuedViewer` (`viewer.ts`), `DomainError` / `DatabaseError` / `fromPgError` (`errors.ts`), `listUsers` / `UserRow` / `changeUserRole` (`services/users.ts`), `removeArtist` (`services/artists.ts`), `MAX_ROWS` (`max-rows.ts`), `pgrstTs` (`timestamps.ts`), `relations.ts`, the `authUsers` alias (`auth-schema.ts`), `yarn db:pull` / `drizzle.config.ts` / `generated/schema.ts`, `DATABASE_URL`, the Supabase CA certificate (`supabase-ca.ts`), the database health check (`checkDatabase`, `/api/health/db`), the lint rules on database drivers / `sql.raw` / `execute()` / `.unsafe()`, the guard-hook rules for `drizzle-kit` and hosted database URLs, the slice map (which SQL functions move to Drizzle next), or the database access tests (`References/testing.md`). Also when "Missing DATABASE_URL", "DATABASE_URL is not a valid URL", "Database query failed", "table reference \"users\" is ambiguous", "permission denied" from a Drizzle read, a certificate or connection error, a statement timeout (57014), `UNAUTHENTICATED` / `FORBIDDEN` / "Not authorized.", or a red "Site database answers" step appears.
 ---
 
 # Database access: Drizzle, `asUser` / `asSystem`, services
 
 How the app reads the database without going through Supabase's API: Drizzle ORM over a direct
 Postgres connection (`DATABASE_URL`), always inside one of two functions that decide whose
-permissions apply. Built on `feature/orm-scaffold-and-reads` (slice 1, 2026-10-23..25): the feed,
-the album page and the admin user list read this way. Writes come in later slices.
+permissions apply. Built on `feature/orm-scaffold-and-reads` (slice 1, 2026-10-23..25): the feed
+and the admin user list read this way. Slice 2 (`feature/ORM-phase-2`, 2026-10-28) added the first
+writes: deleting an artist (`removeArtist`) and changing a user's role (`changeUserRole`), and put
+the album page back on supabase-js. More writes come in later slices.
 
 Words used here, once:
 - **Drizzle** (`drizzle-orm`): a TypeScript library that builds SQL from typed table objects.
@@ -36,8 +38,10 @@ decision.** The connection logs in as the `postgres` role, which skips RLS. So:
 
 Both start with `prepareTransaction`, which sets 10s timeouts for the transaction only, and both
 turn every database error into a safe error (`fromPgError`), so SQL text never reaches a user, a
-log or Sentry. **The rule (owner's): a read or write on one table stays supabase-js; more than one
-table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of it.
+log or Sentry. **The rule (owner's, 2026-10-28): a SQL function goes away. One simple read or
+write on one table uses supabase-js. Several changes that must all succeed or all fail (a
+transaction), or a job supabase-js can't do safely, use Drizzle. Reads that change nothing stay on
+supabase-js, even across several tables.** Drizzle sits next to supabase-js, not instead of it.
 
 ## Pieces
 
@@ -57,9 +61,11 @@ table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of i
 | Who is calling: `getClaims`, `getViewer`, `Viewer`, `JwtClaims`, `isIssuedViewer` | `src/lib/services/viewer.ts` |
 | Permission check: `authorize`, `Grant`, `Action`, `isIssuedGrant` | `src/lib/services/policy.ts` |
 | Safe errors: `DomainError`, `DatabaseError`, `fromPgError`, `isPostgresError` | `src/lib/services/errors.ts` |
-| First service: `listUsers(viewer)`, `UserRow` | `src/lib/services/users.ts` |
-| Drizzle reads as the user | `src/lib/supabase/{feed,feed-search,albums,catalog-selects,artist-names}.ts` ([[timeline-player]]) |
+| User services: `listUsers(viewer)`, `UserRow`, `changeUserRole(viewer, target, role)` | `src/lib/services/users.ts` |
+| Artist service: `removeArtist(viewer, id)` | `src/lib/services/artists.ts` |
+| Drizzle reads as the user | `src/lib/supabase/{feed,feed-search,catalog-selects,artist-names}.ts` ([[timeline-player]]) |
 | Callers of `listUsers` | `src/lib/admin/users.ts` (`listAdminUsers`, `getAdminUser`), `src/lib/admin/artists.ts` (`linkedUsersFor`) |
+| Callers of `changeUserRole` / `removeArtist` | `setUserRole` (`src/lib/admin/users-actions.ts`), `deleteArtist` (`src/lib/admin/artists-actions.ts`) |
 | Lint rules | `eslint.config.mjs` |
 | Guard hook rules (`drizzle-kit`, hosted database URLs) | `.claude/hooks/guard-db.sh`, tests `.claude/hooks/guard-db.drizzle.test.ts` |
 | CI: `DATABASE_URL` for tests, schema diff | `.github/workflows/ci.yml` (`test`, `types`) |
@@ -76,28 +82,34 @@ table goes through Drizzle.** Drizzle sits next to supabase-js, not instead of i
 - [guard-rails.md](References/guard-rails.md) — `DATABASE_URL` per environment, lint rules, the
   guard hook, `yarn db:pull` (sorted, policy names only) and the CI diff, the mis-rendered foreign
   keys in `generated/schema.ts`, Dependabot and esbuild.
-- [slices.md](References/slices.md) — the one-table / many-table rule, the slice map, and every
-  many-table supabase-js read or write not moved yet, with its slice.
+- [slices.md](References/slices.md) — the rule, the slice map, the SQL functions that stay or
+  are left unused, and the supabase-js code that stays on supabase-js.
 - [testing.md](References/testing.md) — every database access test, what it proves, how to run
   them (local `DATABASE_URL`).
 
 ## Depends on
 
 - [[catalog-schema]] — the tables, RLS policies, grants and SQL functions these queries run
-  against; supabase-js clients for one-table work.
+  against; supabase-js clients for the work that stays on supabase-js.
 - [[auth]] — the session cookie `getClaims()` verifies; `getCurrentRole` (supabase-js) vs
   `getViewer` (Drizzle).
 - [[release-ops]] — `DATABASE_URL` in Vercel, the deploy/health workflows, the hook.
 
-Used by: [[timeline-player]] (`getFeed`, `getAlbum`), [[invites]] (`/admin/users`),
-[[admin-upload]] (`/admin/artists` linked users).
+Used by: [[timeline-player]] (`getFeed`), [[invites]] (`/admin/users`: the list and the role
+change), [[admin-upload]] (`/admin/artists` linked users and artist delete).
 
-## Known deferrals (as of 2026-10-25)
+## Known deferrals (as of 2026-10-28)
 
-- Slice 1 is reads only. Writes and the remaining many-table reads are mapped to slices 2-5
-  ([slices.md](References/slices.md)). `fromPgError`'s mapped codes are there for them.
-- `search_feed` and `admin_list_users` stay in the database with no app callers (the parity
-  tests use them); a later cleanup migration drops them.
+- The remaining SQL function writes are mapped to slices 3-5 ([slices.md](References/slices.md)).
+  `fromPgError`'s mapped codes are there for them.
+- `search_feed`, `admin_list_users`, `admin_delete_artist` and `admin_set_user_role` stay in the
+  database with no app callers (their data tests and the parity tests use them); a later cleanup
+  migration drops them.
+- Hardening `public.users` (owner-deferred): the signed-in role holds the column privilege to
+  update every column (`id`, `created_at`, `name`, `role`); only the absence of an update RLS
+  policy blocks it.
+- `src/lib/supabase/artists.ts` (the retired `/artists` reads and `escapeLike`): the owner handles
+  it after all slices.
 - The hosted rollout checks (a)-(h) (pooler certificate, role timeouts, time zone, max rows,
   `DATABASE_URL` in Vercel) are in [[release-ops]] `References/environments.md`, "Hosted database
   checks".

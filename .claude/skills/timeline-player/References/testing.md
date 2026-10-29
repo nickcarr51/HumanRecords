@@ -45,8 +45,8 @@ and that no canvas is created under `prefers-reduced-motion`.
 
 **Data layer** — `src/lib/supabase/feed.data.test.ts` and `albums.data.test.ts`
 (integration, `*.data.test.ts` convention). These require a **local Supabase** running
-(`yarn supabase start`) and `DATABASE_URL` in `.env.local` set to the local stack (the reads run
-through Drizzle); `test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or
+(`yarn supabase start`) and `DATABASE_URL` in `.env.local` set to the local stack (the feed reads
+run through Drizzle); `test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or
 `DATABASE_URL`. They self-seed rows with
 `createAdminClient`/`createTestUser`, sign in, exercise real queries, and clean up in
 `afterEach`. Covers: releases pinned first, then `sort_at` with album tracks + credits in `position`
@@ -61,8 +61,10 @@ Added with the Drizzle move (slice 1), unchanged older tests above still the mai
 `createdAt` is PostgREST's exact string; past-the-end totals; signed out → `UNAUTHENTICATED`),
 `feed-row-cap.data.test.ts` (at most `MAX_ROWS` rows, exact total), `albums.drizzle.data.test.ts`
 (track and artist position order, archived tracks dropped, signed out → `UNAUTHENTICATED`) and
-`artist-names.drizzle.test.ts` (unit: `artistNamesOf`), and `src/lib/db/album-page-query.test.ts`
-(unit: the album query doesn't ask for `track_art_url`). The layer's own tests: [[db-access]]
+`artist-names.drizzle.test.ts` (unit: `artistNamesOf`). `albums.drizzle.data.test.ts` runs unchanged
+against the supabase-js `getAlbum` since slice 2, and `album-request.test.ts` (unit: the album
+request doesn't ask for `track_art_url`) replaced slice 1's `src/lib/db/album-page-query.test.ts`.
+The layer's own tests: [[db-access]]
 `References/testing.md`.
 `src/lib/supabase/catalog-numbers.data.test.ts` (using `release-admin-fixtures.ts`) proves
 `catalog_number` is assigned on insert, increasing, survives a title edit and rejects a

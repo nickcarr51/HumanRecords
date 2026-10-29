@@ -22,16 +22,16 @@ Indexes: `(queued_at) where cleaned_at is null` (pending work) and `(source_tabl
 RLS on, **no policies**, all privileges revoked from `anon` and `authenticated`: only the service
 role, the security-definer functions, or Drizzle's `asSystem` (the `postgres` login skips RLS;
 [[db-access]]) can reach it, and no app code reads it through `asSystem` yet. Even label members
-can't read or write it through the user client. App code never writes it
-directly: the security-definer functions (`archive_release`, `archive_track`, `replace_track_audio`)
-insert rows, and the restore functions delete uncleaned ones
+can't read or write it through the user client. The security-definer functions (`archive_release`,
+`archive_track`, `replace_track_audio`) insert rows, the `removeArtist` service inserts one through
+`asSystem` when an artist with a photo is deleted, and the restore functions delete uncleaned ones
 ([[catalog-schema]] `References/rls-model.md`).
 
 ## When rows are written
 
 - **Archive** a release/track (`archive_release`, `archive_track`): queue the track audio and art keys and, for an album, its art key (`archived`). `archive_track` queues the album art only when it archives the last live track.
 - **Replace** an MP3 (`replace_track_audio`): queue the old key (`replaced`). Image replacement has no function yet. Replacing A→B then B→A leaves an uncleaned `replaced` row for A while A is live again; that is safe because the job only deletes keys no live row references.
-- **Hard-delete an uncredited artist**: queue their `profile_photo_url` key with reason `archived` (the check constraint allows only `archived` / `replaced`, so there is no "deleted" reason).
+- **Hard-delete an uncredited artist** (`removeArtist`, same transaction as the delete): queue their `profile_photo_url` key with reason `archived` (the check constraint allows only `archived` / `replaced`, so there is no "deleted" reason).
 
 ## When rows are removed
 

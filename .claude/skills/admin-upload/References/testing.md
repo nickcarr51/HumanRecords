@@ -65,7 +65,6 @@ errors, auto-title + wav error, Clear all, Cancel confirm, form locked while pub
 
 - Render tests for dashboard/page layout and styling (same scope as the timeline branch).
 - A real browser PUT to R2 and real OTP sign-in — covered by the manual smoke below.
-- `scripts/invite-users.mts` (run by hand; only the "ok" path was exercised locally).
 - Known gaps (deferred): `beforeunload`, the `inFlight` double-click ref, and rejected
   `runPublish` propagation in `UploadForm`; no test that `authenticated` can't insert into
   `releases`; no `toFeedItem` null-branch test.

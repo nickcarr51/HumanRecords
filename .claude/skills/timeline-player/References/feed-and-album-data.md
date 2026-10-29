@@ -6,14 +6,15 @@ Files: `src/lib/supabase/feed.ts`, `src/lib/supabase/feed-search.ts`, `src/lib/s
 `albums.data.test.ts`, `artist-names.test.ts`, `catalog-numbers.data.test.ts`, and from the Drizzle
 move `feed-drizzle.parity.data.test.ts`, `feed-row-cap.data.test.ts`,
 `albums.drizzle.data.test.ts`, `artist-names.drizzle.test.ts`, and
-`src/lib/db/album-page-query.test.ts` (the album query doesn't ask for `track_art_url`).
+`album-request.test.ts` (the album request doesn't ask for `track_art_url`).
 
 Both functions follow the project convention: they take a `SupabaseClient<Database>` as the
 **first argument** (dependency injection), never calling the cookie-based `createClient()`
 themselves. That makes them testable against local Supabase and reusable by server components.
-Since Drizzle slice 1 (2026-10) they use that client only to verify the session
-(`getClaims(supabase)`); the queries run through Drizzle with `asUser`, as the signed-in user, so
-the same RLS policies apply ([[db-access]]). A signed-out client gets
+Since Drizzle slice 1 (2026-10) `getFeed` uses that client only to verify the session
+(`getClaims(supabase)`); its queries run through Drizzle with `asUser`, as the signed-in user, so
+the same RLS policies apply ([[db-access]]). Since slice 2 (2026-10-28) `getAlbum` verifies the
+session the same way and then reads with that supabase-js client. A signed-out client gets
 `DomainError("UNAUTHENTICATED")` instead of empty results (the middleware and the `(app)` layout
 normally redirect first). Any database error comes back as a safe `DomainError` or
 `DatabaseError`, never with the SQL text. See [[catalog-schema]] for the underlying tables and RLS
@@ -120,20 +121,20 @@ then capped at `MAX_QUERY_LENGTH` (200); a non-string `q` is treated as blank.
 
 - Guards the id against a UUID regex and returns `null` for a non-UUID (a malformed id would
   otherwise make Postgres raise "invalid input syntax for type uuid" → a 500/leak).
-- Then, as the signed-in user (`asUser`), `tx.query.albums.findFirst` by id with `columns` id,
-  `catalogNumber`, title, `albumArtUrl` and the nested `releases` (`archivedAt`), `albumArtists`
-  (`ARTIST_NAMES`) and `trackAlbums` (`position` → `track` as `ALBUM_TRACK_WITH`: id,
-  `catalogNumber`, title, `archivedAt`, `trackArtists`, no `trackArtUrl`, the same columns the album
-  query asked for before Drizzle). The app no longer receives `trackArtUrl`, but the database still
-  reads the whole `tracks` row, because Drizzle reads one linked row with `select *`. The query is
-  `findAlbum(tx, id)`, exported from `albums.ts` so a test can check the SQL `getAlbum` sends.
+- Then `await getClaims(supabase)`: signed out → `DomainError("UNAUTHENTICATED")`, as `getFeed`
+  does (without it RLS would return no rows and the page would say "not found").
+- Then one supabase-js read (slice 2 put it back as it was before slice 1): `albums` by id with
+  `id, catalog_number, title, album_art_url`, `releases ( archived_at )`,
+  `album_artists ( position, artists ( name ) )` and `track_albums ( position, tracks ( id,
+  catalog_number, title, archived_at, track_artists ( position, artists ( name ) ) ) )`, then
+  `.maybeSingle()`. It doesn't ask for `track_art_url` (`album-request.test.ts` checks this). A
+  query error is thrown as supabase-js returns it.
   Returns `null` for a missing album **and for an archived one**, even for label members. No
   visible release is also `null` (RLS hides an archived release from listeners, so `releases`
   comes back empty; every album has a release). Archived tracks are skipped from `tracks`.
-- The same nested artist rows as the feed's album branch (`catalog-selects.ts`), and the same
-  track columns apart from `trackArtUrl` (the feed's album tracks use `TRACK_WITH`, the album
-  page `ALBUM_TRACK_WITH`); tracks sorted by `track_albums.position`, so the album page and the
-  feed's expanded album row always agree.
+- Artist names go through `namesFrom` (`artist-names.ts`), the same rules as the feed's
+  `artistNamesOf`; tracks sorted by `track_albums.position` (`byPosition`), so the album page and
+  the feed's expanded album row always agree.
 - `albumArtUrl` is returned but **not rendered** by the album page yet (it is an unsigned R2
   key; see routing-and-auth.md).
 
@@ -153,10 +154,10 @@ Both pages show which tracks the user already downloaded:
 ## `catalog-selects.ts` and `artist-names.ts`
 
 - `ARTIST_NAMES` (`position` → `artist.name`), `TRACK_WITH` (the track columns plus
-  `trackArtists`), `ALBUM_TRACK_WITH` (the same without `trackArtUrl`, for the album page's
-  tracks), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` (takes either) — the
-  Drizzle `columns`/`with` shapes `getFeed` and `getAlbum` share. The feed's album tracks use
-  `TRACK_WITH`, so they also fetch `trackArtUrl`, which the feed doesn't show for them.
+  `trackArtists`), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` (takes a
+  `DbTrack` with or without `trackArtUrl`) — the Drizzle `columns`/`with` shapes `getFeed` uses.
+  The feed's album tracks use `TRACK_WITH`, so they also fetch `trackArtUrl`, which the feed
+  doesn't show for them.
 - `ArtistLink = { position?: number | null; artist: { name: string } | null }` — a Drizzle link
   row (singular `artist`). `artistNamesOf(links)` — `byPosition` → names → drop nulls →
   de-dupe.
@@ -164,7 +165,7 @@ Both pages show which tracks the user already downloaded:
   be ordered by a link-table column in that select shape; the Drizzle reads reuse it for the same
   rule.
 - `ArtistNameRel` and `namesFrom(rel)` — the same rules for a supabase-js
-  `… ( position, artists ( name ) )` embed. Only `getTrackDownloadUrl`
-  (`src/lib/storage/actions.ts`, still supabase-js) uses them now, bridged with `as unknown`.
+  `… ( position, artists ( name ) )` embed. `getAlbum` and `getTrackDownloadUrl`
+  (`src/lib/storage/actions.ts`), both supabase-js, use them, bridged with `as unknown`.
 - `albumArtistLabel(names)` — joins names, or `"Various Artists"` when an album has no album
   artists. Display-only (used by `AlbumRow` and the album page); nothing is stored.

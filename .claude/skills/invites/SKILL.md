@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, the user list read (`listAdminUsers`/`getAdminUser` → `listUsers` in `src/lib/services/users.ts`, `UserRow`/`AdminListRow`, `getViewer`, `authorize("users.list")`, `asSystem`), `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
+description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, the user list read (`listAdminUsers`/`getAdminUser` → `listUsers` in `src/lib/services/users.ts`, `UserRow`/`AdminListRow`, `getViewer`, `authorize("users.list")`, `asSystem`), the role change (`changeUserRole` in `src/lib/services/users.ts`, `authorize("users.setRole")`), `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -41,6 +41,7 @@ link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/logi
 | Admin actions: `createUser`, `issueInvite`, `setUserRole`, `updateUserProfile`, `setUserActive` | `src/lib/admin/users-actions.ts` |
 | List + row mapping (`inviteUrl` for unused rows; `AdminListRow` = `UserRow`) | `src/lib/admin/users.ts`, types in `users-types.ts` |
 | The user list query (`listUsers`, `UserRow`: label members only, via `authorize` + `asSystem`) | `src/lib/services/users.ts` ([[db-access]]) |
+| The role change behind `setUserRole` (`changeUserRole`: label members only, never your own role, via `authorize` + `asSystem`; replaced `admin_set_user_role` in Drizzle slice 2) | `src/lib/services/users.ts` ([[db-access]]) |
 | Welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Redeem (claim → sign-in → restore on failure) | `src/lib/auth/actions.ts` (`redeemInvite`) |
 | `/login` (server component, `<meta name="referrer" content="no-referrer">` via `metadata.referrer`) | `src/app/login/page.tsx` |
@@ -113,7 +114,7 @@ Decided (owner, 2026-10-10): no instant kick on deactivate (admin server actions
 
 - [[auth]] — middleware (signed-in visitors never reach the welcome), `/login`, `getCurrentRole`.
 - [[catalog-schema]] — `users`, `invites`, the triggers, definer functions, service client.
-- [[db-access]] — `listUsers` (Drizzle, `authorize` + `asSystem`) and `getViewer`.
+- [[db-access]] — `listUsers` and `changeUserRole` (Drizzle, `authorize` + `asSystem`) and `getViewer`.
 - [[admin-upload]] — the `/admin` portal, four-layer label-member gate, `requireLabelMember`.
 - [[component-library]] — `Button`, `Select`, `Alert`, `FormField`, `Mono`, theme tokens.
 
@@ -125,9 +126,9 @@ Decided (owner, 2026-10-10): no instant kick on deactivate (admin server actions
 - **No token expiry, Revoke, CSV export, search, or pagination** (under ~50 invitees).
 - **Per-environment `SITE_URL`** must be set in each Vercel environment (prod:
   `https://services.humanrecords.co`; develop: `https://humanservices-dev.vercel.app`); see the domain
-  cut-over ([[release-ops]] `References/domain-cutover.md`). Hosted develop test accounts come
-  from `scripts/invite-users.mts` + gitignored `scripts/users.local.json`. NFC: write the
-  final-domain invite URL, verify a tap, then lock the tag.
+  cut-over ([[release-ops]] `References/domain-cutover.md`). Hosted accounts, develop and
+  production, come from `/admin/users` (the invite script was deleted in Drizzle slice 2).
+  NFC: write the final-domain invite URL, verify a tap, then lock the tag.
 - **Crash between claim and sign-in** leaves the token used (no restore ran). Fallback: the
   invitee signs in with the email code, or an admin presses New link.
 - **`RoleSelect` doesn't re-sync from props** after another admin changes the role; reload.

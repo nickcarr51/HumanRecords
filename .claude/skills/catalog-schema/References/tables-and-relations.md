@@ -72,8 +72,8 @@ got on deploy, forever.
   (`P0001`, "Catalog numbers cannot be changed"). Contrast `keep_created_at`, which silently
   resets the old value instead of raising — both exist, they behave differently on purpose
   (see [functions.md](functions.md)). Via the API, a listener's update is a silent RLS no-op
-  anyway; only the service role, a definer function or `asSystem` (which no app code uses to write
-  yet) reaches these errors.
+  anyway; only the service role, a definer function or `asSystem` (whose only app writes,
+  `removeArtist` and `changeUserRole`, never touch `catalog_number`) reaches these errors.
 - **Never reused.** Archiving keeps the row and its number. A hard delete (tests, `cleanup(tag)`)
   consumes the number — the sequence never goes back, so gaps are normal and expected.
 - **Expand/contract:** additive. Code deployed before the migration never selects the column and
@@ -113,14 +113,17 @@ got an `album` release; every track not on an album got a `single` release.
 
 ## Querying across tables
 
-More than one table → Drizzle ([[db-access]]). Its nested reads (`tx.query…`) follow the
+A read that changes nothing stays on supabase-js even across tables; Drizzle is for
+transactions and jobs supabase-js can't do safely, like the feed search ([[db-access]]). Drizzle's
+nested reads (`tx.query…`) follow the
 hand-written `src/lib/db/relations.ts`: `releases.track` / `album`, `tracks.releases` /
 `trackAlbums` / `trackArtists`, `albums.releases` / `trackAlbums` / `albumArtists`,
 `artists.trackArtists` / `albumArtists`, and on the link tables `track`, `album`, `artist`
 (singular). Example:
-`tx.query.albums.findFirst({ with: { trackAlbums: { with: { track: … } } } })` (`getAlbum`).
+`tx.query.releases.findMany({ with: { album: { with: { trackAlbums: { with: { track: … } } } } } })`
+(`getFeed`).
 
-The supabase-js reads not moved yet use PostgREST resource embedding, which follows FKs:
+The supabase-js reads use PostgREST resource embedding, which follows FKs:
 `releases → track:tracks(…)`, `album:albums(… track_albums(position, tracks(…)))`,
 `… track_artists(position, artists(name))`. Generated types describe nested embeds loosely,
 so call sites cast with `as unknown as <Shape>` — keep the cast narrow and local.
