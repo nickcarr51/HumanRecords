@@ -5,7 +5,8 @@ const getCurrentRole = vi.fn();
 const getUser = vi.fn();
 const createUserApi = vi.fn();
 const changeUserRole = vi.fn();
-const VIEWER = { userId: "11111111-1111-1111-1111-111111111111", role: "label_member" };
+const ME = "11111111-1111-1111-1111-111111111111";
+const VIEWER = { userId: ME, role: "label_member" };
 const upsertInvite = vi.fn();
 const revalidatePath = vi.fn();
 
@@ -29,7 +30,6 @@ vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePa
 
 import { createUser, issueInvite, setUserActive, setUserRole, updateUserProfile } from "./users-actions";
 
-const ME = "11111111-1111-1111-1111-111111111111";
 const OTHER = "22222222-2222-2222-2222-222222222222";
 
 beforeEach(() => {

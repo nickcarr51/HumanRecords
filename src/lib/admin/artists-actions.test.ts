@@ -17,11 +17,12 @@ const updateEq = vi.fn(() => ({ select: updateSelect }));
 const update = vi.fn(() => ({ eq: updateEq }));
 const removeArtist = vi.fn();
 const VIEWER = { userId: "u1", role: "label_member" };
+const getViewer = vi.fn();
 const db = { from: () => ({ insert, update }), auth: { getUser: () => getUser() } };
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => db }));
-vi.mock("@/lib/services/viewer", () => ({ getViewer: async () => VIEWER }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: (...a: unknown[]) => getViewer(...a) }));
 vi.mock("@/lib/services/artists", () => ({ removeArtist: (...a: unknown[]) => removeArtist(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => redirect(to) }));
@@ -43,6 +44,7 @@ beforeEach(() => {
   insertSingle.mockResolvedValue({ data: { id: A }, error: null });
   updateSelect.mockResolvedValue({ data: [{ id: A }], error: null });
   removeArtist.mockResolvedValue(undefined);
+  getViewer.mockResolvedValue(VIEWER);
   getCreditCounts.mockResolvedValue({ tracks: 2, albums: 1 });
   loadLinkTargets.mockResolvedValue({ users: [{ id: U, name: "Ada", email: "ada@x.co" }], links: [] });
 });
@@ -146,7 +148,7 @@ describe("deleteArtist", () => {
     expect(redirect).toHaveBeenCalledWith("/admin/artists");
   });
 
-  it("maps 23503 to the credit message with live counts", async () => {
+  it("maps CONFLICT to the credit message with live counts", async () => {
     removeArtist.mockRejectedValue(new DomainError("CONFLICT", "That item is still in use."));
     expect((await deleteArtist(A)).error).toBe(
       "This artist is credited on 2 tracks / 1 album. Remove those credits first.",
@@ -154,13 +156,21 @@ describe("deleteArtist", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it("maps P0002, 42501 and unknown errors", async () => {
+  it("maps NOT_FOUND, FORBIDDEN and unknown errors", async () => {
     removeArtist.mockRejectedValue(new DomainError("NOT_FOUND", "Artist not found."));
     expect((await deleteArtist(A)).error).toBe("That artist no longer exists.");
     removeArtist.mockRejectedValue(new DomainError("FORBIDDEN", "Only label members can delete artists."));
     expect((await deleteArtist(A)).error).toBe("Only label members can do this.");
     removeArtist.mockRejectedValue(new DatabaseError("XX000", undefined));
     expect((await deleteArtist(A)).error).toBe("Couldn't delete. Try again.");
+  });
+
+  it("returns the generic message when getViewer throws, without deleting", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    getViewer.mockRejectedValue(new DomainError("UNAUTHENTICATED", "Not signed in."));
+    expect((await deleteArtist(A)).error).toBe("Couldn't delete. Try again.");
+    expect(removeArtist).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
 

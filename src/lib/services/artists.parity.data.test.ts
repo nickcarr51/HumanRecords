@@ -54,14 +54,16 @@ async function creditOnTrack(artistId: string) {
   const { data, error } = await admin.from("tracks").insert({ title: "RMA track", audio_url: "tracks/x.mp3" }).select("id").single();
   if (error) throw error;
   trackIds.push(data.id);
-  await admin.from("track_artists").insert({ track_id: data.id, artist_id: artistId, position: 1 });
+  const credit = await admin.from("track_artists").insert({ track_id: data.id, artist_id: artistId, position: 1 });
+  if (credit.error) throw credit.error;
 }
 
 async function creditOnAlbum(artistId: string) {
   const { data, error } = await admin.from("albums").insert({ title: "RMA album" }).select("id").single();
   if (error) throw error;
   albumIds.push(data.id);
-  await admin.from("album_artists").insert({ album_id: data.id, artist_id: artistId, position: 1 });
+  const credit = await admin.from("album_artists").insert({ album_id: data.id, artist_id: artistId, position: 1 });
+  if (credit.error) throw credit.error;
 }
 
 async function exists(id: string): Promise<boolean> {
@@ -131,6 +133,7 @@ describe("removeArtist vs admin_delete_artist", () => {
     expect((await viaFunction(role, old)).error?.code).toBe("42501");
     await expect(viaService(role, next)).rejects.toMatchObject({ name: "DomainError", code: "FORBIDDEN" });
     expect([await exists(old), await exists(next)]).toEqual([true, true]);
+    expect(await queued(old)).toEqual([]);
     expect(await queued(next)).toEqual([]);
   });
 });

@@ -102,7 +102,7 @@ Each admin list call makes two transactions: `getViewer` (through `asUser`) and 
 (through `asSystem`). The owner kept this.
 
 `changeUserRole(viewer, target, role)` (`src/lib/services/users.ts`, action `users.setRole`)
-replaced the `admin_set_user_role` SQL function: after `authorize`, the caller's own id →
+replaced the `admin_set_user_role` SQL function: after `authorize`, the caller's own id (compared case-insensitively, as Postgres compares uuids) →
 `DomainError("INVALID", "You can't change your own role.")`; then `update users set role` where
 `id = target`, and no row changed → `NOT_FOUND`. It updates `public.users.role` only, never
 `app_metadata`. Caller: `setUserRole` (`src/lib/admin/users-actions.ts`, [[invites]]).
@@ -115,7 +115,8 @@ credited on a track or album makes Postgres refuse the delete with `23503`, whic
 turns into `CONFLICT`; then nothing changes and nothing is queued. Caller: `deleteArtist`
 (`src/lib/admin/artists-actions.ts`, [[admin-upload]]).
 
-Both callers keep their `activeLabelMemberId()` check first, get the Viewer with
+Both callers keep their `activeLabelMemberId()` check first (`setUserRole` calls it through its
+`labelMemberId` alias, `deleteArtist` through its `isLabelMember()` helper), get the Viewer with
 `getViewer(await createClient())`, and turn each `DomainError` code into the same message the SQL
 function's error code gave. The role check runs in its own transaction (`getViewer`) just before
 the write's transaction, not inside it as in the SQL functions (owner-accepted).

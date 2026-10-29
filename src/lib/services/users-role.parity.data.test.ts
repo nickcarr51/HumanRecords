@@ -26,11 +26,13 @@ async function roleOf(id: string) {
 
 describe("changeUserRole vs admin_set_user_role", () => {
   it("changes another user's role", async () => {
-    const client = await (await user("label_member")).signIn();
+    const caller = await user("label_member");
+    const client = await caller.signIn();
     const [old, next] = [await user("listener"), await user("listener")];
     expect((await client.rpc("admin_set_user_role", { target: old.id, new_role: "artist" })).error).toBeNull();
     await changeUserRole(await getViewer(client), next.id, "artist");
     expect([await roleOf(old.id), await roleOf(next.id)]).toEqual(["artist", "artist"]);
+    expect(await roleOf(caller.id)).toBe("label_member");
   });
 
   it("refuses your own role and leaves it", async () => {

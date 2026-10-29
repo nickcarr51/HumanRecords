@@ -8,7 +8,7 @@
 | `src/lib/invites/store.data.test.ts` | Claim, restore, regenerate against real rows; concurrent claims yield exactly one winner. |
 | `src/lib/supabase/users.test.ts` | `users.name`, hidden `role` column. |
 | `src/lib/services/users.parity.data.test.ts` | `listUsers` returns the same rows as `admin_list_users`, byte for byte, newest first; a listener gets `FORBIDDEN`. |
-| `src/lib/services/users-role.parity.data.test.ts` | `changeUserRole` gives the same result as `admin_set_user_role`: another user's role changes; your own role refused (`INVALID` / `22023`) and kept; unknown user `NOT_FOUND` / `P0002`; listener and artist refused (`FORBIDDEN` / `42501`) and the target kept. |
+| `src/lib/services/users-role.parity.data.test.ts` | `changeUserRole` gives the same result as `admin_set_user_role`: another user's role changes; your own role refused (`INVALID` / `22023`) and kept, also with your own id in uppercase; unknown user `NOT_FOUND` / `P0002`; listener and artist refused (`FORBIDDEN` / `42501`) and the target kept. |
 | `src/lib/services/users-row-cap.data.test.ts` | `listUsers` stops at `MAX_ROWS` (lowered to 1 in the test). |
 | `src/lib/services/viewer.data.test.ts`, `policy.data.test.ts` | `getViewer` reads the role from the database; `authorize("users.list")` grants label members only and refuses a copied Viewer. |
 | `src/lib/admin/artists-links.data.test.ts` | the same user list through `getAdminArtist` / `loadLinkTargets`, nothing mocked. |

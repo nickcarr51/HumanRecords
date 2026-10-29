@@ -7,8 +7,8 @@ import { MAX_ROWS } from "@/lib/db/max-rows";
 import { asSystem } from "@/lib/db/system";
 import { pgrstTs } from "@/lib/db/timestamps";
 import type { UserRole } from "@/lib/auth/role";
-import { authorize } from "./policy";
 import { DomainError } from "./errors";
+import { authorize } from "./policy";
 import type { Viewer } from "./viewer";
 
 // Every user with email + ban state (from auth.users) and invite state.
