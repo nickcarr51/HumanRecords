@@ -96,8 +96,9 @@ Callers: `listUsers`, `changeUserRole` and `removeArtist`, below.
 SQL function: `users` joined to `auth.users`, plus each user's `invites` row if there is one,
 newest first, at most `MAX_ROWS`, returning `UserRow[]` (`AdminListRow` in
 `src/lib/admin/users.ts` is an alias). Its callers:
-`listAdminUsers` (which re-sorts A to Z by name) and `getAdminUser` (`src/lib/admin/users.ts`) and `linkedUsersFor`
-(`src/lib/admin/artists.ts`, used by `listAdminArtists`, `getAdminArtist`, `loadLinkTargets`).
+`listAdminUsers` (which re-sorts A to Z by name) and `getAdminUser` (`src/lib/admin/users.ts`)
+and `linkedUsersFor` (`src/lib/admin/artists.ts`, used by `listAdminArtists`, `getAdminArtist`,
+`loadLinkTargets`).
 Each admin list call makes two transactions: `getViewer` (through `asUser`) and `listUsers`
 (through `asSystem`). The owner kept this.
 
