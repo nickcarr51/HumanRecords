@@ -8,6 +8,7 @@ import { asSystem } from "@/lib/db/system";
 import { pgrstTs } from "@/lib/db/timestamps";
 import type { UserRole } from "@/lib/auth/role";
 import { authorize } from "./policy";
+import { DomainError } from "./errors";
 import type { Viewer } from "./viewer";
 
 // Every user with email + ban state (from auth.users) and invite state.
@@ -52,4 +53,18 @@ export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
       .orderBy(desc(users.createdAt))
       .limit(MAX_ROWS),
   );
+}
+
+// Changes another user's role. Replaces the admin_set_user_role() SQL
+// function: label members only; never your own role (INVALID); NOT_FOUND when
+// there's no such user. Uses asSystem because public.users has only a read
+// policy, so a signed-in user's update changes no rows. Like the SQL function,
+// it updates public.users only, not the auth account's app_metadata.
+export async function changeUserRole(viewer: Viewer, target: string, role: UserRole): Promise<void> {
+  const grant = authorize(viewer, "users.setRole");
+  if (target === viewer.userId) throw new DomainError("INVALID", "You can't change your own role.");
+  const changed = await asSystem(grant, "users.setRole", (tx) =>
+    tx.update(users).set({ role }).where(eq(users.id, target)).returning({ id: users.id }),
+  );
+  if (changed.length === 0) throw new DomainError("NOT_FOUND", "User not found.");
 }
