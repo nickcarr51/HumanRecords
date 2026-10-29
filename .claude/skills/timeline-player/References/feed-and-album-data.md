@@ -155,7 +155,7 @@ Both pages show which tracks the user already downloaded:
 
 - `ARTIST_NAMES` (`position` → `artist.name`), `TRACK_WITH` (the track columns plus
   `trackArtists`), `DbTrack` (what a `TRACK_WITH` read returns) and `toFeedTrack(t)` (takes a
-  `DbTrack` with or without `trackArtUrl`) — the Drizzle `columns`/`with` shapes `getFeed` uses.
+  `DbTrack`) — the Drizzle `columns`/`with` shapes `getFeed` uses.
   The feed's album tracks use `TRACK_WITH`, so they also fetch `trackArtUrl`, which the feed
   doesn't show for them.
 - `ArtistLink = { position?: number | null; artist: { name: string } | null }` — a Drizzle link

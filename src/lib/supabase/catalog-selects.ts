@@ -23,6 +23,6 @@ export type DbTrack = {
   trackArtists: ArtistLink[];
 };
 
-export function toFeedTrack(t: Omit<DbTrack, "trackArtUrl">): FeedTrack {
+export function toFeedTrack(t: DbTrack): FeedTrack {
   return { id: t.id, catalogNumber: t.catalogNumber, title: t.title, artistNames: artistNamesOf(t.trackArtists) };
 }

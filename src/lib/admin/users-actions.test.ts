@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
+const getViewer = vi.fn();
 const getUser = vi.fn();
 const createUserApi = vi.fn();
 const changeUserRole = vi.fn();
@@ -22,7 +23,7 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: () => getUser() } }) }));
-vi.mock("@/lib/services/viewer", () => ({ getViewer: async () => VIEWER }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: (...a: unknown[]) => getViewer(...a) }));
 vi.mock("@/lib/services/users", () => ({ changeUserRole: (...a: unknown[]) => changeUserRole(...a) }));
 vi.mock("@/lib/invites/store", () => ({ upsertInvite: (...a: unknown[]) => upsertInvite(...a) }));
 vi.mock("@/lib/invites/token", () => ({ generateInviteToken: () => "T".repeat(43) }));
@@ -35,6 +36,7 @@ const OTHER = "22222222-2222-2222-2222-222222222222";
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
+  getViewer.mockResolvedValue(VIEWER);
   getUser.mockResolvedValue({ data: { user: { id: ME } }, error: null });
   createUserApi.mockResolvedValue({ data: { user: { id: OTHER } }, error: null });
   upsertInvite.mockResolvedValue(undefined);
@@ -145,6 +147,17 @@ describe("setUserRole", () => {
   it("refuses your own id without calling the database", async () => {
     expect((await setUserRole(ME, "listener")).error).toBe("You can't change your own role.");
     expect(changeUserRole).not.toHaveBeenCalled();
+  });
+
+  it("returns the generic message when getViewer throws, without changing the role", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      getViewer.mockRejectedValue(new DomainError("UNAUTHENTICATED", "Not signed in."));
+      expect(await setUserRole(OTHER, "artist")).toEqual({ error: "Couldn't save the role. Try again." });
+      expect(changeUserRole).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("rejects an unknown role", async () => {
