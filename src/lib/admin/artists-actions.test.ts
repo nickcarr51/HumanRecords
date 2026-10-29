@@ -167,10 +167,13 @@ describe("deleteArtist", () => {
 
   it("returns the generic message when getViewer throws, without deleting", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    getViewer.mockRejectedValue(new DomainError("UNAUTHENTICATED", "Not signed in."));
-    expect((await deleteArtist(A)).error).toBe("Couldn't delete. Try again.");
-    expect(removeArtist).not.toHaveBeenCalled();
-    spy.mockRestore();
+    try {
+      getViewer.mockRejectedValue(new DomainError("UNAUTHENTICATED", "Not signed in."));
+      expect((await deleteArtist(A)).error).toBe("Couldn't delete. Try again.");
+      expect(removeArtist).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

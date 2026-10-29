@@ -62,7 +62,9 @@ export async function listUsers(viewer: Viewer): Promise<UserRow[]> {
 // it updates public.users only, not the auth account's app_metadata.
 export async function changeUserRole(viewer: Viewer, target: string, role: UserRole): Promise<void> {
   const grant = authorize(viewer, "users.setRole");
-  if (target.toLowerCase() === viewer.userId.toLowerCase()) throw new DomainError("INVALID", "You can't change your own role.");
+  if (target.toLowerCase() === viewer.userId.toLowerCase()) {
+    throw new DomainError("INVALID", "You can't change your own role.");
+  }
   const changed = await asSystem(grant, "users.setRole", (tx) =>
     tx.update(users).set({ role }).where(eq(users.id, target)).returning({ id: users.id }),
   );
