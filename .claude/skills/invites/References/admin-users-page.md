@@ -9,7 +9,9 @@ Drizzle's `asUser`), then `listUsers(viewer)` (`src/lib/services/users.ts`): `au
 "users.list")` lets only label members through, and the query then runs with `asSystem` (admin
 access, RLS skipped), because `auth.users` and `invites` aren't readable under RLS
 ([[db-access]]). Two transactions per load. The role check for the list is therefore in our code,
-not in Postgres. A load failure renders an `Alert` (a missing
+not in Postgres. The page shows users A to Z by name (no name last, ties by email), sorted in
+`listAdminUsers` (`byNameThenEmail`) so saving a row never moves it; `listUsers` itself stays
+newest first, like `admin_list_users`. A load failure renders an `Alert` (a missing
 `SITE_URL` gets its own message). `/admin` has a **Users** `ActionCard` linking here.
 
 ## Actions (`src/lib/admin/users-actions.ts`, `"use server"`)
