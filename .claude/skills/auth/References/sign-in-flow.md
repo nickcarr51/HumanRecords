@@ -6,7 +6,8 @@
    `admin.createUser`/`inviteUserByEmail` with `app_metadata: { role }, user_metadata: { name }`.
    The `handle_new_user` trigger creates the `public.users` row ([[catalog-schema]]). A
    dashboard invite sends the **invite** email (link to `/auth/confirm?…&type=invite`);
-   `scripts/invite-users.mts` sends nothing — the user just signs in.
+   `/admin/users` (`createUser`, [[invites]]) sends nothing — the user opens their invite link or
+   just signs in.
 2. **Request a code.** `/login` email step → `requestOtp(email)` → Supabase sends the
    **magic_link** email containing both a 6-digit code and a link.
 3. **Either** type the code → `submitOtp(email, code, next)` → `verifyOtp({ type: 'email' })`

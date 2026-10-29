@@ -7,6 +7,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { DomainError } from "@/lib/services/errors";
+import { changeUserRole } from "@/lib/services/users";
+import { getViewer } from "@/lib/services/viewer";
 import { upsertInvite } from "@/lib/invites/store";
 import { generateInviteToken } from "@/lib/invites/token";
 import { activeLabelMemberId } from "./caller";
@@ -87,14 +90,16 @@ export async function setUserRole(userId: string, role: UserRole): Promise<Actio
   if (typeof userId !== "string" || !UUID_RE.test(userId)) return { error: "Unknown user." };
   if (userId === caller) return { error: "You can't change your own role." };
 
-  // Cookie client: admin_set_user_role re-checks both rules in Postgres.
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_set_user_role", { target: userId, new_role: role });
-  if (error) {
-    if (error.code === "42501") return { error: FORBIDDEN };
-    if (error.code === "22023") return { error: "You can't change your own role." };
-    if (error.code === "P0002") return { error: "That user no longer exists." };
-    console.error("admin_set_user_role failed", error);
+  // Cookie client: it identifies the caller, and changeUserRole re-checks
+  // both rules (label member, not your own role) before writing.
+  try {
+    await changeUserRole(await getViewer(await createClient()), userId, role);
+  } catch (err) {
+    const code = err instanceof DomainError ? err.code : undefined;
+    if (code === "FORBIDDEN") return { error: FORBIDDEN };
+    if (code === "INVALID") return { error: "You can't change your own role." };
+    if (code === "NOT_FOUND") return { error: "That user no longer exists." };
+    console.error("Role change failed", err);
     return { error: "Couldn't save the role. Try again." };
   }
   revalidatePath("/admin/users");

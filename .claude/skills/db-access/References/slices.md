@@ -1,48 +1,60 @@
 # Reference: The rule and the slice map
 
-## The rule (owner's)
+## The rule (owner-confirmed 2026-10-28)
 
-- **One table → supabase-js.** **More than one table → Drizzle**, behind `asUser` or a service.
-- It applies to reads, writes and everything else. The work moves in slices, one PR into
-  `develop` each, so code that breaks the rule today is either "not moved yet" (listed below,
-  with its slice) or a bug.
+> A SQL function goes away. If the job is one simple read or write on one table, it uses
+> Supabase. If it needs several changes that must all succeed or all fail (a transaction), or
+> Supabase can't do it safely, it uses Drizzle. Reads that change nothing stay on Supabase, even
+> when they touch several tables.
 
-Design and history: `docs/superpowers/specs/2026-10-23-drizzle-services-slice1-design.md` and
-the plan next to it (gitignored, local).
+- Drizzle runs behind `asUser` or a service (`authorize` + `asSystem`).
+- Reads are never moved to Drizzle just to save a round trip.
+- It replaces slice 1's rule ("one table → supabase-js, more than one table → Drizzle", reads
+  included). Under it the feed (`getFeed`) stays on Drizzle: its search can't be done safely
+  through Supabase (a `*` in a search term is always a wildcard there, and a production artist has
+  `*` in their name). The admin user list (`listUsers`) stays on Drizzle: it reads emails from
+  `auth.users`, which a Supabase call made as a signed-in user can't read. The album page
+  (`getAlbum`) went back to one supabase-js read in slice 2.
+- The SQL functions move in slices, one PR into `develop` each.
+
+Design and history: `docs/superpowers/specs/2026-10-23-drizzle-services-slice1-design.md`,
+`docs/superpowers/specs/2026-10-28-drizzle-slice2-design.md` and the plans next to them
+(gitignored, local).
 
 ## Slice map (owner-decided)
 
-| Slice | SQL functions moved into TypeScript | supabase-js code moved to Drizzle |
+| Slice | SQL functions moved into TypeScript (Drizzle) | Other code |
 |---|---|---|
-| **1 (done)** | `search_feed`, `admin_list_users` | `getFeed`, `getAlbum` |
-| 2 | `admin_delete_artist`, `admin_set_user_role` (first writes) | `src/lib/admin/artists.ts` (`listAdminArtists`, `getAdminArtist`, `loadLinkTargets`, `getCreditCounts`); `src/lib/auth/invite.ts` (`getInviteGreeting`); the table parts of `createUser` and `updateUserProfile` (`src/lib/admin/users-actions.ts`; creating and editing the auth user stays on Supabase's Auth API); the table parts of `redeemInvite` (`src/lib/auth/actions.ts`; signing in stays on the Auth API); `scripts/invite-users.mts`; the unused `src/lib/supabase/artists.ts` |
-| 3 | `archive_track`, `restore_track`, `replace_track_audio` (+ `release_for_track`) | `getTrackDownloadUrl` (`src/lib/storage/actions.ts`) |
-| 4 | `archive_release`, `restore_release`, `move_release` | `getAdminReleases`, `getAdminRelease` (`src/lib/admin/releases.ts`) |
+| **1 (done)** | `search_feed`, `admin_list_users` | `getFeed` (Drizzle); `getAlbum` moved to Drizzle, then back to Supabase in slice 2 |
+| **2 (done)** | `admin_delete_artist` → `removeArtist`, `admin_set_user_role` → `changeUserRole` (the first writes) | `getAlbum` back to Supabase; the invite script deleted |
+| 3 | `archive_track`, `restore_track`, `replace_track_audio` (+ `release_for_track`) | — |
+| 4 | `archive_release`, `restore_release`, `move_release` | — |
 | 5 | `publish_release`, `update_release`, `add_album_track` (+ `resolve_artist_refs`) | — |
 
 Stay in SQL permanently: the triggers `handle_new_user`, `sync_user_role_from_app_metadata`,
 `keep_created_at`, `keep_catalog_number`, `releases_default_sort_at`, and `current_user_role`
 (RLS policies call it). `increment_play_count` touches one table and nothing calls it.
 
-## Not moved yet: many-table supabase-js code (as of 2026-10-25)
+Unused, kept in the database until a later cleanup migration drops them: `search_feed`,
+`admin_list_users`, `admin_delete_artist`, `admin_set_user_role` (the app no longer calls them;
+their data tests and the parity tests still call them directly). Migrations only add, and code
+deployed before slice 2 still calls the last two.
 
-| Code | What touches more than one table | Slice |
-|---|---|---|
-| `src/lib/admin/artists.ts` `ROW_SELECT` (`listAdminArtists`, `getAdminArtist`) | embeds `track_artists(count), album_artists(count)`; combined with `listUsers` (Drizzle) | 2 |
-| `src/lib/admin/artists.ts` `loadLinkTargets` | an `artists` query combined with `listUsers` | 2 |
-| `src/lib/admin/artists.ts` `getCreditCounts` | two one-table counts (`track_artists`, `album_artists`) combined | 2 |
-| `src/lib/auth/invite.ts` `getInviteGreeting` | `findUnusedInvite` (`invites`) then a `users` lookup | 2 |
-| `src/lib/admin/users-actions.ts` `createUser` | Auth API `createUser` (the trigger writes `users`), then `upsertInvite` (`invites`); not atomic | 2 (table parts) |
-| `src/lib/admin/users-actions.ts` `updateUserProfile` | Auth API update, then `users.update` | 2 (table parts) |
-| `src/lib/auth/actions.ts` `redeemInvite` | `claimInvite` (`invites`), then the Auth API (`getUserById`, `generateLink`, `verifyOtp`, which read `auth.users`), then `restoreInvite` (`invites`) if signing in fails; not atomic | 2 (table parts) |
-| `scripts/invite-users.mts` | Auth API list/create plus `users` select/update | 2 |
-| `src/lib/supabase/artists.ts` `getArtists`, `getArtist` (retired `/artists`, not live) | `track_artists(count)`; `track:tracks(… track_albums(albums(title)))` | 2 |
-| `src/lib/storage/actions.ts` `getTrackDownloadUrl` | `tracks` embedding `track_artists ( position, artists ( name ) )`, then an upsert into `downloads` (service client) | 3 |
-| `src/lib/admin/releases.ts` `getAdminReleases`, `getAdminRelease` | one embedded select over `releases`, `tracks`, `track_artists`, `artists`, `albums`, `album_artists`, `track_albums` | 4 |
+## Stays on Supabase (under the rule, not "not moved yet")
 
-Not on the list because they touch one table: `getReleaseFeedPage` (`releases` only;
-`getFeedAfterRelease` then calls the Drizzle `getFeed`), `getMyDownloadedTrackIds`
-(`downloads`), `getCurrentRole` (`current_user_role()`), the invite store functions
-(`invites`), `setPinned` (`releases`), and the artist create/update actions (`artists`). Every
-admin write in `release-actions.ts`, `actions.ts`, `artists-actions.ts` and `users-actions.ts`
-that calls `rpc(...)` is a SQL function in the slice map above.
+| Code | Why it stays |
+|---|---|
+| `src/lib/admin/artists.ts` `listAdminArtists`, `getAdminArtist`, `loadLinkTargets`, `getCreditCounts` | reads; their linked-user lists come from the Drizzle `listUsers` |
+| `src/lib/auth/invite.ts` `getInviteGreeting` | a read (`findUnusedInvite`, then a `users` lookup) |
+| `src/lib/admin/users-actions.ts` `createUser`, `updateUserProfile` | each database step is one table (the Auth API, then `invites` or `users`) |
+| `src/lib/auth/actions.ts` `redeemInvite` | each database step is one table (`invites`) or the Auth API |
+| `src/lib/storage/actions.ts` `getTrackDownloadUrl` | a read, then an upsert into one table (`downloads`) |
+| `src/lib/admin/releases.ts` `getAdminReleases`, `getAdminRelease` | reads |
+| `src/lib/supabase/albums.ts` `getAlbum` | a read ([[timeline-player]]) |
+| `src/lib/supabase/artists.ts` `getArtists`, `getArtist`, `escapeLike` (retired `/artists`, not live) | reads; the owner handles this file after all slices |
+
+Also one table: `getReleaseFeedPage` (`releases` only; `getFeedAfterRelease` then calls the
+Drizzle `getFeed`), `getMyDownloadedTrackIds` (`downloads`), `getCurrentRole`
+(`current_user_role()`), the invite store functions (`invites`), `setPinned` (`releases`), and the
+artist create/update actions (`artists`). Every admin write in `release-actions.ts` and
+`actions.ts` that calls `rpc(...)` is a SQL function in the slice map above.

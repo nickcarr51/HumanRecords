@@ -104,7 +104,8 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 
 ## How the read side uses it
 
-Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); details in
+The feed reads through Drizzle as the signed-in user (`asUser`, [[db-access]]); the album page
+is one supabase-js read. Details in
 [[timeline-player]] `References/feed-and-album-data.md`.
 
 - `getFeed` (`feed.ts`): `tx.query.releases.findMany` nesting `track` and `album` (with
@@ -113,13 +114,13 @@ Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); 
   `limit`/`offset`, and a `count()` with the same filter in the same transaction
   (`total`/`totalPages`, `hasMore = page < totalPages`). `toFeedItem` maps single → `kind:"track"`,
   album → `kind:"album"`; a release whose target is null is skipped.
-- `getAlbum` (`albums.ts`): `tx.query.albums.findFirst` (in `findAlbum`) with the same nested
-  rows, except that album tracks leave out `trackArtUrl` (`ALBUM_TRACK_WITH`); tracks ordered by
-  `track_albums.position`.
+- `getAlbum` (`albums.ts`): one supabase-js read of `albums` embedding `releases`,
+  `album_artists` and `track_albums` → `tracks` (back from Drizzle in slice 2), without
+  `track_art_url`; tracks ordered by `track_albums.position`.
 - `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS (PostgREST can't order an
   embed by a column of the link table in that select shape; the Drizzle reads reuse it).
-  `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the remaining supabase-js
-  embeds), so every artist list is in credit order.
+  `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the supabase-js embeds,
+  `getAlbum`'s included), so every artist list is in credit order.
 - **"Various Artists"**: `albumArtistLabel(names)` returns `"Various Artists"` when an album
   has no `album_artists` rows. Display-only (used by `AlbumRow` and the album page); nothing
   is stored.

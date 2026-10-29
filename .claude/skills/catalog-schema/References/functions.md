@@ -19,10 +19,10 @@ for new functions as long as `''` functions schema-qualify every reference.
   `sync_user_role_from_app_metadata()`: after update of `raw_app_meta_data`, only when
   `app_metadata.role` is non-null and changed. Needed because GoTrue's admin `createUser`
   applies `app_metadata` in a later UPDATE. Changing `app_metadata.role` via the admin API
-  therefore overrides `public.users.role`; `admin_set_user_role` doesn't touch `app_metadata`,
-  so it can go stale (nothing reads it after creation).
+  therefore overrides `public.users.role`; `changeUserRole` (like `admin_set_user_role`) doesn't
+  touch `app_metadata`, so it can go stale (nothing reads it after creation).
 - Fed by `admin.createUser` (`app_metadata: { role }`, `user_metadata: { name }`) from the
-  seed, `test-helpers`, `createUser` in `/admin/users`, and `scripts/invite-users.mts`.
+  seed, `test-helpers` and `createUser` in `/admin/users`.
 
 ## `admin_list_users()` → table
 
@@ -43,6 +43,10 @@ for new functions as long as `''` functions schema-qualify every reference.
 
 - Same migration and grants. Errors: `42501` not a label member; `22023` target is the caller;
   `P0002` no such user. Updates `public.users.role` only.
+- No app callers since Drizzle slice 2 (2026-10-28): `setUserRole` calls `changeUserRole` in
+  `services/users.ts` instead (same checks, `DomainError` codes in place of the SQLSTATEs,
+  [[db-access]]). Kept in the DB until a later cleanup migration drops it. The parity test
+  `users-role.parity.data.test.ts` and `invites.data.test.ts` still call it.
 
 ## `increment_play_count(p_track_id uuid)` → void
 
@@ -108,9 +112,13 @@ for new functions as long as `''` functions schema-qualify every reference.
   on a track or album (the `restrict` FKs from `20261010120400` — propagated unchanged, nothing deleted).
 - Deletes the row and, if it had a `profile_photo_url`, inserts that key into `r2_cleanup_queue`
   (`reason='archived'`, `source_table='artists'`, `source_id=target`) in the same transaction.
-- Caller: `/admin/artists` delete action ([[admin-upload]]). Create/edit use the `artists` RLS write
+- Former caller (before Drizzle slice 2, 2026-10-28): the `/admin/artists` delete action
+  ([[admin-upload]]), which now calls `removeArtist` in `services/artists.ts` (same delete and
+  queue row in one transaction, `DomainError` codes in place of the SQLSTATEs, [[db-access]]).
+  Kept in the DB until a later cleanup migration drops it. Create/edit use the `artists` RLS write
   policies instead (see `rls-model.md`).
-- Tests: `src/lib/supabase/artists-admin-writes.data.test.ts`.
+- Tests: `src/lib/supabase/artists-admin-writes.data.test.ts`; the parity test
+  `src/lib/services/artists.parity.data.test.ts` still calls it.
 
 ## `search_feed(q text)` → `setof releases`
 

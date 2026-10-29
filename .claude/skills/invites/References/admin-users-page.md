@@ -9,7 +9,9 @@ Drizzle's `asUser`), then `listUsers(viewer)` (`src/lib/services/users.ts`): `au
 "users.list")` lets only label members through, and the query then runs with `asSystem` (admin
 access, RLS skipped), because `auth.users` and `invites` aren't readable under RLS
 ([[db-access]]). Two transactions per load. The role check for the list is therefore in our code,
-not in Postgres. A load failure renders an `Alert` (a missing
+not in Postgres. The page shows users A to Z by name (no name last, ties by email), sorted in
+`listAdminUsers` (`byNameThenEmail`) so saving a row never moves it; `listUsers` itself stays
+newest first, like `admin_list_users`. A load failure renders an `Alert` (a missing
 `SITE_URL` gets its own message). `/admin` has a **Users** `ActionCard` linking here.
 
 ## Actions (`src/lib/admin/users-actions.ts`, `"use server"`)
@@ -27,8 +29,10 @@ and `revalidatePath('/admin/users')` on success.
   the table."
 - **`issueInvite(userId)`** — Create link, New link, and Regenerate. UUID-validated; upsert.
 - **`setUserRole(userId, role)`** — rejects the caller's own id ("You can't change your own
-  role."), then `rpc('admin_set_user_role')` on the cookie client. SQLSTATEs: `42501` →
-  forbidden, `22023` → own-role, `P0002` → "That user no longer exists."
+  role."), then `changeUserRole(await getViewer(cookie client), userId, role)`
+  (`src/lib/services/users.ts`, since Drizzle slice 2; it replaced `rpc('admin_set_user_role')`).
+  `DomainError` codes: `FORBIDDEN` → forbidden, `INVALID` → own-role, `NOT_FOUND` → "That user
+  no longer exists."; anything else is logged → "Couldn't save the role. Try again."
 
 ## SQL (migration `20261002120100`)
 
@@ -41,10 +45,15 @@ Both functions are `security definer`, `set search_path = public`, execute revok
   `banned_until` (added in `20261010120500`) is what `toAdminUserRow` turns into `deactivated` (a
   ban that hasn't expired yet).
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
-  `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only.
+  `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only. No app
+  callers since Drizzle slice 2: `changeUserRole` does the same (proved by
+  `users-role.parity.data.test.ts`). Both functions stay in the database until a later cleanup
+  migration drops them.
 
-So for `setUserRole`, the role and self-guard checks exist in the action **and** in Postgres. For
-the list, the role check is `authorize()` in the users service.
+So for `setUserRole`, the role and self-guard checks exist in the action **and** in the users
+service (`authorize(viewer, "users.setRole")`, then the own-id check against `viewer.userId`),
+which then updates with `asSystem`, `public.users.role` only. For the list, the role check is
+`authorize()` in the users service. Neither check is in Postgres any more.
 
 ## UI (`src/components/AdminUsers/`)
 

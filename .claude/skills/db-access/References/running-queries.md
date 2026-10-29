@@ -48,8 +48,9 @@ or timeouts into the next. Values are sent as query parameters, never pasted int
   `fromPgError` ([errors-and-health.md](errors-and-health.md)).
 - `db` is only passed by tests that check the connection is left clean.
 
-Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
-([[timeline-player]] `References/feed-and-album-data.md`), and `getViewer`.
+Callers: `getFeed` (with `searchMatches` from `feed-search.ts`; [[timeline-player]]
+`References/feed-and-album-data.md`) and `getViewer`. `getAlbum` went back to one supabase-js read
+in slice 2; it still calls `getClaims` first, so a signed-out caller gets `UNAUTHENTICATED`.
 
 ## Who is calling (`src/lib/services/viewer.ts`)
 
@@ -62,8 +63,9 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
   cast (`yarn typecheck` catches a hand-built object). It is read-only, and `getClaims` returns a
   frozen copy (`Object.freeze`), so no code can swap in another user's id afterwards.
 - `getViewer(supabase)` → `{ userId, role, claims }`. The role comes from the database
-  (`select public.current_user_role()` through `asUser`), not the token: `admin_set_user_role`
-  updates `public.users` but not `app_metadata`, so the token's copy can be stale. Unlike
+  (`select public.current_user_role()` through `asUser`), not the token: `changeUserRole` (like
+  the `admin_set_user_role` SQL function before it) updates `public.users` but not
+  `app_metadata`, so the token's copy can be stale. Unlike
   `getSessionUser()` ([[auth]]), it throws `UNAUTHENTICATED` when signed out instead of returning
   `null`. Every Viewer it returns is frozen (read-only type plus `Object.freeze`, so its role and
   user id can't be changed) and remembered in a private list (a `WeakSet`) that `isIssuedViewer`
@@ -74,8 +76,10 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
 - `authorize(viewer, action)` (`src/lib/services/policy.ts`) is the check:
   - it throws `DomainError("FORBIDDEN", "Not authorized.")` for a Viewer that `getViewer` didn't
     return (a hand-built or copied object);
-  - then applies the rule for `action` (`RULES`). Today there is one action, `users.list`, label
-    members only; anyone else gets `FORBIDDEN` "Only label members can list users.";
+  - then applies the rule for `action` (`RULES`). Today there are three actions, all label
+    members only; anyone else gets `FORBIDDEN` with the action's message: `users.list` "Only
+    label members can list users.", `users.setRole` "Only label members can change roles.",
+    `artists.delete` "Only label members can delete artists.";
   - on success it returns a frozen `Grant` (`Object.freeze`) and remembers it in a private list
     (a `WeakSet`) that `isIssuedGrant` checks.
     `Grant` also has a type-only marker, so a hand-built one fails typecheck.
@@ -86,16 +90,42 @@ Callers: `getFeed` (with `searchMatches` from `feed-search.ts`) and `getAlbum`
   sets only the timeouts. Errors go through `fromPgError`, as in `asUser`.
 - Only `src/lib/services/*` (and `src/lib/db`) may import it; lint enforces it.
 
-Caller: `listUsers(viewer)` (`src/lib/services/users.ts`), which replaced the `admin_list_users`
+Callers: `listUsers`, `changeUserRole` and `removeArtist`, below.
+
+`listUsers(viewer)` (`src/lib/services/users.ts`) replaced the `admin_list_users`
 SQL function: `users` joined to `auth.users`, plus each user's `invites` row if there is one,
 newest first, at most `MAX_ROWS`, returning `UserRow[]` (`AdminListRow` in
 `src/lib/admin/users.ts` is an alias). Its callers:
-`listAdminUsers` and `getAdminUser` (`src/lib/admin/users.ts`) and `linkedUsersFor`
-(`src/lib/admin/artists.ts`, used by `listAdminArtists`, `getAdminArtist`, `loadLinkTargets`).
+`listAdminUsers` (which re-sorts A to Z by name) and `getAdminUser` (`src/lib/admin/users.ts`)
+and `linkedUsersFor` (`src/lib/admin/artists.ts`, used by `listAdminArtists`, `getAdminArtist`,
+`loadLinkTargets`).
 Each admin list call makes two transactions: `getViewer` (through `asUser`) and `listUsers`
 (through `asSystem`). The owner kept this.
 
+`changeUserRole(viewer, target, role)` (`src/lib/services/users.ts`, action `users.setRole`)
+replaced the `admin_set_user_role` SQL function: after `authorize`, the caller's own id (compared case-insensitively, as Postgres compares uuids) →
+`DomainError("INVALID", "You can't change your own role.")`; then `update users set role` where
+`id = target`, and no row changed → `NOT_FOUND`. It updates `public.users.role` only, never
+`app_metadata`. Caller: `setUserRole` (`src/lib/admin/users-actions.ts`, [[invites]]).
+
+`removeArtist(viewer, id)` (`src/lib/services/artists.ts`, action `artists.delete`) replaced the
+`admin_delete_artist` SQL function. In one `asSystem` transaction it deletes the artist (returning
+the photo key); no row → `NOT_FOUND`; if the artist had a photo it inserts an `r2_cleanup_queue`
+row (`reason` `archived`, `source_table` `artists`, `source_id` the artist id). An artist still
+credited on a track or album makes Postgres refuse the delete with `23503`, which `fromPgError`
+turns into `CONFLICT`; then nothing changes and nothing is queued. Caller: `deleteArtist`
+(`src/lib/admin/artists-actions.ts`, [[admin-upload]]).
+
+Both callers keep their `activeLabelMemberId()` check first (`setUserRole` calls it through its
+`labelMemberId` alias, `deleteArtist` through its `isLabelMember()` helper), get the Viewer with
+`getViewer(await createClient())`, and turn each `DomainError` code into the same message the SQL
+function's error code gave. The role check runs in its own transaction (`getViewer`) just before
+the write's transaction, not inside it as in the SQL functions (owner-accepted).
+
 ## Adding a new read or service
+
+First check the rule ([slices.md](slices.md)): a read that changes nothing stays on supabase-js
+unless supabase-js can't do it safely (like the feed search).
 
 - **A user reading their own view** (feed-like): in the data function, `const claims = await
   getClaims(supabase)` then `asUser(claims, (tx) => tx.query.<table>.findMany({ ... }))`. Filter
@@ -116,7 +146,7 @@ Each admin list call makes two transactions: `getViewer` (through `asUser`) and 
   `trackAlbums.track` / `album`; `trackArtists.track` / `artist`; `albumArtists.album` /
   `artist`. Note the singular `artist` (PostgREST's embed says `artists`). Shared `columns`/`with`
   shapes for the catalog live in `src/lib/supabase/catalog-selects.ts` (`ARTIST_NAMES`,
-  `TRACK_WITH`, `ALBUM_TRACK_WITH`).
+  `TRACK_WITH`).
 - A nested read reads every column of a table it joins one-to-one (the generated SQL is
   `select * from "tracks"` inside). Revoking a column from `authenticated` would make such an
   `asUser` read fail with "permission denied"; change a grant only together with the matching
@@ -145,5 +175,7 @@ Each admin list call makes two transactions: `getViewer` (through `asUser`) and 
 
 - Requests through Supabase's API load the `safeupdate` extension, which refuses an `UPDATE` or
   `DELETE` with no `WHERE`. Drizzle connections don't, so a write must never rely on it.
+  `removeArtist` and `changeUserRole` are the pattern: every update and delete has a `.where(...)`,
+  and `.returning(...)` tells whether a row was hit (none → `NOT_FOUND`).
 - `fromPgError` already maps the codes the SQL functions raise, so a ported write reports errors
   the same way ([errors-and-health.md](errors-and-health.md)).

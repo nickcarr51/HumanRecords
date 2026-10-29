@@ -12,7 +12,9 @@
   not a superuser). `asUser` switches each transaction to `authenticated` with the caller's id, so
   everything below applies as it does for supabase-js. `asSystem` stays `postgres` (RLS skipped,
   `auth.users` readable) and runs only after `authorize()` in a service has checked the caller
-  (today only `listUsers`, which reads `users`, `auth.users` and `invites`).
+  (today `listUsers`, which reads `users`, `auth.users` and `invites`; `changeUserRole`, which
+  updates `users.role`; and `removeArtist`, which deletes from `artists` and inserts into
+  `r2_cleanup_queue`).
 
 ## Read policies
 
@@ -20,7 +22,7 @@
 |---|---|
 | `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
 | `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
-| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; only the service role, definer functions, or `asSystem` (no app code reads it that way yet) |
+| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; only the service role, definer functions, or `asSystem` (the app only inserts into it that way, in `removeArtist`; no app code reads it) |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
 
 Because label members can read archived rows, listener-facing code (`getFeed` and its search
@@ -62,14 +64,17 @@ The only write policies are on `artists`, for label members (`/admin/artists`):
 | `"label members insert artists"` | `with check (current_user_role() = 'label_member' and length(trim(name)) > 0)` |
 | `"label members update artists"` | `using (current_user_role() = 'label_member')`, `with check` adds `length(trim(name)) > 0` (blank name → `42501`) — every column is writable, including `user_id` (admins link accounts to artists on purpose) |
 
-No delete policy: deletes go through `admin_delete_artist`. No other table has an insert/update/delete
+No delete policy: deletes go through the `removeArtist` service (`authorize()` + `asSystem`,
+[[db-access]]; the `admin_delete_artist` SQL function it replaced still exists but the app no
+longer calls it). No other table has an insert/update/delete
 policy. Under RLS, a write that no policy allows
 is **silently a no-op** (zero rows, `error: null`) — tests assert the value is unchanged, not
 that the call errored (see `catalog.test.ts`).
 
 Sanctioned write paths (reads that RLS can't allow, like the admin user list, go through
-`authorize()` + `asSystem` in `listUsers`; the `search_feed` and `admin_list_users` SQL functions
-still exist but the app no longer calls them, see [functions.md](functions.md)):
+`authorize()` + `asSystem` in `listUsers`; the `search_feed`, `admin_list_users`,
+`admin_delete_artist` and `admin_set_user_role` SQL functions still exist but the app no longer
+calls them, and a later cleanup migration drops them, see [functions.md](functions.md)):
 
 | Write | Path | Gate |
 |---|---|---|
@@ -78,8 +83,8 @@ still exist but the app no longer calls them, see [functions.md](functions.md)):
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
 | Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
 | Create / edit an artist | cookie client `insert`/`update` on `artists` (RLS policies above) | `label_member`; insert by others → `42501`, update by others → 0 rows (no error). Duplicate name or `user_id` → `23505` (`artists_name_ci_key` / `artists_user_id_key`) |
-| Delete an artist | `rpc('admin_delete_artist')` (definer) | `label_member`, else `42501`; unknown id `P0002`; still credited → `23503` (FK restrict); queues `profile_photo_url` in `r2_cleanup_queue` |
-| Change a role | `admin_set_user_role` RPC (definer) | `label_member`, else `42501`; own id → `22023` |
+| Delete an artist | `removeArtist` service (`authorize(viewer, "artists.delete")` + `asSystem`, one transaction; replaced `rpc('admin_delete_artist')` in slice 2) | `label_member`, else `FORBIDDEN`; unknown id `NOT_FOUND`; still credited → `23503` (FK restrict) → `CONFLICT`, nothing changed; queues `profile_photo_url` in `r2_cleanup_queue` |
+| Change a role | `changeUserRole` service (`authorize(viewer, "users.setRole")` + `asSystem`; replaced the `admin_set_user_role` RPC in slice 2) | `label_member`, else `FORBIDDEN`; own id → `INVALID`; unknown user → `NOT_FOUND` |
 | Invite tokens | service-role client (`src/lib/invites/store.ts`); `invites` has no policies or grants | Server actions check role first |
 | Record a download | service-role `upsert` in `getTrackDownloadUrl` | Server action checks session first |
 | Test fixtures, scripts | service-role client | Never shipped to the browser |
@@ -87,8 +92,11 @@ still exist but the app no longer calls them, see [functions.md](functions.md)):
 
 ## Adding a new write path — checklist
 
-1. Prefer a `security definer` function with `set search_path = public` and a role/ownership
-   check at the top that `raise`s with an `errcode`.
+1. Prefer a Drizzle service (`authorize()` + `asSystem`, [[db-access]]) for a write that needs
+   a role check or several changes that must all succeed or all fail; SQL functions are being
+   moved out (slices 3-5). If you do add a SQL function, make it `security definer` with
+   `set search_path = public` and a role/ownership check at the top that `raise`s with an
+   `errcode`.
 2. `revoke execute … from public; revoke … from anon;` then `grant execute … to authenticated`.
    (Postgres grants `execute` to `public` by default on new functions — the revoke is required.)
 3. Internal helpers callable only from other functions: also revoke from `authenticated`

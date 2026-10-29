@@ -54,6 +54,7 @@ a different value; Regenerate after fixing it.
   `app_metadata.role` is non-null and changed): needed because GoTrue's admin `createUser`
   inserts `auth.users` first and applies `app_metadata` in a later UPDATE.
 - Consequence: changing `app_metadata.role` through the admin API **overrides**
-  `public.users.role`. `admin_set_user_role` changes `public.users.role` only, so
+  `public.users.role`. `changeUserRole` (like `admin_set_user_role` before it) changes
+  `public.users.role` only, so
   `app_metadata.role` can go stale. `public.users.role` is the truth; nothing reads
   `app_metadata.role` after creation.

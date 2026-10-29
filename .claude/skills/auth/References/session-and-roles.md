@@ -28,7 +28,8 @@ caller's supabase client (data functions receive it as their first argument), an
 reports an error it logs `Session check failed: <name> (status <status|none>)`, never the token.
 `getViewer` adds the role, read from the database (`select public.current_user_role()` through
 `asUser`), and returns `{ userId, role, claims }`. Callers: `getFeed`, `getAlbum` (`getClaims`),
-`listAdminUsers`, `getAdminUser` and the `/admin/artists` reads (`getViewer`).
+`listAdminUsers`, `getAdminUser`, the `/admin/artists` reads, `setUserRole` and `deleteArtist`
+(`getViewer`).
 
 ## App roles
 
@@ -51,8 +52,9 @@ every label-member page.
 At creation, from `app_metadata.role` via the `handle_new_user` trigger (default `listener`);
 `app_metadata` is admin-only. A second trigger applies it when it is set or changed.
 `public.users.role` is the truth afterwards. Label members change roles in `/admin/users`
-(`admin_set_user_role`; never their own) — see [[invites]]. That RPC doesn't update
-`app_metadata`, which can go stale.
+(`setUserRole` → the `changeUserRole` service, which replaced the `admin_set_user_role` RPC in
+Drizzle slice 2; never their own) — see [[invites]]. It doesn't update `app_metadata`, which can
+go stale.
 
 ### Role-trigger landmine — resolved (2026-10-02)
 
@@ -66,8 +68,7 @@ The trigger used to read role from user-writable `user_metadata`. It now reads o
 |---|---|
 | Any (admin UI) | `/admin/users` — [[invites]] |
 | Local | `supabase/seed.sql` (`seed_helpers.seed_user`) — see [[catalog-schema]] `References/local-workflow.md` |
-| Hosted develop | `node --env-file=.env.develop.local scripts/invite-users.mts --yes` — idempotent: creates missing users via `admin.createUser` (no email sent), fixes wrong roles, skips the rest. Refuses to run without `--yes`; prints the target URL first. |
-| Hosted production | By hand in the Supabase dashboard (decide deliberately; the script is meant for develop). |
+| Hosted production, first label member | By hand in the prod Supabase dashboard, once ([[release-ops]] `References/onboarding.md`) |
+| Hosted develop and production | `/admin/users` on that site: a label member creates the user, which creates the invite link; the link goes on an NFC card or is sent to the person — [[invites]] |
 
-The script's accounts come from gitignored `scripts/users.local.json` (copy
-`scripts/users.example.json`). Edit that file to add accounts.
+The old `scripts/invite-users.mts` script was deleted in Drizzle slice 2 (2026-10-28).

@@ -22,8 +22,9 @@ signed-in users on `/artists*` to `/feed` (`src/lib/auth/route-guard.ts`). Nothi
 disables it — the pages still compile, build, and pass tests. Reviving it means removing that
 rule (and its test), adding a nav link in `AppShell`, and fixing the gaps listed below. Parts
 of the slice are live elsewhere: `escapeLike` is used by the feed search and the admin artist
-searches, and `initials` / `ArtistCard` are shared. Its data functions read more than one table
-through supabase-js, so a revival moves them to Drizzle first (slice 2, [[db-access]]).
+searches, and `initials` / `ArtistCard` are shared. Its data functions are supabase-js reads
+across several tables, which the rule keeps on supabase-js (they change nothing); the owner
+handles `src/lib/supabase/artists.ts` after all Drizzle slices ([[db-access]]).
 
 ## Pieces
 
