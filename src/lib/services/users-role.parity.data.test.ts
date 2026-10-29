@@ -45,6 +45,19 @@ describe("changeUserRole vs admin_set_user_role", () => {
     expect(await roleOf(label.id)).toBe("label_member");
   });
 
+  it("refuses your own id written in uppercase and leaves the role", async () => {
+    const label = await user("label_member");
+    const client = await label.signIn();
+    const upper = label.id.toUpperCase();
+    const { error } = await client.rpc("admin_set_user_role", { target: upper, new_role: "listener" });
+    expect(error?.code).toBe("22023");
+    await expect(changeUserRole(await getViewer(client), upper, "listener")).rejects.toMatchObject({
+      name: "DomainError",
+      code: "INVALID",
+    });
+    expect(await roleOf(label.id)).toBe("label_member");
+  });
+
   it("reports an unknown user", async () => {
     const client = await (await user("label_member")).signIn();
     const missing = "00000000-0000-0000-0000-000000000000";
