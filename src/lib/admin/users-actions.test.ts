@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
 const getUser = vi.fn();
 const createUserApi = vi.fn();
-const rpc = vi.fn();
+const changeUserRole = vi.fn();
+const VIEWER = { userId: "11111111-1111-1111-1111-111111111111", role: "label_member" };
 const upsertInvite = vi.fn();
 const revalidatePath = vi.fn();
 
@@ -18,7 +20,9 @@ vi.mock("@/lib/supabase/service", () => ({
     from: () => ({ update: usersUpdate }),
   }),
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc, auth: { getUser: () => getUser() } }) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: () => getUser() } }) }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: async () => VIEWER }));
+vi.mock("@/lib/services/users", () => ({ changeUserRole: (...a: unknown[]) => changeUserRole(...a) }));
 vi.mock("@/lib/invites/store", () => ({ upsertInvite: (...a: unknown[]) => upsertInvite(...a) }));
 vi.mock("@/lib/invites/token", () => ({ generateInviteToken: () => "T".repeat(43) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
@@ -34,7 +38,7 @@ beforeEach(() => {
   getUser.mockResolvedValue({ data: { user: { id: ME } }, error: null });
   createUserApi.mockResolvedValue({ data: { user: { id: OTHER } }, error: null });
   upsertInvite.mockResolvedValue(undefined);
-  rpc.mockResolvedValue({ error: null });
+  changeUserRole.mockResolvedValue(undefined);
   getUserById.mockResolvedValue({ data: { user: { id: OTHER, email: "old@x.co" } }, error: null });
   updateUserById.mockResolvedValue({ data: { user: {} }, error: null });
   usersEq.mockResolvedValue({ error: null });
@@ -51,7 +55,7 @@ describe("banned caller", () => {
     expect((await setUserActive(OTHER, true)).error).toMatch(forbidden);
     expect(createUserApi).not.toHaveBeenCalled();
     expect(updateUserById).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(changeUserRole).not.toHaveBeenCalled();
   });
 });
 
@@ -140,24 +144,31 @@ describe("issueInvite", () => {
 describe("setUserRole", () => {
   it("refuses your own id without calling the database", async () => {
     expect((await setUserRole(ME, "listener")).error).toBe("You can't change your own role.");
-    expect(rpc).not.toHaveBeenCalled();
+    expect(changeUserRole).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown role", async () => {
     expect((await setUserRole(OTHER, "root" as never)).error).toBe("Pick a role.");
-    expect(rpc).not.toHaveBeenCalled();
+    expect(changeUserRole).not.toHaveBeenCalled();
   });
 
-  it("calls admin_set_user_role", async () => {
+  it("calls changeUserRole", async () => {
     expect((await setUserRole(OTHER, "artist")).error).toBeNull();
-    expect(rpc).toHaveBeenCalledWith("admin_set_user_role", { target: OTHER, new_role: "artist" });
+    expect(changeUserRole).toHaveBeenCalledWith(VIEWER, OTHER, "artist");
   });
 
   it("maps database errors", async () => {
-    rpc.mockResolvedValue({ error: { code: "P0002", message: "User not found." } });
+    changeUserRole.mockRejectedValue(new DomainError("NOT_FOUND", "User not found."));
     expect((await setUserRole(OTHER, "artist")).error).toBe("That user no longer exists.");
-    rpc.mockResolvedValue({ error: { code: "42501", message: "x" } });
+    changeUserRole.mockRejectedValue(new DomainError("FORBIDDEN", "Only label members can change roles."));
     expect((await setUserRole(OTHER, "artist")).error).toMatch(/label members/i);
+  });
+
+  it("maps the own-role refusal and unexpected failures", async () => {
+    changeUserRole.mockRejectedValue(new DomainError("INVALID", "You can't change your own role."));
+    expect((await setUserRole(OTHER, "artist")).error).toBe("You can't change your own role.");
+    changeUserRole.mockRejectedValue(new DatabaseError("XX000", undefined));
+    expect((await setUserRole(OTHER, "artist")).error).toBe("Couldn't save the role. Try again.");
   });
 });
 
