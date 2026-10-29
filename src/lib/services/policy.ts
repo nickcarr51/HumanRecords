@@ -1,7 +1,7 @@
 import { isIssuedViewer, type Viewer } from "./viewer";
 import { DomainError } from "./errors";
 
-export type Action = "users.list";
+export type Action = "users.list" | "users.setRole" | "artists.delete";
 
 // A type-only marker: no value carries it, so code outside authorize() can't
 // write a Grant without a cast (yarn typecheck catches that).
@@ -12,6 +12,8 @@ export type Grant = { readonly action: Action; readonly [grantOnly]: true };
 
 const RULES: Record<Action, { allow: (v: Viewer) => boolean; message: string }> = {
   "users.list": { allow: (v) => v.role === "label_member", message: "Only label members can list users." },
+  "users.setRole": { allow: (v) => v.role === "label_member", message: "Only label members can change roles." },
+  "artists.delete": { allow: (v) => v.role === "label_member", message: "Only label members can delete artists." },
 };
 
 const issued = new WeakSet<object>();
