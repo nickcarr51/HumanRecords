@@ -47,8 +47,8 @@ Both functions are `security definer`, `set search_path = public`, execute revok
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
   `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only. No app
   callers since Drizzle slice 2: `changeUserRole` does the same (proved by
-  `users-role.parity.data.test.ts`). Both functions stay in the database until a later cleanup
-  migration drops them.
+  `users-role.parity.data.test.ts`). Both functions stay in the database until slice 4's migration
+  drops them ([[db-access]] `References/slices.md`).
 
 So for `setUserRole`, the role and self-guard checks exist in the action **and** in the users
 service (`authorize(viewer, "users.setRole")`, then the own-id check against `viewer.userId`),

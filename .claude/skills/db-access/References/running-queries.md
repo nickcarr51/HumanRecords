@@ -76,10 +76,14 @@ in slice 2; it still calls `getClaims` first, so a signed-out caller gets `UNAUT
 - `authorize(viewer, action)` (`src/lib/services/policy.ts`) is the check:
   - it throws `DomainError("FORBIDDEN", "Not authorized.")` for a Viewer that `getViewer` didn't
     return (a hand-built or copied object);
-  - then applies the rule for `action` (`RULES`). Today there are three actions, all label
+  - then applies the rule for `action` (`RULES`). Today there are nine actions, all label
     members only; anyone else gets `FORBIDDEN` with the action's message: `users.list` "Only
     label members can list users.", `users.setRole` "Only label members can change roles.",
-    `artists.delete` "Only label members can delete artists.";
+    `artists.delete` "Only label members can delete artists.", `releases.archive` "Only label
+    members can archive releases.", `releases.restore` "Only label members can restore
+    releases.", `releases.move` "Only label members can reorder releases.", `tracks.archive`
+    "Only label members can remove tracks.", `tracks.restore` "Only label members can restore
+    tracks.", `tracks.replaceAudio` "Only label members can replace files.";
   - on success it returns a frozen `Grant` (`Object.freeze`) and remembers it in a private list
     (a `WeakSet`) that `isIssuedGrant` checks.
     `Grant` also has a type-only marker, so a hand-built one fails typecheck.
@@ -90,7 +94,7 @@ in slice 2; it still calls `getClaims` first, so a signed-out caller gets `UNAUT
   sets only the timeouts. Errors go through `fromPgError`, as in `asUser`.
 - Only `src/lib/services/*` (and `src/lib/db`) may import it; lint enforces it.
 
-Callers: `listUsers`, `changeUserRole` and `removeArtist`, below.
+Callers: `listUsers`, `changeUserRole`, `removeArtist` and the release services, below.
 
 `listUsers(viewer)` (`src/lib/services/users.ts`) replaced the `admin_list_users`
 SQL function: `users` joined to `auth.users`, plus each user's `invites` row if there is one,
@@ -121,6 +125,34 @@ Both callers keep their `activeLabelMemberId()` check first (`setUserRole` calls
 `getViewer(await createClient())`, and turn each `DomainError` code into the same message the SQL
 function's error code gave. The role check runs in its own transaction (`getViewer`) just before
 the write's transaction, not inside it as in the SQL functions (owner-accepted).
+
+The release services (`src/lib/services/releases.ts`, slice 3) replaced six SQL functions, with
+the same checks in the same order and the same messages:
+
+| Service | Action | Replaced |
+|---|---|---|
+| `archiveRelease(viewer, releaseId)` | `releases.archive` | `archive_release` |
+| `restoreRelease(viewer, releaseId)` | `releases.restore` | `restore_release` |
+| `archiveTrack(viewer, trackId)` | `tracks.archive` | `archive_track` |
+| `restoreTrack(viewer, trackId)` | `tracks.restore` | `restore_track` |
+| `replaceTrackAudio(viewer, trackId, audioKey)` | `tracks.replaceAudio` | `replace_track_audio` |
+| `moveRelease(viewer, releaseId, direction)` | `releases.move` | `move_release` |
+
+Each calls `authorize`, then runs one `asSystem` transaction (signed-in users can only read
+`releases` and `tracks`, and can't touch `r2_cleanup_queue`). Rows are locked with Drizzle's
+`.for("update")` in the SQL function's order: the release first (for a track, the release that
+owns it, which replaced the `release_for_track` helper), then the track, or the target then its
+neighbour. Timestamps are set with the transaction's `` sql`now()` `` and never pass
+through a JavaScript `Date`. `moveRelease` sends the SQL function's `sort_at` spreading statement
+unchanged through `` tx.execute(sql`...`) ``. Two deliberate differences from the SQL functions:
+restore finds its tracks by `tracks.archived_with_release`, and the shared-track checks are gone
+(the database keeps each track on one release). What each one does: [[content-lifecycle]].
+Callers: the six actions in `src/lib/admin/release-actions.ts` ([[admin-upload]]). Each keeps its
+`isLabelMember()` check and input checks first, then calls `runService`, which gets the Viewer with
+`getViewer(await createClient())` and maps `FORBIDDEN` to "Only label members can do
+this.", `INVALID` / `NOT_FOUND` to the error's own message, `RETRY` in `moveRelease` to "Couldn't
+reorder — try again", and anything else to a logged "Couldn't save — try again.". `finish()` stays
+for the actions still on SQL functions (`saveRelease`, `addAlbumTrack`) and for `setPinned`.
 
 ## Adding a new read or service
 
