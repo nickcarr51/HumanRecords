@@ -196,6 +196,40 @@ describe("restoreRelease vs restore_release", () => {
     expect(out[1]).toMatchObject({ releases: [["release", null]], tracks: [["t1", null, expect.any(String)], ["t2", "A", expect.any(String)], ["t3", null, expect.any(String)]] });
   });
 
+  it("the service clears archived_with_release on the tracks it restores", async () => {
+    const flags = async (ids: string[]) => {
+      const { data, error } = await admin.from("tracks").select("id, archived_with_release").in("id", ids);
+      if (error) throw error;
+      return ids.map((id) => data.find((r) => r.id === id)?.archived_with_release);
+    };
+    const via = await viaService(await clientFor("label_member"));
+    const tag = newTag("PAR");
+    tags.push(tag);
+    const a = await album(tag, 3);
+    await via.archiveTrack(a.trackIds[1]);
+    await via.archiveRelease(a.releaseId);
+    expect(await flags(a.trackIds)).toEqual([true, false, true]);
+    await via.restoreRelease(a.releaseId);
+    expect(await flags(a.trackIds)).toEqual([false, false, false]);
+  });
+
+  it("the service flags the last track removed from an album and clears it on restore", async () => {
+    const flags = async (ids: string[]) => {
+      const { data, error } = await admin.from("tracks").select("id, archived_with_release").in("id", ids);
+      if (error) throw error;
+      return ids.map((id) => data.find((r) => r.id === id)?.archived_with_release);
+    };
+    const via = await viaService(await clientFor("label_member"));
+    const tag2 = newTag("PAR");
+    tags.push(tag2);
+    const b = await album(tag2, 2);
+    await via.archiveTrack(b.trackIds[0]);
+    await via.archiveTrack(b.trackIds[1]);
+    expect(await flags(b.trackIds)).toEqual([false, true]);
+    await via.restoreRelease(b.releaseId);
+    expect(await flags(b.trackIds)).toEqual([false, false]);
+  });
+
   it("restores a single and drops its queue rows", async () => {
     await both("label_member", async (via, tag) => {
       const s = await single(tag, { art: true });
@@ -414,7 +448,7 @@ describe("moveRelease vs move_release", () => {
   // they decide the moves. Fixed ids make the two runs identical row for row.
   const id = (n: number, scenario: number) => `${String(scenario).padStart(8, "0")}-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
-  async function release(tag: string, ids: string, sortAt: string, pinned = false) {
+  async function release(tag: string, ids: string, sortAt: string, pinned = false, archived = false) {
     await admin.from("releases").delete().eq("id", ids);
     const { data: t, error } = await admin
       .from("tracks")
@@ -422,7 +456,7 @@ describe("moveRelease vs move_release", () => {
       .select("id")
       .single();
     if (error) throw error;
-    const { error: rErr } = await admin.from("releases").insert({ id: ids, kind: "single", track_id: t.id, sort_at: sortAt, pinned });
+    const { error: rErr } = await admin.from("releases").insert({ id: ids, kind: "single", track_id: t.id, sort_at: sortAt, pinned, archived_at: archived ? "2020-01-01T00:00:00Z" : null });
     if (rErr) throw rErr;
   }
 
@@ -432,7 +466,7 @@ describe("moveRelease vs move_release", () => {
     return Object.fromEntries(data.map((r) => [r.id, [r.sort_at, r.pinned]]));
   }
 
-  type Row = { at: string; pinned?: true };
+  type Row = { at: string; pinned?: true; archived?: true };
   const scenarios: Array<[string, number, Row[], Array<[number, string]>]> = [
     ["up and down one place", 2901, [{ at: "2901-03-01T00:00:00Z" }, { at: "2901-02-01T00:00:00Z" }, { at: "2901-01-01T00:00:00Z" }], [[2, "up"], [0, "down"]]],
     ["the neighbour has an identical sort_at", 2902, [{ at: "2902-01-01T00:00:00Z" }, { at: "2902-01-01T00:00:00Z" }], [[0, "up"], [1, "up"]]],
@@ -443,12 +477,13 @@ describe("moveRelease vs move_release", () => {
     ["well-separated releases (fast path)", 2907, [{ at: "2907-01-03T00:00:00Z" }, { at: "2907-01-02T00:00:00Z" }, { at: "2907-01-01T00:00:00Z" }], [[0, "down"]]],
     ["a tie next to a row already spaced apart", 2908, [{ at: "2908-01-02T00:00:00Z" }, { at: "2908-01-02T00:00:00Z" }, { at: "2907-06-01T00:00:00Z" }], [[1, "down"]]],
     ["the top of the unpinned group, under a pinned release", 2909, [{ at: "2000-01-01T00:00:00Z", pinned: true }, { at: "2909-01-01T00:00:00Z" }], [[1, "up"]]],
+    ["a tie inside the pinned group, next to an archived pinned release", 2910, [{ at: "2910-01-02T00:00:00Z", pinned: true }, { at: "2910-01-02T00:00:00Z", pinned: true }, { at: "2910-01-02T00:00:00Z", pinned: true, archived: true }, { at: "2910-01-01T00:00:00Z", pinned: true }], [[1, "down"], [0, "down"]]],
   ];
 
   it.each(scenarios)("same sort_at values after moves: %s", async (_name, scenario, fixture, moves) => {
     await both("label_member", async (via, tag) => {
       const ids = fixture.map((_, n) => id(n, scenario));
-      for (const [n, row] of fixture.entries()) await release(tag, ids[n], row.at, row.pinned ?? false);
+      for (const [n, row] of fixture.entries()) await release(tag, ids[n], row.at, row.pinned ?? false, row.archived ?? false);
       const errors: Err[] = [];
       for (const [n, direction] of moves) errors.push(await via.moveRelease(ids[n], direction));
       const after = await rows(ids);

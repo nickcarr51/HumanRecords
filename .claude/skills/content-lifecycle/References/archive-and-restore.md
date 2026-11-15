@@ -37,7 +37,7 @@ keys involved in `r2_cleanup_queue` with reason `archived` ([r2-cleanup-queue.md
 `false`. Example: album with tracks A, B, C. Monday: remove B. Tuesday: archive the album (A and C
 get the flag). Restore: A and C come back, B stays removed. Before slice 3, `restore_release`
 found these tracks by matching `archived_at` to the release's `archived_at` (one `now()` for the
-whole archive); the migration's backfill flagged exactly the tracks that match selected, and the
+whole archive); the migration's backfill flagged exactly the tracks the old timestamp match selected, and the
 old SQL function still works that way. Restore deletes the still-uncleaned `archived` queue rows
 for those sources (`cleaned_at is null`) so the job doesn't remove a live file. If a matching
 `archived` row is already `cleaned_at`, the file is gone from R2: both refuse with `INVALID`
@@ -47,6 +47,14 @@ for those sources (`cleaned_at is null`) so the job doesn't remove a live file. 
 album whose last track was removed brings that track back (it carries the flag). A track removed
 on its own keeps the flag `false`, and `restoreTrack` only runs while the album is live, so it
 never touches the flag. Archive/restore on something already in that state is a no-op.
+
+Deploy window: during the minutes between the migration and the new code going live, the old
+code still runs and never writes the flag. (a) A release archived by the old code gets no flag, so
+restoring it later brings back none of its tracks. (b) A release restored by the old code keeps its
+tracks' flags set to `true`; if old code then also removes one of those tracks on its own, a later
+restore of the album brings that track back. Either is fixed by restoring the affected tracks by
+hand, or by re-running the migration's backfill after setting `archived_with_release = false` on
+every track.
 `archiveTrack` locks the release, rejects singles, then locks the track and returns if it is already archived; only then does it refuse an archived album. So removing an album's last track twice (double-click) is a no-op the second time.
 `moveRelease` refuses archived releases ("Archived releases cannot be moved."), so restore before reordering.
 
