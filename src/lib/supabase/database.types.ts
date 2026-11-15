@@ -333,6 +333,7 @@ export type Database = {
       tracks: {
         Row: {
           archived_at: string | null
+          archived_with_release: boolean
           audio_url: string
           catalog_number: number
           created_at: string
@@ -343,6 +344,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          archived_with_release?: boolean
           audio_url: string
           catalog_number?: never
           created_at?: string
@@ -353,6 +355,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          archived_with_release?: boolean
           audio_url?: string
           catalog_number?: never
           created_at?: string
