@@ -116,7 +116,7 @@ The CORS rules are `infra/r2/cors.{local,dev,prod}.json` + `infra/r2/README.md`
 - [[db-access]] — `getFeed` runs through Drizzle's `asUser` (as the signed-in user, so those RLS
   policies apply); its errors come back as `DomainError` / `DatabaseError`. `getAlbum` is one
   supabase-js read (back from Drizzle in slice 2) after the same `getClaims` session check.
-- [[content-lifecycle]] — owns `archived_at`, `pinned`/`sort_at` and `move_release`, which decide what the feed shows and in what order.
+- [[content-lifecycle]] — owns `archived_at`, `pinned`/`sort_at` and the `moveRelease` service, which decide what the feed shows and in what order.
 - [[admin-upload]] — owns the `releases` table, `position` columns, and the publish path
   that creates what the feed shows.
 - [[media-storage]] also serves downloads: rows render `DownloadButton`, which calls `getTrackDownloadUrl`.

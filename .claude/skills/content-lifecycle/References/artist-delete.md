@@ -15,7 +15,7 @@ unchanged). `artists.user_id` stays `on delete set null`.
 - `/admin/artists/[id]` has a Danger zone (`DeleteArtist`) that calls `deleteArtist`, which calls
   the `removeArtist` service (`src/lib/services/artists.ts`, `authorize` + `asSystem`,
   [[db-access]]; it replaced the definer function `admin_delete_artist`, migration
-  `20261010130000`, in Drizzle slice 2; the function still exists until a cleanup migration drops
+  `20261010130000`, in Drizzle slice 2; the function still exists until slice 4's migration drops
   it). On `23503` (which reaches the action as `DomainError` `CONFLICT`) the UI shows
   `creditMessage` (still credited on N tracks / M albums; remove or reassign those credits
   first), and nothing is deleted or queued.

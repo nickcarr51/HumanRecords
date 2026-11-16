@@ -43,12 +43,13 @@ tests, future scripts) without a `releases` row does not appear on `/feed`.
 - `publish_release` is unchanged: it omits `sort_at` and the `releases_default_sort_at` trigger
   fills it from `created_at`, so a new release lands at the top of the unpinned group. Pin to stay
   above later uploads.
-- `move_release(target, direction)` (label members, definer) swaps `sort_at` with the neighbour in
-  the same pinned group. Details: [[content-lifecycle]] `References/ordering.md`.
+- The `moveRelease` service (label members, `src/lib/services/releases.ts`; was the
+  `move_release` SQL function until slice 3) swaps `sort_at` with the neighbour in the same pinned
+  group. Details: [[content-lifecycle]] `References/ordering.md`.
 - Archived releases are hidden from the feed and album page; label members still read the rows.
   Stream/download signing checks only `tracks.archived_at`, so archiving an album release alone
-  leaves its live tracks signable by id (known gap, now closed by `archive_release`, which
-  archives the album's live tracks with the same timestamp). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
+  leaves its live tracks signable by id (known gap, now closed by `archiveRelease`, which
+  archives the album's live tracks too and flags them `archived_with_release`). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
 - `catalog_number` (`20261011170000`): new rows in `albums` and `tracks` receive it automatically
   from a `generated always as identity` column (permanent, never reused; `keep_catalog_number`
   raises on any change). `publish_release`, `add_album_track` and the upload/publish code pass

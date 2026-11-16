@@ -32,14 +32,20 @@ check exists at four layers because each one alone has a hole.
      member is refused even while their access token is still valid. The upload and release actions don't do this yet. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
-   Every other admin SQL function the app calls re-checks the same way. The exceptions are the
-   Drizzle services, which check the role in our code (`authorize(viewer, action)`,
-   `src/lib/services/policy.ts`) and then run with RLS skipped (`asSystem`), so this layer doesn't
-   apply to them ([[db-access]]): the user list (`listUsers`, `users.list`, since slice 1), and
-   the role change (`changeUserRole`, `users.setRole`) and artist delete (`removeArtist`,
-   `artists.delete`), which replaced `admin_set_user_role` and `admin_delete_artist` in slice 2.
-   Those two SQL functions still exist (and re-check the role) until a cleanup migration drops
-   them, but the app no longer calls them. Even a direct PostgREST
+   The other admin SQL functions the app still calls (`update_release`, `add_album_track`)
+   re-check the same way. The exceptions are the Drizzle services, which check the role in our
+   code (`authorize(viewer, action)`, `src/lib/services/policy.ts`, on the Viewer whose role
+   `getViewer` read from the database) and then run with RLS skipped (`asSystem`), so this layer doesn't apply to them
+   ([[db-access]]): the user list (`listUsers`, `users.list`, since slice 1); the role change
+   (`changeUserRole`, `users.setRole`) and artist delete (`removeArtist`, `artists.delete`),
+   which replaced `admin_set_user_role` and `admin_delete_artist` in slice 2; and the release
+   services in slice 3 (`src/lib/services/releases.ts`): `archiveRelease` (`releases.archive`),
+   `restoreRelease` (`releases.restore`), `moveRelease` (`releases.move`), `archiveTrack`
+   (`tracks.archive`), `restoreTrack` (`tracks.restore`), `replaceTrackAudio`
+   (`tracks.replaceAudio`), which replaced `archive_release`, `restore_release`, `move_release`,
+   `archive_track`, `restore_track` and `replace_track_audio`. Those SQL functions still exist
+   (and re-check the role) until slice 4's migration drops them, but the app no longer calls
+   them. Even a direct PostgREST
    call (`/rest/v1/rpc/publish_release` with a listener's JWT) is refused. `releases` has no write
    policies, and `resolve_artist_refs` isn't executable through the API.
 

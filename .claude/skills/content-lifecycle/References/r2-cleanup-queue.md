@@ -21,21 +21,23 @@ Indexes: `(queued_at) where cleaned_at is null` (pending work) and `(source_tabl
 
 RLS on, **no policies**, all privileges revoked from `anon` and `authenticated`: only the service
 role, the security-definer functions, or Drizzle's `asSystem` (the `postgres` login skips RLS;
-[[db-access]]) can reach it, and no app code reads it through `asSystem` yet. Even label members
-can't read or write it through the user client. The security-definer functions (`archive_release`,
-`archive_track`, `replace_track_audio`) insert rows, the `removeArtist` service inserts one through
-`asSystem` when an artist with a photo is deleted, and the restore functions delete uncleaned ones
-([[catalog-schema]] `References/rls-model.md`).
+[[db-access]]) can reach it. Even label members can't read or write it through the user client.
+The release services (`archiveRelease`, `archiveTrack`, `replaceTrackAudio` in
+`src/lib/services/releases.ts`) insert rows through `asSystem`, `restoreRelease` and
+`restoreTrack` read and delete them there, and the `removeArtist` service inserts one when an
+artist with a photo is deleted. The old security-definer functions (`archive_release`,
+`archive_track`, `replace_track_audio`, the restore functions) do the same and stay in the
+database, unused by the app, until slice 4 ([[catalog-schema]] `References/rls-model.md`).
 
 ## When rows are written
 
-- **Archive** a release/track (`archive_release`, `archive_track`): queue the track audio and art keys and, for an album, its art key (`archived`). `archive_track` queues the album art only when it archives the last live track.
-- **Replace** an MP3 (`replace_track_audio`): queue the old key (`replaced`). Image replacement has no function yet. Replacing A→B then B→A leaves an uncleaned `replaced` row for A while A is live again; that is safe because the job only deletes keys no live row references.
+- **Archive** a release/track (`archiveRelease`, `archiveTrack`; were `archive_release`, `archive_track`): queue the track audio and art keys and, for an album, its art key (`archived`). `archiveTrack` queues the album art only when it archives the last live track.
+- **Replace** an MP3 (`replaceTrackAudio`; was `replace_track_audio`): queue the old key (`replaced`). Image replacement has no function yet. Replacing A→B then B→A leaves an uncleaned `replaced` row for A while A is live again; that is safe because the job only deletes keys no live row references.
 - **Hard-delete an uncredited artist** (`removeArtist`, same transaction as the delete): queue their `profile_photo_url` key with reason `archived` (the check constraint allows only `archived` / `replaced`, so there is no "deleted" reason).
 
 ## When rows are removed
 
-`restore_release` / `restore_track` delete the uncleaned `archived` rows for that `(source_table, source_id)`, and refuse (`22023`) if a matching `archived` row already has `cleaned_at` set. Rows are
+`restoreRelease` / `restoreTrack` (were `restore_release` / `restore_track`) delete the uncleaned `archived` rows for the tracks they bring back (and, for an album, its art), and refuse (`INVALID`; the SQL functions raised `22023`) if a matching `archived` row already has `cleaned_at` set. Rows are
 otherwise kept; `cleaned_at` marks them done.
 
 ## The future cleanup job (not built)

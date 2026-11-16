@@ -22,7 +22,7 @@
 |---|---|
 | `users`, `artists`, `albums`, `track_artists`, `album_artists`, `track_albums` | `authenticated … for select using (true)` |
 | `releases`, `tracks` | `"signed-in users read live …; label members read all"`: `using (archived_at is null or (select current_user_role()) = 'label_member')` |
-| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; only the service role, definer functions, or `asSystem` (the app only inserts into it that way, in `removeArtist`; no app code reads it) |
+| `r2_cleanup_queue` | none — RLS on, no policies, all privileges revoked from `anon`/`authenticated`; only the service role, definer functions, or `asSystem` (the app reaches it only that way: `removeArtist` and the archive/replace release services insert rows, `restoreRelease` / `restoreTrack` read and delete them) |
 | `downloads` | `"users can read their own downloads"`: `using (user_id = (select auth.uid()))` |
 
 Because label members can read archived rows, listener-facing code (`getFeed` and its search
@@ -73,15 +73,19 @@ that the call errored (see `catalog.test.ts`).
 
 Sanctioned write paths (reads that RLS can't allow, like the admin user list, go through
 `authorize()` + `asSystem` in `listUsers`; the `search_feed`, `admin_list_users`,
-`admin_delete_artist` and `admin_set_user_role` SQL functions still exist but the app no longer
-calls them, and a later cleanup migration drops them, see [functions.md](functions.md)):
+`admin_delete_artist`, `admin_set_user_role`, `archive_release`, `restore_release`,
+`archive_track`, `restore_track`, `replace_track_audio` and `move_release` SQL functions still
+exist but the app no longer calls them, and slice 4's migration drops them, see
+[functions.md](functions.md)):
 
 | Write | Path | Gate |
 |---|---|---|
 | New `users` row | `handle_new_user` trigger (definer) on `auth.users` insert | Supabase Auth (invite-only) |
 | Increment `play_count` | `rpc('increment_play_count')` (definer) | `authenticated` only; `public`/`anon` revoked |
 | Publish a release | `rpc('publish_release')` (definer) | `current_user_role() = 'label_member'`, else SQLSTATE 42501 |
-| Reorder the feed | `rpc('move_release')` (definer) | `label_member`, else `42501`; bad direction `22023`; unknown id `P0002`; archived `22023` |
+| Reorder the feed | `moveRelease` service (`authorize(viewer, "releases.move")` + `asSystem`; replaced `rpc('move_release')` in slice 3) | `label_member`, else `FORBIDDEN`; bad direction `INVALID`; unknown id `NOT_FOUND`; archived `INVALID` |
+| Archive / restore a release, remove / restore an album track, replace a track's MP3 | `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio` services (`authorize` with `releases.archive`, `releases.restore`, `tracks.archive`, `tracks.restore`, `tracks.replaceAudio`, then one `asSystem` transaction; replaced the SQL functions of the same names in slice 3) | `label_member`, else `FORBIDDEN`; rule violations `INVALID`, missing rows `NOT_FOUND`, with the SQL functions' messages; write `releases`, `tracks` and `r2_cleanup_queue` together ([[content-lifecycle]]) |
+| Edit a release, add an album track | `rpc('update_release')`, `rpc('add_album_track')` (definer) | `label_member`, else `42501`; rule violations `22023` ([functions.md](functions.md)) |
 | Create / edit an artist | cookie client `insert`/`update` on `artists` (RLS policies above) | `label_member`; insert by others → `42501`, update by others → 0 rows (no error). Duplicate name or `user_id` → `23505` (`artists_name_ci_key` / `artists_user_id_key`) |
 | Delete an artist | `removeArtist` service (`authorize(viewer, "artists.delete")` + `asSystem`, one transaction; replaced `rpc('admin_delete_artist')` in slice 2) | `label_member`, else `FORBIDDEN`; unknown id `NOT_FOUND`; still credited → `23503` (FK restrict) → `CONFLICT`, nothing changed; queues `profile_photo_url` in `r2_cleanup_queue` |
 | Change a role | `changeUserRole` service (`authorize(viewer, "users.setRole")` + `asSystem`; replaced the `admin_set_user_role` RPC in slice 2) | `label_member`, else `FORBIDDEN`; own id → `INVALID`; unknown user → `NOT_FOUND` |
@@ -94,7 +98,7 @@ calls them, and a later cleanup migration drops them, see [functions.md](functio
 
 1. Prefer a Drizzle service (`authorize()` + `asSystem`, [[db-access]]) for a write that needs
    a role check or several changes that must all succeed or all fail; SQL functions are being
-   moved out (slices 3-5). If you do add a SQL function, make it `security definer` with
+   moved out (the last ones in slice 4). If you do add a SQL function, make it `security definer` with
    `set search_path = public` and a role/ownership check at the top that `raise`s with an
    `errcode`.
 2. `revoke execute … from public; revoke … from anon;` then `grant execute … to authenticated`.

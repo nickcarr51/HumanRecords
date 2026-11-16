@@ -2,13 +2,18 @@
 
 // Release admin write path: pin, reorder, edit, archive/restore, replace,
 // add/remove album tracks. Every action re-checks the caller's role (server
-// actions can be invoked directly); the SQL functions check it again and do
-// each multi-table change in one transaction.
+// actions can be invoked directly). Reorder, archive/restore, remove/restore
+// track and replace go through the release services (src/lib/services/
+// releases.ts); edit and add-track through SQL functions. Both check the role
+// again and do each multi-table change in one transaction.
 
 import { revalidatePath } from "next/cache";
 import { getCurrentRole } from "@/lib/auth/role";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { DomainError } from "@/lib/services/errors";
+import * as releaseService from "@/lib/services/releases";
+import { getViewer, type Viewer } from "@/lib/services/viewer";
 import { headObject } from "@/lib/storage/sign";
 import type { Json } from "@/lib/supabase/database.types";
 import { AUDIO_KEY_RE, MAX_AUDIO_BYTES, MAX_TRACKS, UUID_RE } from "./rules";
@@ -47,6 +52,24 @@ function finish(error: DbError | null): AdminResult {
   return { error: FALLBACK };
 }
 
+// Runs a release service as the signed-in user and maps its error to the
+// message finish() gives for the same SQL function error. `retry` is shown for
+// a deadlock (RETRY) instead of the logged fallback.
+async function runService(call: (viewer: Viewer) => Promise<void>, retry?: string): Promise<AdminResult> {
+  try {
+    await call(await getViewer(await createClient()));
+  } catch (err) {
+    if (err instanceof DomainError) {
+      if (err.code === "FORBIDDEN") return { error: FORBIDDEN };
+      if (err.code === "INVALID" || err.code === "NOT_FOUND") return { error: err.message };
+      if (err.code === "RETRY" && retry) return { error: retry };
+    }
+    console.error("Release admin call failed", err);
+    return { error: FALLBACK };
+  }
+  return finish(null);
+}
+
 // releases has no user update policy, so pin/unpin goes through the service
 // client after the role check. Archived releases are left alone.
 export async function setPinned(releaseId: string, pinned: boolean): Promise<AdminResult> {
@@ -68,39 +91,35 @@ export async function moveRelease(releaseId: string, direction: MoveDirection): 
   if (!(await isLabelMember())) return { error: FORBIDDEN };
   if (!isUuid(releaseId) || (direction !== "up" && direction !== "down")) return { error: INVALID };
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("move_release", { target: releaseId, direction });
   // Two admins moving neighbours at once can deadlock; Postgres aborts one.
-  if (error?.code === "40P01") return { error: "Couldn't reorder — try again" };
-  return finish(error);
+  return runService(
+    (viewer) => releaseService.moveRelease(viewer, releaseId, direction),
+    "Couldn't reorder — try again",
+  );
 }
 
 export async function archiveRelease(releaseId: string): Promise<AdminResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
   if (!isUuid(releaseId)) return { error: INVALID };
-  const { error } = await (await createClient()).rpc("archive_release", { p_release_id: releaseId });
-  return finish(error);
+  return runService((viewer) => releaseService.archiveRelease(viewer, releaseId));
 }
 
 export async function restoreRelease(releaseId: string): Promise<AdminResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
   if (!isUuid(releaseId)) return { error: INVALID };
-  const { error } = await (await createClient()).rpc("restore_release", { p_release_id: releaseId });
-  return finish(error);
+  return runService((viewer) => releaseService.restoreRelease(viewer, releaseId));
 }
 
 export async function removeTrack(trackId: string): Promise<AdminResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
   if (!isUuid(trackId)) return { error: INVALID };
-  const { error } = await (await createClient()).rpc("archive_track", { p_track_id: trackId });
-  return finish(error);
+  return runService((viewer) => releaseService.archiveTrack(viewer, trackId));
 }
 
 export async function restoreTrack(trackId: string): Promise<AdminResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
   if (!isUuid(trackId)) return { error: INVALID };
-  const { error } = await (await createClient()).rpc("restore_track", { p_track_id: trackId });
-  return finish(error);
+  return runService((viewer) => releaseService.restoreTrack(viewer, trackId));
 }
 
 // Each ref must be an object with a UUID `id` OR a non-blank string `newName`.
@@ -173,9 +192,5 @@ export async function replaceTrackAudio(trackId: string, audioKey: string): Prom
   const problem = await verifyUpload(audioKey);
   if (problem) return { error: problem };
 
-  const { error } = await (await createClient()).rpc("replace_track_audio", {
-    p_track_id: trackId,
-    p_audio_key: audioKey,
-  });
-  return finish(error);
+  return runService((viewer) => releaseService.replaceTrackAudio(viewer, trackId, audioKey));
 }

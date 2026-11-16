@@ -1,7 +1,16 @@
 import { isIssuedViewer, type Viewer } from "./viewer";
 import { DomainError } from "./errors";
 
-export type Action = "users.list" | "users.setRole" | "artists.delete";
+export type Action =
+  | "users.list"
+  | "users.setRole"
+  | "artists.delete"
+  | "releases.archive"
+  | "releases.restore"
+  | "releases.move"
+  | "tracks.archive"
+  | "tracks.restore"
+  | "tracks.replaceAudio";
 
 // A type-only marker: no value carries it, so code outside authorize() can't
 // write a Grant without a cast (yarn typecheck catches that).
@@ -14,6 +23,12 @@ const RULES: Record<Action, { allow: (v: Viewer) => boolean; message: string }> 
   "users.list": { allow: (v) => v.role === "label_member", message: "Only label members can list users." },
   "users.setRole": { allow: (v) => v.role === "label_member", message: "Only label members can change roles." },
   "artists.delete": { allow: (v) => v.role === "label_member", message: "Only label members can delete artists." },
+  "releases.archive": { allow: (v) => v.role === "label_member", message: "Only label members can archive releases." },
+  "releases.restore": { allow: (v) => v.role === "label_member", message: "Only label members can restore releases." },
+  "releases.move": { allow: (v) => v.role === "label_member", message: "Only label members can reorder releases." },
+  "tracks.archive": { allow: (v) => v.role === "label_member", message: "Only label members can remove tracks." },
+  "tracks.restore": { allow: (v) => v.role === "label_member", message: "Only label members can restore tracks." },
+  "tracks.replaceAudio": { allow: (v) => v.role === "label_member", message: "Only label members can replace files." },
 };
 
 const issued = new WeakSet<object>();

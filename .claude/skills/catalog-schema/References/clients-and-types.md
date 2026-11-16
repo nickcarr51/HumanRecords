@@ -104,8 +104,11 @@ across several tables. Drizzle sits next to supabase-js, not instead of it. The 
     `current_user_role()`);
   - through `asSystem`: `listUsers` (`src/lib/services/users.ts`), called by `listAdminUsers` and
     `getAdminUser` (`src/lib/admin/users.ts`) and by `linkedUsersFor` (`src/lib/admin/artists.ts`);
-    `changeUserRole` (`src/lib/services/users.ts`), called by `setUserRole`; and `removeArtist`
-    (`src/lib/services/artists.ts`), called by `deleteArtist`.
+    `changeUserRole` (`src/lib/services/users.ts`), called by `setUserRole`; `removeArtist`
+    (`src/lib/services/artists.ts`), called by `deleteArtist`; and the release services
+    `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`,
+    `moveRelease` (`src/lib/services/releases.ts`), called by the release admin actions in
+    `src/lib/admin/release-actions.ts`.
   - The feed's query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`,
     `toFeedTrack`);
     the artist-name mapper `artistNamesOf` is in `artist-names.ts`.
