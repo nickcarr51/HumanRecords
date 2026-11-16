@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getClaims } from "@/lib/services/viewer";
 import type { Database } from "./database.types";
 import type { FeedTrack } from "./feed";
 import { byPosition, namesFrom, type ArtistNameRel } from "./artist-names";
@@ -22,6 +23,10 @@ export async function getAlbum(
   // A non-UUID id would make Postgres raise "invalid input syntax for type
   // uuid" and surface as a 500; treat a malformed id as simply not found.
   if (!UUID_RE.test(id)) return null;
+
+  // Signed out → UNAUTHENTICATED, as getFeed does. Without this check RLS
+  // would return no rows and the page would say "not found".
+  await getClaims(supabase);
 
   const { data, error } = await supabase
     .from("albums")

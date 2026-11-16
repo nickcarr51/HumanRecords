@@ -40,8 +40,8 @@ Pure function, evaluated in this order:
 `pathname === p || pathname.startsWith(p + "/")`, so `/feedback` is **not** protected by
 `/feed`.
 
-Public routes: `/`, `/login`, `/auth/confirm`, `/style-guide` (dev only), and any unmatched
-path (→ 404 page).
+Public routes: `/`, `/login`, `/auth/confirm`, `/style-guide` (dev only), `/api/health/db` (the
+database health check, [[db-access]]), and any unmatched path (→ 404 page).
 
 ## The `?next=` round trip
 

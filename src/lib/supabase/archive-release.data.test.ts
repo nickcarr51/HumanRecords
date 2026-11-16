@@ -5,15 +5,6 @@ import { admin, archivedAt, cleanup, makeAlbum, makeSingle, newTag, queueRows, s
 let tag = "";
 afterEach(() => cleanup(tag));
 
-async function shareTrackOnSecondAlbum(tag: string, trackId: string) {
-  const { data: album, error } = await admin.from("albums").insert({ title: `${tag}-AlbumB` }).select("id").single();
-  if (error) throw error;
-  const { error: link } = await admin.from("track_albums").insert({ track_id: trackId, album_id: album.id, position: 1 });
-  if (link) throw link;
-  const { error: rel } = await admin.from("releases").insert({ kind: "album", album_id: album.id });
-  if (rel) throw rel;
-}
-
 describe("archive_release", () => {
   it("refuses non-label-members", async () => {
     tag = newTag("ARC");
@@ -117,15 +108,12 @@ describe("restore_release", () => {
     expect((await archivedAt("releases", [releaseId])).get(releaseId)).not.toBeNull();
   });
 
-  it("refuses to archive an album whose track is shared with another release", async () => {
+  it("can't share an album's track with a second album: the database refuses the link", async () => {
     tag = newTag("ARC");
-    const { releaseId, trackIds } = await makeAlbum(tag, 2);
-    await shareTrackOnSecondAlbum(tag, trackIds[0]);
-    const client = await signedIn();
-    const { error } = await client.rpc("archive_release", { p_release_id: releaseId });
-    expect([error?.code, error?.message]).toEqual(["22023", "A track on this release also belongs to another release."]);
-    expect((await archivedAt("releases", [releaseId])).get(releaseId)).toBeNull();
-    for (const v of (await archivedAt("tracks", trackIds)).values()) expect(v).toBeNull();
-    expect(await queueRows(tag)).toEqual([]);
+    const { trackIds } = await makeAlbum(tag, 2);
+    const { data: album, error } = await admin.from("albums").insert({ title: `${tag}-AlbumB` }).select("id").single();
+    if (error) throw error;
+    const { error: link } = await admin.from("track_albums").insert({ track_id: trackIds[0], album_id: album.id, position: 1 });
+    expect(link?.code).toBe("23505");
   });
 });

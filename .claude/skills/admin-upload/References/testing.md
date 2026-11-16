@@ -18,7 +18,10 @@ pinned first then `sort_at`, with tracks + credits in position order; tracks wit
 uncredited single → `artistNames: []`; pagination with `hasMore`; album tracks by position
 not title. The feed tests give `releases.created_at` values that **contradict** track
 creation order, so they'd fail if ordering came from `tracks.created_at`.
-`artist-names.test.ts` (unit): `byPosition`, `namesFrom`, `albumArtistLabel`.
+`artist-names.test.ts` (unit): `byPosition`, `namesFrom`, `albumArtistLabel`;
+`artist-names.drizzle.test.ts` (unit): `artistNamesOf`. Since the Drizzle move (slice 1) these
+reads also have `feed-drizzle.parity.data.test.ts`, `feed-row-cap.data.test.ts` and
+`albums.drizzle.data.test.ts` ([[timeline-player]] `References/testing.md`).
 `artists.data.test.ts` / `catalog-relations.test.ts` were only updated to pass `position`.
 
 **Access control** — `src/lib/auth/role.test.ts` (getCurrentRole: value, null on error, null
@@ -48,23 +51,20 @@ missing, upload failure, action errors, rejected calls, redirect rethrow, mismat
 targets), `UploadForm.test.tsx` (initial single, album fields, toggle confirm, empty publish
 errors, auto-title + wav error, Clear all, Cancel confirm, form locked while publishing).
 
-**Release admin** — `src/lib/admin/release-actions.test.ts` (role gate before any DB call, UUID/artist-ref/key validation, `headObject` before add/replace, RPC error mapping, revalidation), `src/lib/admin/releases.data.test.ts` (local Supabase: `getAdminReleases`/`getAdminRelease`), `src/lib/supabase/{archive-release,move-release,update-release}.data.test.ts` plus the Part 1 archive-track / add-track tests (the SQL functions), `src/components/AdminReleases/{edit-reducer.test.ts, upload-one.test.ts, ReleasesTable.test.tsx, ArchiveControl.test.tsx, EditReleaseForm.test.tsx, instant-actions.test.tsx}` (draft reducer and `draftKey`, dirty lock, instant actions, inline errors), `src/app/(app)/admin/releases/page.test.tsx` and `[id]/page.test.tsx` (each page gates itself).
+**Release admin** — `src/lib/admin/release-actions.test.ts` (role gate before any DB call, UUID/artist-ref/key validation, `headObject` before add/replace, service error mapping with `getViewer` and the release services mocked: `FORBIDDEN` / `INVALID` / `NOT_FOUND` / `RETRY` in `moveRelease` / anything else, and a throwing `getViewer`; RPC error mapping for `saveRelease` / `addAlbumTrack`; revalidation), `src/lib/admin/releases.data.test.ts` (local Supabase: `getAdminReleases`/`getAdminRelease`), `src/lib/supabase/{archive-release,move-release,update-release}.data.test.ts` plus the Part 1 archive-track / add-track tests (the SQL functions; the shared-track cases are now tests that the database refuses a shared link), `src/lib/services/releases.parity.data.test.ts` (each release service next to its SQL function, same errors and rows), `src/lib/supabase/track-one-place.data.test.ts` (one track in one place, the `archived_with_release` default), the six release rules in `src/lib/services/policy-writes.data.test.ts`, `src/components/AdminReleases/{edit-reducer.test.ts, upload-one.test.ts, ReleasesTable.test.tsx, ArchiveControl.test.tsx, EditReleaseForm.test.tsx, instant-actions.test.tsx}` (draft reducer and `draftKey`, dirty lock, instant actions, inline errors), `src/app/(app)/admin/releases/page.test.tsx` and `[id]/page.test.tsx` (each page gates itself).
 
 ## Running
 
 - Unit only (no DB; `src/lib/admin/releases.data.test.ts` needs local Supabase, so `src/lib/admin` is listed file by file): `yarn test --run src/components/Upload src/lib/admin/{actions,release-actions,rules,users,users-actions}.test.ts src/lib/auth src/lib/storage src/app src/components/AppShell`
-- DB tests: `yarn supabase start` first, then
-  `yarn test --run src/lib/supabase`
-  (`test-helpers.ts` refuses non-local URLs).
-- Everything: `yarn test --run`; also `yarn lint` and `yarn build`. (A pre-existing
-  `tsc --noEmit` error in `src/lib/auth/actions.test.ts` is not a build failure; Next's
-  build excludes tests.)
+- DB tests: `yarn supabase start` first, with the local `DATABASE_URL` in `.env.local`, then
+  `yarn test --run src/lib/supabase src/lib/db src/lib/services src/lib/admin`
+  (`test-helpers.ts` refuses a non-local `NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`).
+- Everything: `yarn test --run`; also `yarn lint` and `yarn build`.
 
 ## Deliberately not tested
 
 - Render tests for dashboard/page layout and styling (same scope as the timeline branch).
 - A real browser PUT to R2 and real OTP sign-in — covered by the manual smoke below.
-- `scripts/invite-users.mts` (run by hand; only the "ok" path was exercised locally).
 - Known gaps (deferred): `beforeunload`, the `inFlight` double-click ref, and rejected
   `runPublish` propagation in `UploadForm`; no test that `authenticated` can't insert into
   `releases`; no `toFeedItem` null-branch test.

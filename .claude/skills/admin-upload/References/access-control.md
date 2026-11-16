@@ -12,7 +12,9 @@ check exists at four layers because each one alone has a hole.
 2. **Layout + page gates → 404 bounce** — `requireLabelMember()` in `src/lib/auth/role.ts`
    calls `notFound()` unless the role is `label_member`. It is called first in
    `src/app/(app)/admin/layout.tsx` **and** at the top of every admin page
-   (`admin/page.tsx`, `admin/upload/page.tsx`, `admin/users/page.tsx`, `admin/releases/page.tsx`, `admin/releases/[id]/page.tsx`). The page call is required: on client-side
+   (all 9 under `src/app/(app)/admin/`: `page.tsx`, `upload/page.tsx`, `users/page.tsx`,
+   `users/[id]/page.tsx`, `releases/page.tsx`, `releases/[id]/page.tsx`, `artists/page.tsx`,
+   `artists/new/page.tsx`, `artists/[id]/page.tsx`). The page call is required: on client-side
    (RSC) navigation Next can render a child page without re-running its layout, so a
    layout-only gate is bypassable. `notFound()` renders `src/app/not-found.tsx`, which
    redirects signed-in users to `/feed` — a non-member sees the same thing as for any
@@ -30,9 +32,22 @@ check exists at four layers because each one alone has a hole.
      member is refused even while their access token is still valid. The upload and release actions don't do this yet. Server actions are public
    HTTP endpoints; no layout or page protects them.
 4. **Database** — `publish_release` checks `current_user_role()` itself and raises `42501`.
-   `admin_list_users` and `admin_set_user_role` re-check the same way. Even a direct PostgREST call (`/rest/v1/rpc/publish_release` with a listener's JWT) is
-   refused. `releases` has no write policies, and `resolve_artist_refs` isn't executable
-   through the API.
+   The other admin SQL functions the app still calls (`update_release`, `add_album_track`)
+   re-check the same way. The exceptions are the Drizzle services, which check the role in our
+   code (`authorize(viewer, action)`, `src/lib/services/policy.ts`, on the Viewer whose role
+   `getViewer` read from the database) and then run with RLS skipped (`asSystem`), so this layer doesn't apply to them
+   ([[db-access]]): the user list (`listUsers`, `users.list`, since slice 1); the role change
+   (`changeUserRole`, `users.setRole`) and artist delete (`removeArtist`, `artists.delete`),
+   which replaced `admin_set_user_role` and `admin_delete_artist` in slice 2; and the release
+   services in slice 3 (`src/lib/services/releases.ts`): `archiveRelease` (`releases.archive`),
+   `restoreRelease` (`releases.restore`), `moveRelease` (`releases.move`), `archiveTrack`
+   (`tracks.archive`), `restoreTrack` (`tracks.restore`), `replaceTrackAudio`
+   (`tracks.replaceAudio`), which replaced `archive_release`, `restore_release`, `move_release`,
+   `archive_track`, `restore_track` and `replace_track_audio`. Those SQL functions still exist
+   (and re-check the role) until slice 4's migration drops them, but the app no longer calls
+   them. Even a direct PostgREST
+   call (`/rest/v1/rpc/publish_release` with a listener's JWT) is refused. `releases` has no write
+   policies, and `resolve_artist_refs` isn't executable through the API.
 
 ## `current_user_role()` and `getCurrentRole()`
 
@@ -56,9 +71,9 @@ client navigation).
 
 ## Role assignment
 
-Roles are set from `app_metadata.role` at account creation (`/admin/users`, the seed's
-`seed_helpers.seed_user`, or `scripts/invite-users.mts` on hosted) and changed in `/admin/users`
-(`admin_set_user_role`, never your own). The role-trigger landmine is resolved: `user_metadata`
+Roles are set from `app_metadata.role` at account creation (`/admin/users`, or the seed's
+`seed_helpers.seed_user` locally) and changed in `/admin/users` (`setUserRole` → the
+`changeUserRole` service, never your own). The role-trigger landmine is resolved: `user_metadata`
 no longer sets roles. See [[invites]].
 
 ## Rollout pre-check

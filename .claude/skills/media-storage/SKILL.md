@@ -76,7 +76,7 @@ intended fix; the R2 free egress is the reason the architecture is presigned URL
 | Seed local bucket from `supabase/seed-media/` (refuses a `-dev`/`-prod` bucket) | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
 | CORS policy per bucket (GET/HEAD/PUT, exact origins) | `infra/r2/cors.{local,dev,prod}.json` + status table in `infra/r2/README.md`; applied by pasting into the Cloudflare dashboard, no CLI |
 | Env template | `.env.example` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`) |
-| Keys that may be deletable later | `r2_cleanup_queue` table (service-role only; see [[content-lifecycle]]) |
+| Keys that may be deletable later | `r2_cleanup_queue` table (only the service role, definer functions or `asSystem`; see [[content-lifecycle]]) |
 | Tests | `src/lib/storage/{config,sign,actions,filename}.test.ts`; `PlayerProvider.test.tsx` asserts `crossOrigin` is `anonymous` on desktop and absent on touch; `src/lib/peaks/*.test.ts`, `src/components/Player/peaks.test.tsx` |
 
 ## References
