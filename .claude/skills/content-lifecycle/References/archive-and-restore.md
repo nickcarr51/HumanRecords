@@ -55,6 +55,7 @@ tracks' flags set to `true`; if old code then also removes one of those tracks o
 restore of the album brings that track back. Either is fixed by restoring the affected tracks by
 hand, or by re-running the migration's backfill after setting `archived_with_release = false` on
 every track.
+
 `archiveTrack` locks the release, rejects singles, then locks the track and returns if it is already archived; only then does it refuse an archived album. So removing an album's last track twice (double-click) is a no-op the second time.
 `moveRelease` refuses archived releases ("Archived releases cannot be moved."), so restore before reordering.
 

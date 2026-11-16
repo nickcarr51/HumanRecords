@@ -255,12 +255,13 @@ describe("restoreRelease vs restore_release", () => {
   });
 
   it("refuses when the album art was already deleted from storage", async () => {
-    await both("label_member", async (via, tag) => {
+    const out = await both("label_member", async (via, tag) => {
       const a = await album(tag, 2, { albumArt: true });
       await via.archiveRelease(a.releaseId);
       await markCleaned(tag, "art/TAG-album.jpg");
       return [await via.restoreRelease(a.releaseId), await state(tag, a.labels)];
     });
+    expect(out[0]).toEqual({ code: "INVALID", message: "Some files for this release were already deleted from storage; it can't be restored." });
   });
 
   it("reports an unknown release", async () => {
