@@ -1,9 +1,10 @@
 # Reference: Artists data layer (`src/lib/supabase/artists.ts`)
 
 Follows the data-function convention: `SupabaseClient<Database>` is the first argument; the
-caller creates the client ([[catalog-schema]] `References/clients-and-types.md`). Both reads still
-use supabase-js embeds across tables; under the one-table rule they move to Drizzle (`asUser`) in
-slice 2 ([[db-access]] `References/slices.md`). Nothing live calls them today.
+caller creates the client ([[catalog-schema]] `References/clients-and-types.md`). Both reads use
+supabase-js embeds across tables; they change nothing, so under the rule they stay on supabase-js
+([[db-access]] `References/slices.md`). The owner handles this file after all Drizzle slices.
+Nothing live calls them today.
 
 ## Types
 

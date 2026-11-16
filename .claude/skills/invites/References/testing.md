@@ -8,6 +8,7 @@
 | `src/lib/invites/store.data.test.ts` | Claim, restore, regenerate against real rows; concurrent claims yield exactly one winner. |
 | `src/lib/supabase/users.test.ts` | `users.name`, hidden `role` column. |
 | `src/lib/services/users.parity.data.test.ts` | `listUsers` returns the same rows as `admin_list_users`, byte for byte, newest first; a listener gets `FORBIDDEN`. |
+| `src/lib/services/users-role.parity.data.test.ts` | `changeUserRole` gives the same result as `admin_set_user_role`: another user's role changes; your own role refused (`INVALID` / `22023`) and kept, also with your own id in uppercase; unknown user `NOT_FOUND` / `P0002`; listener and artist refused (`FORBIDDEN` / `42501`) and the target kept. |
 | `src/lib/services/users-row-cap.data.test.ts` | `listUsers` stops at `MAX_ROWS` (lowered to 1 in the test). |
 | `src/lib/services/viewer.data.test.ts`, `policy.data.test.ts` | `getViewer` reads the role from the database; `authorize("users.list")` grants label members only and refuses a copied Viewer. |
 | `src/lib/admin/artists-links.data.test.ts` | the same user list through `getAdminArtist` / `loadLinkTargets`, nothing mocked. |
@@ -19,7 +20,7 @@
 | `src/lib/invites/{token,url}.test.ts` | 43-char base64url unique tokens; URL encodes email, throws without `siteUrl`. |
 | `src/lib/auth/invite.test.ts` | `getInviteGreeting`: name, null for unknown/used/malformed/error. |
 | `src/lib/auth/redeem-invite.test.ts` | Claim miss → USED with no `generateLink`; success → `verifyOtp` on the cookie client + `/feed`; failure → restore + FAILED. |
-| `src/lib/admin/users-actions.test.ts`, `users.test.ts` | Role refusal, email/duplicate mapping, soft invite failure, own-role refusal; row mapping. `users.test.ts` mocks `getViewer` and `listUsers` and checks the Viewer from `getViewer` is the one passed to `listUsers`. |
+| `src/lib/admin/users-actions.test.ts`, `users.test.ts` | Role refusal, email/duplicate mapping, soft invite failure, own-role refusal; row mapping. `users-actions.test.ts` mocks `getViewer` and `changeUserRole`: `setUserRole` passes the Viewer, target and role, and maps `NOT_FOUND`, `FORBIDDEN`, `INVALID` and an unexpected error to the same messages as before, and returns the generic "Couldn't save the role" message, without calling `changeUserRole`, when `getViewer` throws. `users.test.ts` mocks `getViewer` and `listUsers`, checks the Viewer from `getViewer` is the one passed to `listUsers`, and checks `listAdminUsers` order: name A to Z ignoring case, no name last, ties by email, the same output for any input order. |
 | `src/lib/services/policy.test.ts` | A hand-built Viewer or Grant is refused. |
 | `src/components/Login/*.test.tsx`, `src/app/login/page.test.tsx` | Pre-fill, no auto-send; welcome vs form; Enter, error fallback. |
 | `src/components/AdminUsers/*.test.*`, `src/app/(app)/admin/users/page.test.tsx` | Three invite states, own-row select disabled, confirm before Regenerate, mailto, page gate. |

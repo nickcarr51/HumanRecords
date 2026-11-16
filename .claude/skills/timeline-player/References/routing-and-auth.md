@@ -65,7 +65,8 @@ intended.)
 
 `src/app/(app)/error.tsx` is a client error boundary (`'use client'`, default export taking
 `{ error, reset }`). If `getFeed`/`getAlbum` throw (a database error, which `asUser` turns into
-a `DatabaseError` or a `DomainError` such as `UNAUTHENTICATED` for a session that expired after
+a `DatabaseError`, `getAlbum`'s supabase-js error as returned, or a `DomainError` such as
+`UNAUTHENTICATED` for a session that expired after
 the middleware ran; not the empty case — empty is handled by `FeedList`'s "Nothing here yet."),
 it renders a friendly retry state instead of a 500.
 

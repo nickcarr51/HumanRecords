@@ -13,8 +13,10 @@ yet. This is noted here so future work doesn't contradict it.
 - yarn (not npm/pnpm)
 - styled-components only (no Tailwind, no CSS Modules) — SSR registry in
   `src/lib/registry.tsx`, wired into `src/app/layout.tsx`
-- Drizzle ORM over postgres.js (the `postgres` driver) for any read or write that touches more
-  than one table (`src/lib/db`, `src/lib/services`, `DATABASE_URL`); supabase-js for one table.
+- supabase-js for one simple read or write on one table, and for reads that change nothing, even
+  across several tables. Drizzle ORM over postgres.js (the `postgres` driver) for several changes
+  that must all succeed or all fail (a transaction), or a job supabase-js can't do safely
+  (`src/lib/db`, `src/lib/services`, `DATABASE_URL`). SQL functions move to Drizzle in phases.
   See the `db-access` skill.
 - Vitest + React Testing Library for tests, colocated as `*.test.tsx`
 - Node 22 (see `.nvmrc`)

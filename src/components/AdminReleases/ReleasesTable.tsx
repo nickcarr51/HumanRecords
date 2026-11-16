@@ -84,7 +84,7 @@ function ReleaseGroup({ name, rows, empty }: { name: string; rows: AdminReleaseR
 }
 
 // `releases` arrives in feed order; filtering keeps that order inside each
-// group, and edges are computed from live rows only (move_release skips archived).
+// group, and edges are computed from live rows only (moveRelease skips archived).
 export function ReleasesTable({ releases, showArchived }: { releases: AdminReleaseRow[]; showArchived: boolean }) {
   const pinned = releases.filter((r) => !r.archived && r.pinned);
   const feed = releases.filter((r) => !r.archived && !r.pinned);

@@ -31,7 +31,7 @@ async function insert(
   if (error) throw error;
 }
 
-describe("getAlbum (Drizzle)", () => {
+describe("getAlbum (data)", () => {
   it("orders tracks and artists by position, drops archived tracks", async () => {
     const tag = `ALBDZ${Date.now()}`;
     const al = await row("albums", { title: `${tag} LP` });

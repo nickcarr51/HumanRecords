@@ -81,9 +81,8 @@ timestamp is not newer than the base branch's newest.
 
 **Auth setting to keep OFF on every hosted project:** Dashboard → Authentication → "Allow new
 users to sign up" (the app is invite-only; role no longer reads `user_metadata`, see
-[functions.md](functions.md)). Hosted accounts come from `scripts/invite-users.mts` (develop)
-or the dashboard invite + `/admin/users` (production, see [[release-ops]]
-`References/onboarding.md`) — never from the seed.
+[functions.md](functions.md)). Hosted accounts, develop and production, come from `/admin/users`
+(see [[invites]] and [[release-ops]] `References/onboarding.md`) — never from the seed.
 
 The local CLI stays linked to the develop project, so `db push` and any `--linked` /
 `--db-url` / `--project-ref` command reach hosted data. `.claude/hooks/guard-db.sh` (wired in
@@ -95,9 +94,10 @@ on `drizzle-kit` with a hosted host, and on any command carrying a hosted databa
 ### Switched branches and the app or a test now fails with 42703?
 
 Symptom: `/feed` or `/albums/[id]` throws, or a `db` test fails, with Postgres error `42703`. The
-Drizzle reads (`getFeed`, `getAlbum`) report it as a `DatabaseError` ("Database query failed",
-`code: "42703"`; the SQL text is never kept, [[db-access]]). No app code reads `catalog_number`
-through supabase-js any more. The supabase-js test `catalog-numbers.data.test.ts` fails at its
+Drizzle read `getFeed` reports it as a `DatabaseError` ("Database query failed",
+`code: "42703"`; the SQL text is never kept, [[db-access]]); `getAlbum` (supabase-js since slice
+2) throws the supabase-js error with `code: "42703"`. The supabase-js test
+`catalog-numbers.data.test.ts` fails at its
 first `expect`; the select's own error (`column tracks.catalog_number does not exist`, or
 `albums.catalog_number` in the album test) isn't printed. Cause: the checked-out code selects
 `catalog_number` (added by `20261011170000`) but your local database hasn't run that migration
