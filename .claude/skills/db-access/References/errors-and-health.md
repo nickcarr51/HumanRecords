@@ -44,7 +44,17 @@ and rethrow every error through it:
 | any other code, or none on a Drizzle query error | `DatabaseError` | "Database query failed" |
 
 `42501`, `22023` and `P0002` are what our SQL functions raise; the slice 2+ writes inherit the
-mapping. Callers on the current read paths don't look at codes: the feed server actions show
+mapping. The slice 2 writes also throw `NOT_FOUND` and `INVALID` themselves, and their callers
+turn codes into the old messages: `deleteArtist` maps `CONFLICT` (a credited artist, `23503`) to
+the credit-count message, `NOT_FOUND` to "That artist no longer exists." and `FORBIDDEN` to "Only
+label members can do this."; `setUserRole` maps `FORBIDDEN`, `INVALID` ("You can't change your own
+role.") and `NOT_FOUND` ("That user no longer exists."); anything else is logged and shows
+"Couldn't delete. Try again." / "Couldn't save the role. Try again.". The slice 3 release
+services throw `INVALID` and `NOT_FOUND` with the SQL functions' own messages, and `runService`
+in `release-actions.ts` shows those messages as they are, `FORBIDDEN` as "Only label members can
+do this.", `RETRY` in `moveRelease` as "Couldn't reorder — try again", and anything else, logged,
+as "Couldn't save — try again.". Callers on the current read
+paths don't look at codes: the feed server actions show
 "Could not load more tracks.", `/admin/users` "Couldn't load users.", `/admin/artists` "Couldn't
 load artists.", and pages without a `try` reach the `(app)/error.tsx` boundary. Errors thrown while
 a page renders also go to Sentry (`onRequestError` in `src/instrumentation.ts`), which is why the
@@ -61,6 +71,8 @@ message must never hold SQL.
 | `UNAUTHENTICATED` "Sign in to continue." | No verified session (`getClaims`) | Expected for signed-out callers; the middleware usually redirects first |
 | `FORBIDDEN` "Not authorized." | A Viewer not from `getViewer`, a Grant not from `authorize`, or a Grant for another action | Pass the real objects through; use the matching `Action` |
 | `FORBIDDEN` "Only label members can list users." | The `users.list` rule refused the viewer | Expected for non-label-members |
+| `FORBIDDEN` "Only label members can change roles." / "Only label members can delete artists." | The `users.setRole` / `artists.delete` rule refused the viewer | Expected for non-label-members; the actions show "Only label members can do this." |
+| `FORBIDDEN` "Only label members can archive releases." / "… restore releases." / "… reorder releases." / "… remove tracks." / "… restore tracks." / "… replace files." | The `releases.archive` / `releases.restore` / `releases.move` / `tracks.archive` / `tracks.restore` / `tracks.replaceAudio` rule refused the viewer | Expected for non-label-members; the release admin actions show "Only label members can do this." |
 | `FORBIDDEN` "You don't have permission to do that." | Postgres `42501`: RLS or a grant refused the query (e.g. an `asUser` read of `auth.users`, or a column revoked from `authenticated`) | Use `asSystem` behind `authorize`, or fix the grant together with the query |
 | `DatabaseError` code `57014` | The 10s statement timeout | Make the query cheaper; don't raise the timeout without the owner |
 | `table reference "users" is ambiguous` (seen as a `DatabaseError`, code `42P09`) | `auth.users` joined without the alias | `alias(authUsers, "auth_users")` |

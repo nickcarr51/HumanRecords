@@ -20,7 +20,8 @@ middleware on every request. Signed-in users land on `/feed`.
    to `/login`; admin pages call `requireLabelMember()`.
 3. **Server actions and the database** re-check on every call (`getSessionUser()` in each action;
    RLS + definer functions in Postgres; for Drizzle reads, `getClaims()` then RLS through `asUser`,
-   or `authorize()` in our code before `asSystem` — the admin user list, [[db-access]]). Admin
+   or `authorize()` in our code before `asSystem` — the admin user list, role change and artist
+   delete, [[db-access]]). Admin
    artist/user actions use `activeLabelMemberId()` (`src/lib/admin/caller.ts`): role check plus
    `auth.getUser()`, which refuses a deactivated (banned) caller whose access token is still valid.
    `getClaims()` / `getCurrentRole()` alone accept that stale token for up to `jwt_expiry` (1h).
@@ -48,7 +49,7 @@ plus `enable_signup = false`.
 | Signed-in shell guard | `src/app/(app)/layout.tsx` |
 | Signed-in 404 → `/feed` | `src/app/not-found.tsx` |
 | Email templates | `supabase/templates/{invite,magic_link}.html`, wired in `supabase/config.toml` |
-| Hosted test accounts | `scripts/invite-users.mts` |
+| Hosted accounts (develop and production) | `/admin/users` ([[invites]]) |
 
 ## References
 
@@ -78,8 +79,8 @@ admin layers).
 ## Known deferrals (as of 2026-10-02)
 
 - Invites live at `/admin/users` ([[invites]]); sending the invite is still a `mailto:` link.
-  `scripts/invite-users.mts` (reads gitignored `scripts/users.local.json`; template
-  `scripts/users.example.json`) remains for hosted develop accounts.
+  Hosted accounts, develop and production, come from there (`scripts/invite-users.mts` was
+  deleted in Drizzle slice 2).
 - **Hosted auth email is Resend SMTP** (`smtp.resend.com`, port 465, user `resend`). Sender is
   `noreply@humanrecords.co` (Resend domain `humanrecords.co` verified 2026-10-09). Caps: 30 emails/hour, 60s OTP frequency per email. Settings list:
   [[release-ops]] `References/environments.md`.

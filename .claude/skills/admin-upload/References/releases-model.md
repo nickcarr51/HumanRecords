@@ -43,12 +43,13 @@ tests, future scripts) without a `releases` row does not appear on `/feed`.
 - `publish_release` is unchanged: it omits `sort_at` and the `releases_default_sort_at` trigger
   fills it from `created_at`, so a new release lands at the top of the unpinned group. Pin to stay
   above later uploads.
-- `move_release(target, direction)` (label members, definer) swaps `sort_at` with the neighbour in
-  the same pinned group. Details: [[content-lifecycle]] `References/ordering.md`.
+- The `moveRelease` service (label members, `src/lib/services/releases.ts`; was the
+  `move_release` SQL function until slice 3) swaps `sort_at` with the neighbour in the same pinned
+  group. Details: [[content-lifecycle]] `References/ordering.md`.
 - Archived releases are hidden from the feed and album page; label members still read the rows.
   Stream/download signing checks only `tracks.archived_at`, so archiving an album release alone
-  leaves its live tracks signable by id (known gap, now closed by `archive_release`, which
-  archives the album's live tracks with the same timestamp). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
+  leaves its live tracks signable by id (known gap, now closed by `archiveRelease`, which
+  archives the album's live tracks too and flags them `archived_with_release`). Details: [[content-lifecycle]] `References/archive-and-restore.md`.
 - `catalog_number` (`20261011170000`): new rows in `albums` and `tracks` receive it automatically
   from a `generated always as identity` column (permanent, never reused; `keep_catalog_number`
   raises on any change). `publish_release`, `add_album_track` and the upload/publish code pass
@@ -104,7 +105,8 @@ Built client-side by `buildPayload` (`upload-reducer.ts`), which omits `album` f
 
 ## How the read side uses it
 
-Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); details in
+The feed reads through Drizzle as the signed-in user (`asUser`, [[db-access]]); the album page
+is one supabase-js read. Details in
 [[timeline-player]] `References/feed-and-album-data.md`.
 
 - `getFeed` (`feed.ts`): `tx.query.releases.findMany` nesting `track` and `album` (with
@@ -113,13 +115,13 @@ Both reads run through Drizzle as the signed-in user (`asUser`, [[db-access]]); 
   `limit`/`offset`, and a `count()` with the same filter in the same transaction
   (`total`/`totalPages`, `hasMore = page < totalPages`). `toFeedItem` maps single → `kind:"track"`,
   album → `kind:"album"`; a release whose target is null is skipped.
-- `getAlbum` (`albums.ts`): `tx.query.albums.findFirst` (in `findAlbum`) with the same nested
-  rows, except that album tracks leave out `trackArtUrl` (`ALBUM_TRACK_WITH`); tracks ordered by
-  `track_albums.position`.
+- `getAlbum` (`albums.ts`): one supabase-js read of `albums` embedding `releases`,
+  `album_artists` and `track_albums` → `tracks` (back from Drizzle in slice 2), without
+  `track_art_url`; tracks ordered by `track_albums.position`.
 - `byPosition` (`artist-names.ts`) sorts link rows by `position` in JS (PostgREST can't order an
   embed by a column of the link table in that select shape; the Drizzle reads reuse it).
-  `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the remaining supabase-js
-  embeds), so every artist list is in credit order.
+  `artistNamesOf` uses it for the Drizzle rows (and `namesFrom` for the supabase-js embeds,
+  `getAlbum`'s included), so every artist list is in credit order.
 - **"Various Artists"**: `albumArtistLabel(names)` returns `"Various Artists"` when an album
   has no `album_artists` rows. Display-only (used by `AlbumRow` and the album page); nothing
   is stored.

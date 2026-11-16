@@ -1,6 +1,6 @@
 ---
 name: admin-upload
-description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), the invite-users script, or artist management at `/admin/artists` (its linked-user lists come from the Drizzle `listUsers` service via `getViewer`). (User management at `/admin/users` is the `invites` skill.)
+description: Use when working on the releases model (releases table, positions, publish_release), the admin portal (`/admin`, `/admin/upload`, `/admin/releases`, `/admin/releases/[id]`), label-member access control (current_user_role, getCurrentRole, admin layout gate, navbar Admin link), the upload form (UploadForm, TrackWidget, ArtistCombobox, upload reducer/engine), presigned R2 uploads, the release admin (pin/reorder/archive, edit page, replace/add/remove track: `release-actions.ts` and its `runService` calls into the Drizzle release services in `src/lib/services/releases.ts`, `AdminReleases`), the upload side of stored waveforms (`peaksUrl`, `storePeaks` after each MP3 PUT, the Analyze all panel on the release edit page; the waveform end to end is the `waveform` skill), or artist management at `/admin/artists` (its linked-user lists come from the Drizzle `listUsers` service via `getViewer`; delete goes through the Drizzle `removeArtist` service). (User management at `/admin/users` is the `invites` skill.)
 ---
 
 # Releases + Admin Upload
@@ -56,20 +56,21 @@ files already uploaded stay in R2 (orphans; accepted for now).
 | Admin pages | `src/app/(app)/admin/page.tsx`, `admin.styles.ts`, `src/app/(app)/admin/upload/page.tsx`. Each exports `metadata = { title: 'Admin · <Section>' }` (tab `Admin · Upload · Human Services`); new admin pages follow [[head-tags]] |
 | "Various Artists" display | `src/components/Feed/AlbumRow.tsx`, `src/app/(app)/albums/[id]/page.tsx` |
 | Copy: admin UI says "album" (`KindToggle`, `UploadForm`, release admin); listener copy says "Pack" (CLAUDE.md Vocabulary) | `src/components/Upload/KindToggle.tsx` vs `src/components/Feed/AlbumRow.tsx` |
-| Release admin actions (role check first, then RPCs; `setPinned` uses the service client): `setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio` | `src/lib/admin/release-actions.ts` |
+| Release admin actions (role check first; `setPinned` uses the service client; `saveRelease` / `addAlbumTrack` call RPCs; `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `replaceTrackAudio` call the release services through `runService`): `setPinned`, `moveRelease`, `archiveRelease`, `restoreRelease`, `removeTrack`, `restoreTrack`, `saveRelease`, `addAlbumTrack`, `replaceTrackAudio` | `src/lib/admin/release-actions.ts` |
+| Release services (Drizzle, `authorize` + one `asSystem` transaction): `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`, `moveRelease` | `src/lib/services/releases.ts` ([[db-access]]) |
 | Release admin reads (`AdminTrack` carries `audioKey` = `tracks.audio_url`, which changes when the MP3 is replaced) | `src/lib/admin/releases.ts` (`getAdminReleases`, `getAdminRelease`) |
 | Release admin UI | `src/components/AdminReleases/*` (`ReleasesTable`, `ArchiveControl`, `ConfirmModal`, `useAdminAction`, `uploadOne` (also calls `storePeaks`), `AnalyzeWaveforms`, `edit-reducer` incl. `draftKey`, `TrackEditor`, `ReplaceAudio`, `RemoveTrack`, `RemovedTracks`, `AddTrackForm`, `EditReleaseForm`) |
 | Release admin pages | `src/app/(app)/admin/releases/page.tsx`, `src/app/(app)/admin/releases/[id]/page.tsx` |
 | Artists admin: list / new / `[id]` (edit + Danger zone delete) | `src/app/(app)/admin/artists/{page,new/page,[id]/page}.tsx`, `src/components/AdminArtists/{ArtistsTable,ArtistForm,DeleteArtist}.tsx` |
 | Artist reads: `listAdminArtists`, `getAdminArtist`, `getCreditCounts`, `loadLinkTargets` (artists via supabase-js; linked users via `listUsers` / `getViewer`, [[db-access]]) | `src/lib/admin/artists.ts` |
-| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via `admin_delete_artist`; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
+| Artist actions: `createArtist`, `updateArtist`, `deleteArtist`, `searchLinkableUsers` (cookie client, so RLS applies; delete via the `removeArtist` service, `src/lib/services/artists.ts`, [[db-access]]; error mapping incl. 23503 on create/update = "That user no longer exists. Pick another.", `CONFLICT` on delete → `creditMessage`) | `src/lib/admin/artists-actions.ts`, `src/lib/admin/artists-types.ts` |
 | Admin caller check (`activeLabelMemberId()`: label_member role AND `auth.getUser()` succeeds, so banned label members are refused at once; used by the artists and users actions) | `src/lib/admin/caller.ts` |
 | Artists table phone cards (cells carry `data-label`; shared `Table` shows it as a `::before` label below `md`) | `src/components/AdminArtists/ArtistsTable.tsx`, `src/components/AdminUsers/users.styles.ts` |
 | Link an artist to an account | `src/components/AdminArtists/UserCombobox.tsx` |
 | Reused list search + pagination (`basePath="/admin/artists"`) | `src/components/SearchInput/`, `src/components/Pagination/` (`pageHref(basePath, query, page)`); see [[artists-read]] |
 | Admin index cards (Upload, Releases, Users, Artists) | `src/app/(app)/admin/page.tsx` |
 | Users page + actions (each action re-checks role) | `src/app/(app)/admin/users/page.tsx`, `src/lib/admin/users-actions.ts` — see [[invites]] |
-| Hosted test accounts | `scripts/invite-users.mts` (env documented in `.env.example`) |
+| Hosted accounts (develop and production) | `/admin/users` ([[invites]]) |
 
 ## References
 
@@ -96,7 +97,7 @@ files already uploaded stay in R2 (orphans; accepted for now).
 - [[catalog-schema]] — `artists`/`tracks`/`albums` and the link tables that
   `publish_release` writes; RLS "authenticated can read" policies.
 - [[component-library]] — `Button`, `Input`, `FormField`, `Alert`, `Heading`, theme tokens.
-- [[content-lifecycle]] — `archived_at`, `pinned`/`sort_at`, `move_release`, `r2_cleanup_queue` on the rows this feature creates.
+- [[content-lifecycle]] — `archived_at`, `archived_with_release`, `pinned`/`sort_at`, `moveRelease`, `r2_cleanup_queue` on the rows this feature creates.
 - [[invites]] — `/admin/users`; its page and actions follow the same gates.
 - [[waveform]] — the stored-peaks system this feature writes (`storePeaks`, Analyze all) and the player reads.
 - [[auth]] — session/middleware layer under the label-member gate; `getCurrentRole` and
@@ -114,19 +115,23 @@ files already uploaded stay in R2 (orphans; accepted for now).
   - **Replace MP3** shows a `role="status"` "MP3 replaced." line next to the control; picking another file clears it.
   - **Per-row controls** have accessible names with the title (`Pin <title>`, `Archive <title>`, `Remove <title>`, `Replace MP3 for <title>`); visible text is unchanged.
   - **Errors are inline** (`role="alert"`), not toasts (built before `ToastProvider` was mounted in `AppShell`; switching is optional).
-  - Every action checks the role first, validates UUIDs and artist refs (each ref must be a UUID `id` or a non-blank string `newName`; anything else is "Invalid request." with no DB call), and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
+  - Every action checks the role first, validates UUIDs and artist refs (each ref must be a UUID `id` or a non-blank string `newName`; anything else is "Invalid request." with no DB call), and for add/replace checks `AUDIO_KEY_RE` plus `headObject` before the RPC or service call. Success revalidates `/feed`, `/admin/releases`, `/admin/releases/[id]`, `/albums/[id]`.
   - **Edit page**: a failed read shows an inline "Couldn't load this release." (unknown id → 404); "‹ releases" returns to `?archived=1` for an archived release. Tab titles: `Admin · Releases`, `Admin · Edit release`.
-  - **Known gap (security review 2026-10-11, deferred)**: `add_album_track`/`replace_track_audio` accept any existing `tracks/<uuid>.mp3` key, so a hand-built server-action call by a label member could point a track at an object another track uses or one already queued in `r2_cleanup_queue`. Add a SQL guard (refuse keys referenced by `tracks.audio_url` or an uncleaned queue row) before any R2 cleanup job ships.
+  - **Known gap (security review 2026-10-11, deferred)**: `add_album_track`/`replaceTrackAudio` (was `replace_track_audio`) accept any existing `tracks/<uuid>.mp3` key, so a hand-built server-action call by a label member could point a track at an object another track uses or one already queued in `r2_cleanup_queue`. Add a guard (refuse keys referenced by `tracks.audio_url` or an uncleaned queue row) before any R2 cleanup job ships.
   - **Retry re-uploads**: retrying an add/replace after a failed action uploads a fresh object; the old one is orphaned (accepted; never delete from R2).
   - **ID3 hint**: edits don't rewrite MP3 tags; the page tells users to replace the MP3 with a re-tagged file.
   - No images in this pass.
 - **Orphaned R2 objects**: a publish that fails after uploads (or a retried add/replace) leaves objects in R2 with no row pointing at them. Replaced/archived keys are queued in `r2_cleanup_queue`; the cleanup job is not built.
 - **No artwork** upload this pass (`album_art_url`/`track_art_url` stay null).
-- **ORM**: Drizzle since slice 1 (2026-10), reads only so far ([[db-access]]). The admin writes are
-  still SQL functions behind thin server actions; they move into TypeScript in slices 2-5, and the
-  multi-table admin reads (`src/lib/admin/artists.ts` in slice 2, `src/lib/admin/releases.ts` in
-  slice 4) move to Drizzle ([[db-access]] `References/slices.md`).
-- **Production accounts** are created by hand; `scripts/invite-users.mts` is for develop.
+- **ORM**: Drizzle since slice 1 (2026-10) ([[db-access]]). Artist delete moved off its SQL
+  function in slice 2 (`removeArtist`); archive/restore, remove/restore track, replace MP3 and
+  reorder moved to the release services in slice 3 (2026-11-15). Publish, `saveRelease`
+  (`update_release`) and `addAlbumTrack` (`add_album_track`) are still SQL functions behind thin
+  server actions and move into TypeScript in slice 4. The admin reads
+  (`src/lib/admin/artists.ts`, `src/lib/admin/releases.ts`) stay on supabase-js: they change
+  nothing ([[db-access]] `References/slices.md`).
+- **Accounts**, develop and production, are created at `/admin/users` ([[invites]]); the invite
+  script was deleted in slice 2.
 - **R2 CORS** must be applied in Cloudflare before any real browser upload works.
 - **Upload bar sits at 100% during the peaks decode (deferred, owner 2026-10-14):** `uploadDone` fires only after `storePeaks` (decode + PUT), with no "analyzing…" text, and the lane waits on the page-wide decode queue. Details and possible fixes: [[waveform]] Known gaps.
 

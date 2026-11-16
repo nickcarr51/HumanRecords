@@ -36,7 +36,7 @@ the status table in `infra/r2/README.md` (see [pipeline.md](References/pipeline.
 | Migration rules check (edit/rename/delete/backdated, `--include-seed`) | `scripts/check-migrations.mts`, `scripts/lib/*` |
 | Newest-backup picker; drill assertions | `scripts/latest-backup.mts`, `scripts/restore-check.mts` |
 | Seed the local R2 bucket | `yarn r2:seed-local` → `scripts/r2-seed-local.mts` |
-| Develop-only account creation | `scripts/invite-users.mts` (+ gitignored `scripts/users.local.json`, template `users.example.json`) |
+| Account creation (develop and production, after the first prod admin) | `/admin/users` ([[invites]]); see `References/onboarding.md` |
 | Hosted-data guard hook (Supabase/R2/prod names, plus `drizzle-kit push\|migrate\|drop\|up`, `drizzle-kit` with a hosted host, and any command with a hosted database URL) | `.claude/hooks/guard-db.sh` (wired in `.claude/settings.json`) |
 | Seed split | `supabase/seed.sql`, gitignored `supabase/seed.local.sql` ([[catalog-schema]]) |
 | R2 CORS per bucket (`GET`/`HEAD`/`PUT`, applied to all three buckets 2026-10-11) | `infra/r2/cors.{local,dev,prod}.json`, status table in `infra/r2/README.md` |

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getAdminUser, toAdminUserRow, type AdminListRow } from "./users";
+import { getAdminUser, listAdminUsers, toAdminUserRow, type AdminListRow } from "./users";
 
 const { listUsers, viewer } = vi.hoisted(() => ({
   listUsers: vi.fn(),
@@ -82,5 +82,33 @@ describe("getAdminUser", () => {
   it("returns null for an unknown or malformed id", async () => {
     expect(await getAdminUser(db([{ ...base, id: ID }]), SITE, "22222222-2222-4222-8222-222222222222")).toBeNull();
     expect(await getAdminUser(db([]), SITE, "not-a-uuid")).toBeNull();
+  });
+});
+
+describe("listAdminUsers order", () => {
+  const u = (id: string, email: string, name: string | null) => ({ ...base, id, email, name }) as unknown as AdminListRow;
+  const rows = [
+    u("1", "z@x.co", null),
+    u("2", "bob@x.co", "bob"),
+    u("3", "m@x.co", ""),
+    u("4", "ann2@x.co", "Ann"),
+    u("5", "Cy@x.co", "Cy"),
+    u("6", "ann1@x.co", "ann"),
+    u("7", "a@x.co", null),
+  ];
+  const db = {} as unknown as Parameters<typeof listAdminUsers>[0];
+  const emails = async (input: AdminListRow[]) => {
+    listUsers.mockResolvedValue(input);
+    return (await listAdminUsers(db, SITE)).map((r) => r.email);
+  };
+
+  it("sorts by name A to Z ignoring case, unnamed last, ties by email", async () => {
+    expect(await emails(rows)).toEqual(["ann1@x.co", "ann2@x.co", "bob@x.co", "Cy@x.co", "a@x.co", "m@x.co", "z@x.co"]);
+  });
+
+  it("gives the same order whatever order the rows arrive in", async () => {
+    const first = await emails(rows);
+    expect(await emails([...rows].reverse())).toEqual(first);
+    expect(await emails([rows[3], rows[0], rows[6], rows[1], rows[5], rows[2], rows[4]])).toEqual(first);
   });
 });

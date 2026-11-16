@@ -42,8 +42,8 @@ export async function getClaims(supabase: SupabaseClient<Database>): Promise<Jwt
   return Object.freeze({ ...claims }) as JwtClaims;
 }
 
-// Role comes from the database: admin_set_user_role updates public.users but
-// not app_metadata, so the JWT's copy can be stale.
+// Role comes from the database: changeUserRole updates public.users but not
+// app_metadata, so the JWT's copy can be stale.
 export async function getViewer(supabase: SupabaseClient<Database>): Promise<Viewer> {
   const claims = await getClaims(supabase);
   const [row] = await asUser(claims, (tx) =>

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
 const rpc = vi.fn();
@@ -9,12 +10,31 @@ const svcUpdate = vi.fn<(v: unknown) => { eq: typeof svcEq }>(() => ({ eq: svcEq
 const svcFrom = vi.fn<(t: string) => { update: typeof svcUpdate }>(() => ({ update: svcUpdate }));
 const headObject = vi.fn();
 const revalidatePath = vi.fn();
+const VIEWER = { userId: "u1", role: "label_member" };
+const getViewer = vi.fn();
+const service = {
+  moveRelease: vi.fn(),
+  archiveRelease: vi.fn(),
+  restoreRelease: vi.fn(),
+  archiveTrack: vi.fn(),
+  restoreTrack: vi.fn(),
+  replaceTrackAudio: vi.fn(),
+};
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ rpc })) }));
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from: svcFrom }) }));
 vi.mock("@/lib/storage/sign", () => ({ headObject: (...a: [string]) => headObject(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: (...a: unknown[]) => getViewer(...a) }));
+vi.mock("@/lib/services/releases", () => ({
+  moveRelease: (...a: unknown[]) => service.moveRelease(...a),
+  archiveRelease: (...a: unknown[]) => service.archiveRelease(...a),
+  restoreRelease: (...a: unknown[]) => service.restoreRelease(...a),
+  archiveTrack: (...a: unknown[]) => service.archiveTrack(...a),
+  restoreTrack: (...a: unknown[]) => service.restoreTrack(...a),
+  replaceTrackAudio: (...a: unknown[]) => service.replaceTrackAudio(...a),
+}));
 
 import {
   addAlbumTrack,
@@ -32,10 +52,15 @@ import type { ReleaseEditPayload } from "./types";
 const ID = "0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f";
 const FORBIDDEN = "Only label members can do this.";
 
+function expectNoServiceCall() {
+  for (const fn of Object.values(service)) expect(fn).not.toHaveBeenCalled();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
   rpc.mockResolvedValue({ data: null, error: null });
+  getViewer.mockResolvedValue(VIEWER);
   svcSelect.mockResolvedValue({ data: [{ id: ID }], error: null });
 });
 
@@ -54,6 +79,7 @@ describe("role gate", () => {
     }
     expect(rpc).not.toHaveBeenCalled();
     expect(svcFrom).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 });
 
@@ -65,6 +91,7 @@ describe("input checks", () => {
     expect(await archiveRelease("1; drop table")).toEqual({ error: "Invalid request." });
     expect(rpc).not.toHaveBeenCalled();
     expect(svcFrom).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 });
 
@@ -91,35 +118,58 @@ describe("setPinned", () => {
   });
 });
 
-describe("rpc actions", () => {
+describe("service actions", () => {
   it.each([
-    ["moveRelease", () => moveRelease(ID, "down"), "move_release", { target: ID, direction: "down" }],
-    ["archiveRelease", () => archiveRelease(ID), "archive_release", { p_release_id: ID }],
-    ["restoreRelease", () => restoreRelease(ID), "restore_release", { p_release_id: ID }],
-    ["removeTrack", () => removeTrack(ID), "archive_track", { p_track_id: ID }],
-    ["restoreTrack", () => restoreTrack(ID), "restore_track", { p_track_id: ID }],
+    ["moveRelease", () => moveRelease(ID, "down"), "moveRelease", [ID, "down"]],
+    ["archiveRelease", () => archiveRelease(ID), "archiveRelease", [ID]],
+    ["restoreRelease", () => restoreRelease(ID), "restoreRelease", [ID]],
+    ["removeTrack", () => removeTrack(ID), "archiveTrack", [ID]],
+    ["restoreTrack", () => restoreTrack(ID), "restoreTrack", [ID]],
   ] as const)("%s calls %s and revalidates", async (_n, call, fn, args) => {
     expect(await call()).toEqual({ error: null });
-    expect(rpc).toHaveBeenCalledWith(fn, args);
+    expect(service[fn]).toHaveBeenCalledWith(VIEWER, ...args);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/releases/[id]", "page");
     expect(revalidatePath).toHaveBeenCalledWith("/albums/[id]", "page");
   });
 
-  it("maps 42501, 22023, P0002, 40P01 and unknown errors", async () => {
-    rpc.mockResolvedValueOnce({ error: { code: "42501", message: "x" } });
+  it("maps FORBIDDEN, INVALID, NOT_FOUND, RETRY and unknown errors", async () => {
+    service.archiveRelease.mockRejectedValueOnce(new DomainError("FORBIDDEN", "Only label members can archive releases."));
     expect(await archiveRelease(ID)).toEqual({ error: FORBIDDEN });
-    rpc.mockResolvedValueOnce({ error: { code: "22023", message: "Restore the album first." } });
+    service.restoreTrack.mockRejectedValueOnce(new DomainError("INVALID", "Restore the album first."));
     expect(await restoreTrack(ID)).toEqual({ error: "Restore the album first." });
-    rpc.mockResolvedValueOnce({ error: { code: "P0002", message: "Track not found." } });
+    service.archiveTrack.mockRejectedValueOnce(new DomainError("NOT_FOUND", "Track not found."));
     expect(await removeTrack(ID)).toEqual({ error: "Track not found." });
-    rpc.mockResolvedValueOnce({ error: { code: "40P01", message: "deadlock detected" } });
+    service.moveRelease.mockRejectedValueOnce(new DomainError("RETRY", "The database was busy; please try again."));
     expect(await moveRelease(ID, "up")).toEqual({ error: "Couldn't reorder — try again" });
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    rpc.mockResolvedValueOnce({ error: { code: "XX000", message: "boom" } });
+    service.restoreRelease.mockRejectedValueOnce(new DatabaseError("XX000", undefined));
     expect(await restoreRelease(ID)).toEqual({ error: "Couldn't save — try again." });
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("gives the logged fallback for RETRY outside moveRelease, as for a deadlock today", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      service.archiveRelease.mockRejectedValueOnce(new DomainError("RETRY", "The database was busy; please try again."));
+      expect(await archiveRelease(ID)).toEqual({ error: "Couldn't save — try again." });
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("gives the logged fallback when getViewer throws, without calling the service", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      getViewer.mockRejectedValueOnce(new DomainError("UNAUTHENTICATED", "Sign in to continue."));
+      expect(await removeTrack(ID)).toEqual({ error: "Couldn't save — try again." });
+      expectNoServiceCall();
+      expect(revalidatePath).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -133,6 +183,7 @@ describe("content actions: role gate", () => {
     expect(await addAlbumTrack(ID, { title: "t", audioKey: KEY, artists: [{ newName: "N" }] })).toEqual({ error: FORBIDDEN });
     expect(await replaceTrackAudio(ID, KEY)).toEqual({ error: FORBIDDEN });
     expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
     expect(headObject).not.toHaveBeenCalled();
   });
 });
@@ -182,7 +233,7 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
     expect(headObject).toHaveBeenCalledWith(KEY);
     expect(rpc).toHaveBeenCalledWith("add_album_track", { p_release_id: ID, payload: add });
     expect(await replaceTrackAudio(ID, KEY)).toEqual({ error: null });
-    expect(rpc).toHaveBeenCalledWith("replace_track_audio", { p_track_id: ID, p_audio_key: KEY });
+    expect(service.replaceTrackAudio).toHaveBeenCalledWith(VIEWER, ID, KEY);
   });
 
   it("refuses a key that wasn't minted by createUploadUrls", async () => {
@@ -215,5 +266,6 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
     expect(await addAlbumTrack(ID, add)).toEqual({ error: "Couldn't verify the uploaded file. Try again." });
     spy.mockRestore();
     expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 });

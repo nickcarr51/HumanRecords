@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
 import { DatabaseError, DomainError } from "@/lib/services/errors";
-import { authorize, type Action } from "@/lib/services/policy";
+import { authorize } from "@/lib/services/policy";
 import { getClaims, getViewer, type JwtClaims } from "@/lib/services/viewer";
 import { createDb, type Db } from "./client";
 import { asSystem } from "./system";
@@ -201,8 +201,7 @@ describe("asSystem", () => {
   it("refuses a real grant used for a different job, before any database access", async () => {
     const grant = authorize(await getViewer(await label.signIn()), "users.list");
     const fn = vi.fn(async () => 1);
-    // The cast stands in for a second job: "users.list" is the only Action until slice 2 adds one.
-    await expect(asSystem(grant, "users.delete" as unknown as Action, fn, untouchableDb())).rejects.toMatchObject({
+    await expect(asSystem(grant, "artists.delete", fn, untouchableDb())).rejects.toMatchObject({
       name: "DomainError",
       code: "FORBIDDEN",
     });
