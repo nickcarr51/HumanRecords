@@ -60,11 +60,13 @@ jobs:
           # Separate lines: under `bash -e`, a failing non-final `&&` operand doesn't exit.
           test -n "$API_URL"
           test -n "$SECRET_KEY"
+          test -n "$DB_URL"
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
             echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+            echo "DATABASE_URL=$DB_URL"
           } >> "$GITHUB_ENV"
       - run: yarn test
 
@@ -94,6 +96,13 @@ jobs:
           yarn -s supabase gen types typescript --local > /tmp/database.types.ts
           diff -u src/lib/supabase/database.types.ts /tmp/database.types.ts || {
             echo "::error::database.types.ts is stale. Run: yarn -s supabase gen types typescript --local > src/lib/supabase/database.types.ts"
+            exit 1
+          }
+      - name: Drizzle schema matches the committed file
+        run: |
+          yarn -s db:pull
+          git diff --exit-code src/lib/db/generated/schema.ts || {
+            echo "::error::src/lib/db/generated/schema.ts is stale. Run: yarn db:pull"
             exit 1
           }
 

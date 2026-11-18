@@ -1,6 +1,6 @@
 ---
 name: auth
-description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, a new route needs protecting, or a public asset (icon, `og.png`, manifest) redirects to `/login` when logged out.
+description: Use when working on sign-in, sign-out, or session handling — the `/login` page, `requestOtp`/`submitOtp`/`signOut` (`src/lib/auth/actions.ts`), the `/auth/confirm` route, `src/middleware.ts` + `updateSession`, route protection (`route-guard.ts`, `PROTECTED_PREFIXES`), `safeNextPath` / the `?next=` param, `getSessionUser`, `getCurrentRole`/`requireLabelMember`, the verified-session helpers for Drizzle reads (`getClaims` / `getViewer` / `Viewer` / `JwtClaims` in `src/lib/services/viewer.ts`, `UNAUTHENTICATED`), the `(app)` layout guard, Supabase email templates (`supabase/templates/*`), or inviting users. Also when users get randomly logged out, a redirect loops, an OTP/magic link fails, a new route needs protecting, or a public asset (icon, `og.png`, manifest) redirects to `/login` when logged out.
 ---
 
 # Auth: Invite-only Passwordless Sign-in
@@ -18,11 +18,13 @@ middleware on every request. Signed-in users land on `/feed`.
    on `/`, `/login`, or retired `/artists` → `/feed`. It knows *signed in or not*, never role.
 2. **Server components** re-check: the `(app)` layout calls `getSessionUser()` and redirects
    to `/login`; admin pages call `requireLabelMember()`.
-3. **Server actions and the database** re-check on every call (`getSessionUser()` in each
-   action; RLS + definer functions in Postgres). Admin artist/user actions use
-   `activeLabelMemberId()` (`src/lib/admin/caller.ts`): role check plus `auth.getUser()`, which
-   refuses a deactivated (banned) caller whose access token is still valid. `getClaims()` /
-   `getCurrentRole()` alone accept that stale token for up to `jwt_expiry` (1h).
+3. **Server actions and the database** re-check on every call (`getSessionUser()` in each action;
+   RLS + definer functions in Postgres; for Drizzle reads, `getClaims()` then RLS through `asUser`,
+   or `authorize()` in our code before `asSystem` — the admin user list, role change and artist
+   delete, [[db-access]]). Admin
+   artist/user actions use `activeLabelMemberId()` (`src/lib/admin/caller.ts`): role check plus
+   `auth.getUser()`, which refuses a deactivated (banned) caller whose access token is still valid.
+   `getClaims()` / `getCurrentRole()` alone accept that stale token for up to `jwt_expiry` (1h).
 Invite-only is enforced by Supabase, not app code: `shouldCreateUser: false` on OTP request
 plus `enable_signup = false`.
 
@@ -37,6 +39,7 @@ plus `enable_signup = false`.
 | Server actions: request code, verify code, sign out, `redeemInvite` (+ `redeemInviteForm`) | `src/lib/auth/actions.ts` |
 | Invite welcome lookup (read-only) | `src/lib/auth/invite.ts` (`getInviteGreeting`) |
 | Current claims (server) | `src/lib/auth/session.ts` (`getSessionUser`) |
+| Verified claims + role for Drizzle reads (`getClaims`, `getViewer`; throw `UNAUTHENTICATED` when signed out) | `src/lib/services/viewer.ts` ([[db-access]]) |
 | Own role + label-member gate | `src/lib/auth/role.ts` (`getCurrentRole`, `requireLabelMember`) |
 | `/login` page (server component; invite branch) | `src/app/login/page.tsx` |
 | Login UI (email step → code step, invite welcome) | `src/components/Login/{LoginForm,InviteWelcome}.tsx` |
@@ -46,7 +49,7 @@ plus `enable_signup = false`.
 | Signed-in shell guard | `src/app/(app)/layout.tsx` |
 | Signed-in 404 → `/feed` | `src/app/not-found.tsx` |
 | Email templates | `supabase/templates/{invite,magic_link}.html`, wired in `supabase/config.toml` |
-| Hosted test accounts | `scripts/invite-users.mts` |
+| Hosted accounts (develop and production) | `/admin/users` ([[invites]]) |
 
 ## References
 
@@ -65,6 +68,7 @@ plus `enable_signup = false`.
 - [[catalog-schema]] — `public.users`, the `handle_new_user` trigger that copies role from
   `app_metadata`, the hidden `role` column, `current_user_role()`, and the server client.
 - [[invites]] — the `/login?email=&invite=` welcome/Enter flow and `/admin/users`.
+- [[db-access]] — `getClaims`/`getViewer` feed the verified user id into Drizzle's `asUser`.
 - [[component-library]] — login screen uses `Card`, `FormField`, `Input`, `Button`, `Alert`,
   and `Screen`.
 
@@ -75,8 +79,8 @@ admin layers).
 ## Known deferrals (as of 2026-10-02)
 
 - Invites live at `/admin/users` ([[invites]]); sending the invite is still a `mailto:` link.
-  `scripts/invite-users.mts` (reads gitignored `scripts/users.local.json`; template
-  `scripts/users.example.json`) remains for hosted develop accounts.
+  Hosted accounts, develop and production, come from there (`scripts/invite-users.mts` was
+  deleted in Drizzle slice 2).
 - **Hosted auth email is Resend SMTP** (`smtp.resend.com`, port 465, user `resend`). Sender is
   `noreply@humanrecords.co` (Resend domain `humanrecords.co` verified 2026-10-09). Caps: 30 emails/hour, 60s OTP frequency per email. Settings list:
   [[release-ops]] `References/environments.md`.

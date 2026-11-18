@@ -37,3 +37,10 @@ jobs:
           curl -fsS -o /dev/null "$SB_URL/rest/v1/releases?select=id&limit=1" -H "apikey: $SB_KEY"
       - name: Site answers
         run: curl -fsSL -o /dev/null "$SITE/login"
+      - name: Site database answers
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$SITE/api/health/db" || true)
+          if [ "$status" != "200" ]; then
+            echo "::error::$SITE/api/health/db returned $status, not 200."
+            exit 1
+          fi

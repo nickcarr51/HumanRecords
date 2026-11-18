@@ -60,7 +60,10 @@ fail. The preferred path therefore replays migrations first, exactly as the week
    ```
 6. Re-apply hosted Auth settings ([environments.md](environments.md)) and email templates.
 7. Repoint Vercel Production `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, publishable key,
-   `SUPABASE_SECRET_KEY`; update the `PROD_*` health variables; redeploy. Smoke test sign-in.
+   `SUPABASE_SECRET_KEY`, and `DATABASE_URL` (the new project's **transaction pooler** URL, port
+   6543; the app's Drizzle reads use it, so without this they keep reading the old project);
+   update the `PROD_*` health variables; redeploy. Smoke test sign-in and check that
+   `<site>/api/health/db` answers 200.
 8. R2 media is unaffected (separate, locked bucket).
 
 **Fallback (roles.sql + schema.sql):** instead of steps 4-5, run

@@ -11,6 +11,7 @@
 
 Env vars (`.env.example`): `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 (browser-safe), `SUPABASE_URL` + `SUPABASE_SECRET_KEY` (server-only; never `NEXT_PUBLIC_`).
+Drizzle's `DATABASE_URL` is server-only too ([[db-access]] `References/guard-rails.md`).
 
 ## Data-function convention (dependency injection)
 
@@ -25,14 +26,20 @@ const page = await getFeed(supabase, { page: 1 });
 ```
 
 Why: the same function runs in a page with the cookie client and in a `*.data.test.ts` with a
-signed-in test client, against real Postgres. Other conventions in these modules:
+signed-in test client, against real Postgres. Since Drizzle slice 1, `getFeed` uses that client
+only to verify the session (`getClaims`); its queries go through Drizzle (`asUser`,
+[[db-access]]). `getAlbum` verifies the session the same way, then reads with the client (one
+supabase-js read again since slice 2). Other conventions in these modules:
 
-- Throw on a Supabase `error` (the route `error.tsx` boundary catches it); return `null` for
-  not-found.
+- supabase-js reads throw the returned `error` (the route `error.tsx` boundary catches it); Drizzle
+  reads throw the safe error `asUser`/`asSystem` produce (`DomainError` or `DatabaseError`). Return
+  `null` for not-found.
 - Guard id params with a UUID regex and return `null` for non-UUIDs — otherwise Postgres raises
   "invalid input syntax for type uuid" → 500.
 - Escape user text before `ilike` with `escapeLike` (`src/lib/supabase/artists.ts`).
-- Map snake_case rows to camelCase view types (`albumArtUrl`, `artistNames`) at the boundary.
+- Return camelCase view types (`albumArtUrl`, `artistNames`). supabase-js rows are snake_case and
+  are mapped at the boundary; Drizzle rows already use the camelCase names of
+  `src/lib/db/generated/schema.ts`.
 
 ## Generated types
 
@@ -65,7 +72,50 @@ So a typed client can read the number but any attempt to insert or update it is 
 mirroring Postgres, which rejects the write at runtime (`428C9`; and the `keep_catalog_number`
 trigger, see [functions.md](functions.md)). The app view types follow the Row shape:
 `catalogNumber: number` is **required** on `FeedItem`/`FeedTrack` (`feed.ts`) and `AlbumDetail`
-(`albums.ts`), and `RELEASE_SELECT` / `getAlbum` select `catalog_number` explicitly. That is
-why a database without the migration breaks those pages with `42703 column tracks_1.catalog_number
-does not exist` — see [local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###`
-happens only in `src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
+(`albums.ts`), and the reads behind them (the Drizzle `TRACK_WITH` and album `columns` in
+`catalog-selects.ts` / `feed.ts`, and `getAlbum`'s supabase-js select in `albums.ts`) select
+`catalog_number` explicitly.
+That is why a database without the migration breaks those pages with Postgres error `42703` — see
+[local-workflow.md](local-workflow.md). Formatting to `HS###`/`HSS###` happens only in
+`src/components/CatalogId/CatalogId.tsx`; never add a formatted string column.
+
+## Drizzle (since slice 1, 2026-10)
+
+Rule (owner's, 2026-10-28): a SQL function goes away. One simple read or write on one table uses
+supabase-js; several changes that must all succeed or all fail (a transaction), or a job
+supabase-js can't do safely, use Drizzle; reads that change nothing stay on supabase-js, even
+across several tables. Drizzle sits next to supabase-js, not instead of it. The full guide is the
+[[db-access]] skill; the short version:
+
+- `getDb()` (`src/lib/db/client.ts`) connects with `DATABASE_URL` (server-only; local stack URL in
+  `.env.local`, each hosted project's transaction pooler URL in Vercel). Only `src/lib/db` may
+  import it or a database driver (lint).
+- Every query runs in `asUser(claims, fn)` (as the signed-in user, so RLS applies) or
+  `asSystem(grant, action, fn)` (admin access with RLS skipped, only with a `Grant` from
+  `authorize(viewer, action)`, only from `src/lib/services`). Both first set 10s timeouts for the
+  transaction only (`prepareTransaction`).
+- Both pass every error through `fromPgError` (`src/lib/services/errors.ts`): a mapped Postgres
+  code (`42501`, `22023`, `P0002`, `40P01`, `23503`) becomes a `DomainError` with a fixed message,
+  any other database error a `DatabaseError` ("Database query failed", code and values only,
+  never the SQL text). Details: [[db-access]] `References/errors-and-health.md`.
+- Callers so far:
+  - through `asUser`: `getFeed` with `searchMatches` (`src/lib/supabase/feed.ts`,
+    `feed-search.ts`), and `getViewer` (`src/lib/services/viewer.ts`, the caller's role from
+    `current_user_role()`);
+  - through `asSystem`: `listUsers` (`src/lib/services/users.ts`), called by `listAdminUsers` and
+    `getAdminUser` (`src/lib/admin/users.ts`) and by `linkedUsersFor` (`src/lib/admin/artists.ts`);
+    `changeUserRole` (`src/lib/services/users.ts`), called by `setUserRole`; `removeArtist`
+    (`src/lib/services/artists.ts`), called by `deleteArtist`; and the release services
+    `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`,
+    `moveRelease` (`src/lib/services/releases.ts`), called by the release admin actions in
+    `src/lib/admin/release-actions.ts`.
+  - The feed's query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`,
+    `toFeedTrack`);
+    the artist-name mapper `artistNamesOf` is in `artist-names.ts`.
+- After every migration, run `yarn db:pull` (local stack only) next to the `database.types.ts`
+  regeneration above, and commit `src/lib/db/generated/schema.ts`; CI diffs both.
+- A Drizzle nested read (`tx.query.*`) reads every column of a table it joins one-to-one, so
+  revoking a column from `authenticated` breaks `asUser` reads with "permission denied"; change a
+  grant only together with the matching Drizzle query.
+- Reads that embed more than one table stay on supabase-js under the rule; the SQL functions
+  still to move each have an assigned slice ([[db-access]] `References/slices.md`).
