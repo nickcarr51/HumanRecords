@@ -58,7 +58,7 @@ object with no row pointing at it. Accepted for now.
 | `replaced` | a file swapped out in the admin UI (MP3 or image) | `tracks` / `albums` / `artists` |
 | `archived` | the photo of an uncredited artist that was hard-deleted (queued as `archived` because the check constraint allows only `archived` / `replaced`) | `artists` |
 
-**Replace flow (admin edit page):** `createUploadUrls` → browser `putFile` → `headObject` → `replace_track_audio` RPC, which points the track at the new key and queues the old key as `replaced`. A retry after a failed action re-uploads a fresh object and orphans the first (accepted).
+**Replace flow (admin edit page):** `createUploadUrls` → browser `putFile` → `headObject` → the `replaceTrackAudio` service (`src/lib/services/releases.ts`; was the `replace_track_audio` RPC until Drizzle slice 3), which points the track at the new key and queues the old key as `replaced`, in one transaction. A retry after a failed action re-uploads a fresh object and orphans the first (accepted).
 
 Queue rows are **candidates, not a delete list**: album and track art can share one key, so the future job must re-check that no live row references the key. Replacing an MP3 changes nothing for downloads already made, and the download count stays on the same track id. Edits never rewrite ID3 tags (D5); the edit page tells users to replace the MP3 with a re-tagged file instead.
 

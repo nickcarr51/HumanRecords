@@ -1,6 +1,6 @@
 ---
 name: catalog-schema
-description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), table, column, RLS policy, grant, trigger, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`, `replace_track_audio`, `update_release`, `keep_created_at`, `keep_catalog_number`), `archived_at`, `catalog_number` / HS### / HSS### catalog numbers, `r2_cleanup_queue`, `supabase/seed.sql`, `supabase/config.toml`, regenerating `database.types.ts`, the browser/server/service clients (`src/lib/supabase/{client,server,service}.ts`), which tables a Drizzle read touches and the one-table (supabase-js) / many-table (Drizzle) rule, re-pulling the Drizzle schema after a migration (`yarn db:pull`, `src/lib/db/generated/schema.ts`), the `postgres` login role and `asUser`/`asSystem` in the permission model, or a `*.data.test.ts` / schema test (`test-helpers.ts`, `release-admin-fixtures.ts`, the local `DATABASE_URL`). Also when a query silently returns zero rows, a column read errors with permission denied, "column catalog_number does not exist" or a `DatabaseError` with code 42703, or a data test refuses to run against a non-local URL (`NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`). The Drizzle layer itself (`src/lib/db`, `src/lib/services`) is the `db-access` skill.
+description: Use when adding or changing a Supabase migration (`supabase/migrations/*`), table, column, RLS policy, grant, trigger, or SQL function (`increment_play_count`, `current_user_role`, `handle_new_user`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `move_release`, `search_feed`, `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`, `replace_track_audio`, `update_release`, `keep_created_at`, `keep_catalog_number`, `track_in_one_place`), `archived_at`, `archived_with_release`, the one-track-one-place rule (`track_albums_track_id_key`), `catalog_number` / HS### / HSS### catalog numbers, `r2_cleanup_queue`, `supabase/seed.sql`, `supabase/config.toml`, regenerating `database.types.ts`, the browser/server/service clients (`src/lib/supabase/{client,server,service}.ts`), which tables a Drizzle read touches and the rule for supabase-js vs Drizzle, re-pulling the Drizzle schema after a migration (`yarn db:pull`, `src/lib/db/generated/schema.ts`), the `postgres` login role and `asUser`/`asSystem` in the permission model, or a `*.data.test.ts` / schema test (`test-helpers.ts`, `release-admin-fixtures.ts`, the local `DATABASE_URL`). Also when a query silently returns zero rows, a column read errors with permission denied, "column catalog_number does not exist" or a `DatabaseError` with code 42703, or a data test refuses to run against a non-local URL (`NEXT_PUBLIC_SUPABASE_URL` or `DATABASE_URL`). The Drizzle layer itself (`src/lib/db`, `src/lib/services`) is the `db-access` skill.
 ---
 
 # Catalog Schema + Supabase Data Layer
@@ -8,8 +8,9 @@ description: Use when adding or changing a Supabase migration (`supabase/migrati
 The Postgres schema (users, artists, albums, tracks, their link tables, downloads, releases),
 its Row Level Security model, the three Supabase client factories, the local Supabase
 workflow, and the generated TypeScript types (Supabase's and Drizzle's). Every other feature reads
-through this. Reads and writes that touch more than one table go through Drizzle instead of
-supabase-js (since slice 1, 2026-10): see [[db-access]].
+through this. SQL functions are moving to Drizzle (since slice 1, 2026-10): one simple read or
+write on one table, and any read that changes nothing, uses supabase-js; a transaction, or a job
+supabase-js can't do safely, uses Drizzle. See [[db-access]].
 
 ## The one thing to understand first
 
@@ -17,14 +18,21 @@ supabase-js (since slice 1, 2026-10): see [[db-access]].
 every table has an `authenticated … for select` policy: `using (true)` for most, except
 `downloads` (owner-only), `releases`/`tracks` (archived rows hidden unless the caller is a label
 member), and `r2_cleanup_queue` (no policies at all; only the service role, definer functions, or
-`asSystem`, which no app code uses for it yet). See
+`asSystem`, which the app uses in `removeArtist` and the release services). See
 `References/rls-model.md`. And **no table has a write policy except `artists`** (label-member insert/update,
 for `/admin/artists`). Every other write goes through one of
-two routes: a `security definer` SQL function that checks the caller itself
-(`increment_play_count`, `publish_release`, `move_release`, `admin_delete_artist`), or the server-only **service-role** client
+three routes: a `security definer` SQL function that checks the caller itself
+(`increment_play_count`, `publish_release`, `update_release`, `add_album_track`), a Drizzle
+service that checks the caller with `authorize()` and then runs with `asSystem` (`removeArtist`,
+`changeUserRole`, which replaced `admin_delete_artist` and `admin_set_user_role` in slice 2; the
+release services in `src/lib/services/releases.ts`, which replaced `archive_release`,
+`restore_release`, `archive_track`, `restore_track`, `replace_track_audio` and `move_release` in
+slice 3; [[db-access]]), or the
+server-only **service-role** client
 (`createServiceClient`, used for recording downloads). A blocked write under RLS does not
-error — it silently affects zero rows. Design new writes as a definer function with a role
-check (see `publish_release` in [[admin-upload]]) rather than opening a write policy.
+error — it silently affects zero rows. Design a new write that needs a transaction or a role
+check as a Drizzle service (see `removeArtist`, [[db-access]]) rather than opening a write
+policy or adding a SQL function.
 
 ## Pieces
 
@@ -42,14 +50,15 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 | `users.name`, role from `app_metadata`, role-sync trigger | `…20261002120000_users_name_and_app_metadata_role.sql` |
 | `invites`, `admin_list_users`, `admin_set_user_role` | `…20261002120100_create_invites.sql` |
 | `pinned`/`sort_at`/`archived_at`, `keep_created_at`, live-only read policies | `…20261010120000_feed_order_and_archive.sql` |
-| `move_release` (admin reorder) | `…20261010120100_move_release.sql` |
+| `move_release` (admin reorder; unused by the app since slice 3) | `…20261010120100_move_release.sql` |
 | `search_feed` (feed search) | `…20261010120200_search_feed.sql` |
 | `r2_cleanup_queue` (service role, definer functions or `asSystem` only) | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
 | `admin_list_users` returns `banned_until` | `…20261010120500_admin_list_users_banned_until.sql` |
 | `artists` label-member insert/update policies, `admin_delete_artist` | `…20261010130000_artists_admin_writes.sql` |
-| Release admin: `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`/`replace_track_audio`, `update_release` | `…20261010140000`..`…20261010140300` |
+| Release admin: `archive_release`/`restore_release`, `archive_track`/`restore_track`, `add_album_track`/`replace_track_audio`, `update_release` (all but `add_album_track` and `update_release` unused by the app since slice 3) | `…20261010140000`..`…20261010140300` |
 | `catalog_number` on `albums` + `tracks` (identity, backfilled), `keep_catalog_number` trigger | `…20261011170000_catalog_numbers.sql` |
+| `tracks.archived_with_release` (backfilled), unique index `track_albums_track_id_key`, `track_in_one_place` trigger (one track in one place) | `…20261115120000_track_one_place.sql` |
 | Local seed (example users, 4 artists, 1 album, 1 single, releases; `seed_helpers.seed_user`) | `supabase/seed.sql` |
 | Optional gitignored real-account seed (template: `supabase/seed-local.example.sql`) | `supabase/seed.local.sql` (`sql_paths` globs `./seed.local*.sql`) |
 | Local stack config (ports, auth, OTP, email templates) | `supabase/config.toml` |
@@ -78,7 +87,7 @@ check (see `publish_release` in [[admin-upload]]) rather than opening a write po
 - [functions.md](References/functions.md) — `handle_new_user` + role-sync trigger, `increment_play_count`,
   `current_user_role`, `admin_list_users`, `admin_set_user_role`, `admin_delete_artist`, `resolve_artist_refs`, `publish_release`,
   `move_release`, `search_feed`, the release-admin functions,
-  `releases_default_sort_at`/`keep_created_at`/`keep_catalog_number` (signatures, grants, callers).
+  `releases_default_sort_at`/`keep_created_at`/`keep_catalog_number`/`track_in_one_place` (signatures, grants, callers).
 - [clients-and-types.md](References/clients-and-types.md) — which client to use where, the
   dependency-injection convention for data functions, regenerating `database.types.ts` (and
   `yarn db:pull`), what the generated types look like for an identity column
@@ -111,16 +120,21 @@ role trigger), [[media-storage]] (`tracks.audio_url` keys, `downloads`), [[timel
 [[release-ops]] (how migrations
 reach hosted databases), [[db-access]] (Drizzle reads and writes over these tables).
 
-## Known deferrals (as of 2026-10-25)
+## Known deferrals (as of 2026-10-28)
 
 - Soft delete exists in the schema (`archived_at`); the release admin UI for it is built
   ([[content-lifecycle]]).
 - `play_count` has an RPC but nothing in the app calls it yet.
 - Catalog numbers are display-only: nothing searches or sorts by `catalog_number` yet, and the
   admin UI does not show them.
-- Drizzle since slice 1 (2026-10): one table → supabase-js, more → Drizzle. The SQL functions
-  and supabase-js reads still to move are mapped to slices 2-5 ([[db-access]]
-  `References/slices.md`). `search_feed` and `admin_list_users` have no app callers.
+- Drizzle since slice 1 (2026-10), under the rule in [[db-access]] `References/slices.md`. The
+  SQL functions still to move (`publish_release`, `update_release`, `add_album_track`) are slice
+  4 there. The 11 functions slices 1–3 replaced (`search_feed`, `admin_list_users`,
+  `admin_delete_artist`, `admin_set_user_role`, `archive_release`, `restore_release`,
+  `archive_track`, `restore_track`, `replace_track_audio`, `move_release`, `release_for_track`)
+  have no app callers; slice 4's migration drops them (once slice 3 is live in production) and
+  also revokes `TRUNCATE`, `TRIGGER`, `REFERENCES`, `MAINTAIN` on the `public` tables and `UPDATE`
+  on `public.users` from `anon` and `authenticated`.
 
 A code guide (migration-by-migration read, with why each security fix exists) is in
 `Walkthrough/walkthrough.md` (gitignored).

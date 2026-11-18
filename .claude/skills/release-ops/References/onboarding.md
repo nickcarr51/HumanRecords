@@ -21,6 +21,6 @@ Codes come from `noreply@humanrecords.co` and reach any address (Resend domain v
 
 ## Develop
 
-`node --env-file=.env.develop.local scripts/invite-users.mts --yes` reads the gitignored
-`scripts/users.local.json` (copy `scripts/users.example.json`). It is idempotent, creates missing
-users without sending email, fixes roles, and refuses to run without `--yes`. Develop only.
+Accounts are added at `/admin/users` on the develop site, as on prod: a label member creates the
+user, which creates the invite link; the link goes on an NFC card or is sent to the person (the
+`invites` skill). The old `scripts/invite-users.mts` was deleted in Drizzle slice 2 (2026-10-28).

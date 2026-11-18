@@ -28,6 +28,14 @@ export function toAdminUserRow(row: AdminListRow, siteUrl: string | undefined, n
   };
 }
 
+const byText = (a: string, b: string) => a.localeCompare(b, "en", { sensitivity: "base" });
+
+// Name A to Z (no name last), then email: a fixed order, so saving a row never moves it.
+function byNameThenEmail(a: AdminUserRow, b: AdminUserRow): number {
+  if (!a.name !== !b.name) return a.name ? -1 : 1;
+  return (a.name && b.name ? byText(a.name, b.name) : 0) || byText(a.email, b.email);
+}
+
 // Pass the cookie-bound server client: it identifies the caller, and the users
 // service checks the label-member role before reading.
 export async function listAdminUsers(
@@ -35,7 +43,7 @@ export async function listAdminUsers(
   siteUrl: string | undefined,
 ): Promise<AdminUserRow[]> {
   const rows = await listUsers(await getViewer(db));
-  return rows.map((r) => toAdminUserRow(r, siteUrl));
+  return rows.map((r) => toAdminUserRow(r, siteUrl)).sort(byNameThenEmail);
 }
 
 // One user for /admin/users/[id]. Reuses listAdminUsers (the role check

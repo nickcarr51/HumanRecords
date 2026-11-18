@@ -158,6 +158,7 @@ export const trackAlbums = pgTable("track_albums", {
 	index("track_albums_album_id_idx").using("btree", table.albumId.asc().nullsLast().op("uuid_ops")),
 	pgPolicy("authenticated users can read track_albums", { as: "permissive", for: "select", to: ["authenticated"] }),
 	primaryKey({ columns: [table.albumId, table.trackId], name: "track_albums_pkey"}),
+	uniqueIndex("track_albums_track_id_key").using("btree", table.trackId.asc().nullsLast().op("uuid_ops")),
 ]);
 
 export const trackArtists = pgTable("track_artists", {
@@ -189,6 +190,7 @@ export const tracks = pgTable("tracks", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
 	catalogNumber: integer("catalog_number").generatedAlwaysAsIdentity({ name: "tracks_catalog_number_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
+	archivedWithRelease: boolean("archived_with_release").default(false).notNull(),
 }, (table) => [
 	pgPolicy("signed-in users read live tracks; label members read all", { as: "permissive", for: "select", to: ["authenticated"] }),
 	unique("tracks_catalog_number_key").on(table.catalogNumber),
