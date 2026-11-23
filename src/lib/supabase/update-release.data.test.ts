@@ -1,5 +1,7 @@
 // src/lib/supabase/update-release.data.test.ts
 import { afterEach, describe, expect, it } from "vitest";
+import { archiveRelease } from "@/lib/services/releases";
+import { getViewer } from "@/lib/services/viewer";
 import { admin, cleanup, makeAlbum, makeArtist, makeSingle, newTag, positions, signedIn } from "./release-admin-fixtures";
 
 let tag = "";
@@ -102,7 +104,7 @@ describe("update_release", () => {
     });
     expect([blankAlbum.error?.code, blankAlbum.error?.message]).toEqual(["22023", "Album title is required."]);
 
-    await client.rpc("archive_release", { p_release_id: single.releaseId });
+    await archiveRelease(await getViewer(client), single.releaseId);
     const archived = await client.rpc("update_release", {
       p_release_id: single.releaseId,
       payload: { tracks: [{ id: single.trackId, title: "x", artists }] },

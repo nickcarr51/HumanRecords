@@ -6,8 +6,8 @@ import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
 import { removeArtist } from "./artists";
 import { getViewer } from "./viewer";
 
-// removeArtist next to the admin_delete_artist SQL function it replaces: on
-// the same kind of artist, both give the same result.
+// removeArtist, checked the way it was checked next to the admin_delete_artist
+// SQL function it replaced (dropped in slice 4).
 const admin = createAdminClient();
 const artistIds: string[] = [];
 const trackIds: string[] = [];
@@ -81,28 +81,22 @@ async function queued(id: string) {
   return data;
 }
 
-const viaFunction = (role: keyof typeof clients, id: string) =>
-  clients[role].rpc("admin_delete_artist", { target: id });
 const viaService = async (role: keyof typeof clients, id: string) =>
   removeArtist(await getViewer(clients[role]), id);
 
-describe("removeArtist vs admin_delete_artist", () => {
-  it("deletes an artist with a photo and queues the same cleanup row", async () => {
-    const [old, next] = [await seedArtist("artists/rma.jpg"), await seedArtist("artists/rma.jpg")];
-    expect((await viaFunction("label_member", old)).error).toBeNull();
+describe("removeArtist (was admin_delete_artist)", () => {
+  it("deletes an artist with a photo and queues the cleanup row", async () => {
+    const next = await seedArtist("artists/rma.jpg");
     await viaService("label_member", next);
-    expect([await exists(old), await exists(next)]).toEqual([false, false]);
+    expect(await exists(next)).toBe(false);
     const row = { object_key: "artists/rma.jpg", reason: "archived", source_table: "artists", cleaned_at: null };
-    expect(await queued(old)).toEqual([row]);
     expect(await queued(next)).toEqual([row]);
   });
 
   it("deletes an artist without a photo and queues nothing", async () => {
-    const [old, next] = [await seedArtist(), await seedArtist()];
-    expect((await viaFunction("label_member", old)).error).toBeNull();
+    const next = await seedArtist();
     await viaService("label_member", next);
-    expect([await exists(old), await exists(next)]).toEqual([false, false]);
-    expect(await queued(old)).toEqual([]);
+    expect(await exists(next)).toBe(false);
     expect(await queued(next)).toEqual([]);
   });
 
@@ -110,18 +104,14 @@ describe("removeArtist vs admin_delete_artist", () => {
     ["a track", creditOnTrack],
     ["an album", creditOnAlbum],
   ])("refuses an artist credited on %s, changes nothing and queues nothing", async (_what, credit) => {
-    const [old, next] = [await seedArtist("artists/kept.jpg"), await seedArtist("artists/kept.jpg")];
-    await credit(old);
+    const next = await seedArtist("artists/kept.jpg");
     await credit(next);
-    expect((await viaFunction("label_member", old)).error?.code).toBe("23503");
     await expect(viaService("label_member", next)).rejects.toMatchObject({ name: "DomainError", code: "CONFLICT" });
-    expect([await exists(old), await exists(next)]).toEqual([true, true]);
-    expect(await queued(old)).toEqual([]);
+    expect(await exists(next)).toBe(true);
     expect(await queued(next)).toEqual([]);
   });
 
   it("reports an unknown artist", async () => {
-    expect((await viaFunction("label_member", randomUUID())).error?.code).toBe("P0002");
     await expect(viaService("label_member", randomUUID())).rejects.toMatchObject({
       name: "DomainError",
       code: "NOT_FOUND",
@@ -129,11 +119,9 @@ describe("removeArtist vs admin_delete_artist", () => {
   });
 
   it.each(["listener", "artist"] as const)("refuses the %s role and leaves the artist", async (role) => {
-    const [old, next] = [await seedArtist("artists/kept.jpg"), await seedArtist("artists/kept.jpg")];
-    expect((await viaFunction(role, old)).error?.code).toBe("42501");
+    const next = await seedArtist("artists/kept.jpg");
     await expect(viaService(role, next)).rejects.toMatchObject({ name: "DomainError", code: "FORBIDDEN" });
-    expect([await exists(old), await exists(next)]).toEqual([true, true]);
-    expect(await queued(old)).toEqual([]);
+    expect(await exists(next)).toBe(true);
     expect(await queued(next)).toEqual([]);
   });
 });

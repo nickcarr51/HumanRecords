@@ -4,8 +4,8 @@ import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
 import { changeUserRole } from "./users";
 import { getViewer } from "./viewer";
 
-// changeUserRole next to the admin_set_user_role SQL function it replaces: on
-// the same kind of user, both give the same result.
+// changeUserRole, checked the way it was checked next to the
+// admin_set_user_role SQL function it replaced (dropped in slice 4).
 const admin = createAdminClient();
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -24,22 +24,19 @@ async function roleOf(id: string) {
   return data.role as string;
 }
 
-describe("changeUserRole vs admin_set_user_role", () => {
+describe("changeUserRole (was admin_set_user_role)", () => {
   it("changes another user's role", async () => {
     const caller = await user("label_member");
     const client = await caller.signIn();
-    const [old, next] = [await user("listener"), await user("listener")];
-    expect((await client.rpc("admin_set_user_role", { target: old.id, new_role: "artist" })).error).toBeNull();
+    const next = await user("listener");
     await changeUserRole(await getViewer(client), next.id, "artist");
-    expect([await roleOf(old.id), await roleOf(next.id)]).toEqual(["artist", "artist"]);
+    expect(await roleOf(next.id)).toBe("artist");
     expect(await roleOf(caller.id)).toBe("label_member");
   });
 
   it("refuses your own role and leaves it", async () => {
     const label = await user("label_member");
     const client = await label.signIn();
-    const { error } = await client.rpc("admin_set_user_role", { target: label.id, new_role: "listener" });
-    expect(error?.code).toBe("22023");
     await expect(changeUserRole(await getViewer(client), label.id, "listener")).rejects.toMatchObject({
       name: "DomainError",
       code: "INVALID",
@@ -51,8 +48,6 @@ describe("changeUserRole vs admin_set_user_role", () => {
     const label = await user("label_member");
     const client = await label.signIn();
     const upper = label.id.toUpperCase();
-    const { error } = await client.rpc("admin_set_user_role", { target: upper, new_role: "listener" });
-    expect(error?.code).toBe("22023");
     await expect(changeUserRole(await getViewer(client), upper, "listener")).rejects.toMatchObject({
       name: "DomainError",
       code: "INVALID",
@@ -63,8 +58,6 @@ describe("changeUserRole vs admin_set_user_role", () => {
   it("reports an unknown user", async () => {
     const client = await (await user("label_member")).signIn();
     const missing = "00000000-0000-0000-0000-000000000000";
-    const { error } = await client.rpc("admin_set_user_role", { target: missing, new_role: "artist" });
-    expect(error?.code).toBe("P0002");
     await expect(changeUserRole(await getViewer(client), missing, "artist")).rejects.toMatchObject({
       name: "DomainError",
       code: "NOT_FOUND",
@@ -74,8 +67,6 @@ describe("changeUserRole vs admin_set_user_role", () => {
   it.each(["listener", "artist"] as const)("refuses the %s role and leaves the target", async (role) => {
     const client = await (await user(role)).signIn();
     const target = await user("listener");
-    const { error } = await client.rpc("admin_set_user_role", { target: target.id, new_role: "label_member" });
-    expect(error?.code).toBe("42501");
     await expect(changeUserRole(await getViewer(client), target.id, "label_member")).rejects.toMatchObject({
       name: "DomainError",
       code: "FORBIDDEN",
