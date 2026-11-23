@@ -1,17 +1,30 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or, sql } from "drizzle-orm";
-import { albums, r2CleanupQueue, releases, trackAlbums, tracks } from "@/lib/db/generated/schema";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, max, ne, notInArray, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import {
+  albumArtists,
+  albums,
+  artists,
+  r2CleanupQueue,
+  releases,
+  trackAlbums,
+  trackArtists,
+  tracks,
+} from "@/lib/db/generated/schema";
+import type { AddTrackPayload, ArtistRef, ReleaseEditPayload, ReleasePayload } from "@/lib/admin/types";
 import type { Tx } from "@/lib/db/client";
 import { asSystem } from "@/lib/db/system";
 import { DomainError } from "./errors";
 import { authorize } from "./policy";
 import type { Viewer } from "./viewer";
 
-// The release admin writes: archive/restore a release, remove/restore an
-// album track, replace a track's MP3, move a release up or down. They replace
-// the SQL functions archive_release, restore_release, archive_track,
+// The release admin writes: publish a release, edit it, add an album track,
+// archive/restore a release, remove/restore an album track, replace a track's
+// MP3, move a release up or down. They replace the SQL functions
+// publish_release, update_release, add_album_track (and their helper
+// resolve_artist_refs), archive_release, restore_release, archive_track,
 // restore_track, replace_track_audio and move_release, with the same checks in
-// the same order and the same messages. Two deliberate differences: restore
+// the same order and the same messages (for publish, edit and add-track: for
+// every request the actions let through). Two deliberate differences: restore
 // finds the tracks to bring back by tracks.archived_with_release instead of
 // matching archived_at, and the shared-track checks are gone (the database
 // keeps every track on one release).
@@ -22,6 +35,15 @@ import type { Viewer } from "./viewer";
 
 type Release = typeof releases.$inferSelect;
 type QueueRow = typeof r2CleanupQueue.$inferInsert;
+
+// Empty, or only spaces (the SQL functions' coalesce(trim(x), '') = '').
+function blank(s: string): boolean {
+  return s.trim() === "";
+}
+
+function invalid(message: string): DomainError {
+  return new DomainError("INVALID", message);
+}
 
 // Locks the release (select ... for update), or undefined when it doesn't exist.
 async function lockRelease(tx: Tx, id: string): Promise<Release | undefined> {
@@ -280,5 +302,214 @@ export async function moveRelease(viewer: Viewer, releaseId: string, direction: 
 
     await tx.update(releases).set({ sortAt: nbAt }).where(eq(releases.id, cur.id));
     await tx.update(releases).set({ sortAt: curAt }).where(eq(releases.id, nb.id));
+  });
+}
+
+// The artist with this name in any case (artists_name_ci_key), created if new.
+async function artistIdByName(tx: Tx, name: string): Promise<string> {
+  // A new artist can only clash on artists_name_ci_key (lower(trim(name))):
+  // its id is random and its user_id is empty.
+  await tx.insert(artists).values({ name }).onConflictDoNothing();
+  const [found] = await tx
+    .select({ id: artists.id })
+    .from(artists)
+    .where(sql`lower(trim(${artists.name})) = lower(${name})`);
+  return found.id;
+}
+
+// Turns each list of artist refs into artist ids, in order, without repeats.
+// Picked artists ({ id }) are checked in one query; each typed name
+// ({ newName }) reuses the artist with that name in any case, or creates it.
+async function resolveArtists(tx: Tx, lists: ArtistRef[][]): Promise<string[][]> {
+  const refs = lists.flat();
+  const picked = [...new Set(refs.flatMap((ref) => ("id" in ref ? [ref.id.toLowerCase()] : [])))];
+  if (picked.length) {
+    const found = await tx.select({ id: artists.id }).from(artists).where(inArray(artists.id, picked));
+    if (found.length < picked.length) throw invalid("Unknown artist.");
+  }
+  const byName = new Map<string, string>();
+  for (const ref of refs) {
+    if ("newName" in ref && !byName.has(ref.newName.trim())) {
+      byName.set(ref.newName.trim(), await artistIdByName(tx, ref.newName.trim()));
+    }
+  }
+  const idOf = (ref: ArtistRef) => ("id" in ref ? ref.id.toLowerCase() : byName.get(ref.newName.trim())!);
+  return lists.map((list) => [...new Set(list.map(idOf))]);
+}
+
+// Credit rows for tracks (each track's artists numbered from 1), for one insert.
+function trackCredits(trackIds: string[], artistIds: string[][]) {
+  return trackIds.flatMap((trackId, i) => artistIds[i].map((artistId, n) => ({ trackId, artistId, position: n + 1 })));
+}
+
+async function creditAlbum(tx: Tx, albumId: string, artistIds: string[]): Promise<void> {
+  if (artistIds.length) {
+    await tx.insert(albumArtists).values(artistIds.map((artistId, n) => ({ albumId, artistId, position: n + 1 })));
+  }
+}
+
+// sort_at is left out, as in the SQL function: the releases_default_sort_at
+// trigger fills it from created_at (Drizzle's types require the column).
+async function insertRelease(
+  tx: Tx,
+  target: { kind: "single"; trackId: string } | { kind: "album"; albumId: string },
+): Promise<string> {
+  const [rel] = await tx
+    .insert(releases)
+    .values({ ...target, sortAt: sql`default` })
+    .returning({ id: releases.id });
+  return rel.id;
+}
+
+// The track checks a form can fail, in track order.
+function checkTracks(items: Array<{ title: string; artists: ArtistRef[] }>): void {
+  for (const [i, item] of items.entries()) {
+    if (blank(item.title)) throw invalid(`Track ${i + 1} needs a title.`);
+    if (!item.artists.length) throw invalid(`Track ${i + 1} needs at least one artist.`);
+  }
+}
+
+// Inserts the tracks one at a time, so their HSS catalog numbers follow track
+// order, then all their credits at once. Returns the track ids.
+async function insertTracks(tx: Tx, items: ReleasePayload["tracks"], artistIds: string[][]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const item of items) {
+    const [row] = await tx
+      .insert(tracks)
+      .values({ title: item.title.trim(), audioUrl: item.audioKey })
+      .returning({ id: tracks.id });
+    ids.push(row.id);
+  }
+  await tx.insert(trackArtists).values(trackCredits(ids, artistIds));
+  return ids;
+}
+
+async function publishSingle(tx: Tx, { album, tracks: items }: ReleasePayload): Promise<string> {
+  if (items.length !== 1) throw invalid("A single has exactly one track.");
+  if (album !== undefined) throw invalid("A single has no album details.");
+  checkTracks(items);
+  const [trackId] = await insertTracks(tx, items, await resolveArtists(tx, [items[0].artists]));
+  return insertRelease(tx, { kind: "single", trackId });
+}
+
+async function publishAlbum(tx: Tx, { album, tracks: items }: ReleasePayload): Promise<string> {
+  if (items.length < 2) throw invalid("An album needs at least 2 tracks.");
+  if (!album || blank(album.title)) throw invalid("Album title is required.");
+  checkTracks(items);
+  const [albumArtistIds, ...trackArtistIds] = await resolveArtists(tx, [album.artists, ...items.map((t) => t.artists)]);
+  const trackIds = await insertTracks(tx, items, trackArtistIds);
+  const [row] = await tx.insert(albums).values({ title: album.title.trim() }).returning({ id: albums.id });
+  await creditAlbum(tx, row.id, albumArtistIds);
+  await tx.insert(trackAlbums).values(trackIds.map((trackId, i) => ({ trackId, albumId: row.id, position: i + 1 })));
+  return insertRelease(tx, { kind: "album", albumId: row.id });
+}
+
+// Publishes a single (one track) or an album (two or more): its tracks in
+// order, each with ordered artist credits, then the album and its credits,
+// then the release. Returns the release id. The tracks get their HSS catalog
+// numbers in track order, then the album its HS number, as before. The action
+// has already checked the payload's shape (src/lib/admin/actions.ts).
+export async function publishRelease(viewer: Viewer, release: ReleasePayload): Promise<string> {
+  const grant = authorize(viewer, "releases.publish");
+  return asSystem(grant, "releases.publish", (tx) =>
+    release.kind === "single" ? publishSingle(tx, release) : publishAlbum(tx, release),
+  );
+}
+
+// SQL `case` that picks a value per row, so one UPDATE can give each row its own value.
+function perRow(idColumn: AnyColumn, values: Array<[string, SQL]>): SQL {
+  return sql`case ${sql.join(values.map(([id, value]) => sql`when ${idColumn} = ${id} then ${value}`), sql` `)} end`;
+}
+
+// Saves the edit page's draft: track titles, artists and order, and the
+// album's title and artists. The draft must list exactly the release's live
+// tracks; anything else means the page is stale. The action has already
+// checked the draft's shape (src/lib/admin/release-actions.ts).
+export async function updateRelease(viewer: Viewer, releaseId: string, draft: ReleaseEditPayload): Promise<void> {
+  const grant = authorize(viewer, "releases.update");
+  await asSystem(grant, "releases.update", async (tx) => {
+    const rel = await lockRelease(tx, releaseId);
+    if (!rel) throw new DomainError("NOT_FOUND", "Release not found.");
+    if (rel.archivedAt !== null) throw invalid("Restore this release before editing it.");
+
+    // A release has an album exactly when it isn't a single (releases_kind_matches_target).
+    const albumId = rel.kind === "album" ? rel.albumId : null;
+    const { album, tracks: items } = draft;
+    let live: string[];
+    if (albumId === null) {
+      if (album !== undefined) throw invalid("A single has no album details.");
+      live = [rel.trackId!];
+    } else {
+      if (!album || blank(album.title)) throw invalid("Album title is required.");
+      const rows = await tx
+        .select({ id: trackAlbums.trackId })
+        .from(trackAlbums)
+        .innerJoin(tracks, eq(tracks.id, trackAlbums.trackId))
+        .where(and(eq(trackAlbums.albumId, albumId), isNull(tracks.archivedAt)));
+      live = rows.map((r) => r.id);
+    }
+
+    // Postgres compares uuids in any case; it stores them in lower case.
+    const given = items.map((item) => item.id.toLowerCase());
+    const matches =
+      given.length === live.length && new Set(given).size === given.length && given.every((id) => live.includes(id));
+    if (!matches) throw invalid("This release changed since you opened it. Reload the page.");
+    checkTracks(items);
+
+    const [albumArtistIds, ...trackArtistIds] = await resolveArtists(tx, [album?.artists ?? [], ...items.map((t) => t.artists)]);
+    if (given.length) {
+      await tx
+        .update(tracks)
+        .set({ title: perRow(tracks.id, items.map((item, i) => [given[i], sql`${item.title.trim()}`])) })
+        .where(inArray(tracks.id, given));
+      await tx.delete(trackArtists).where(inArray(trackArtists.trackId, given));
+      await tx.insert(trackArtists).values(trackCredits(given, trackArtistIds));
+    }
+
+    if (albumId !== null && album) {
+      // The live tracks in the draft's order, then the removed (archived) ones
+      // in their old order.
+      const removed = await tx
+        .select({ id: trackAlbums.trackId })
+        .from(trackAlbums)
+        .innerJoin(tracks, eq(tracks.id, trackAlbums.trackId))
+        .where(and(eq(trackAlbums.albumId, albumId), isNotNull(tracks.archivedAt)))
+        .orderBy(asc(trackAlbums.position), asc(trackAlbums.trackId));
+      const order = [...given, ...removed.map((r) => r.id)];
+      if (order.length) {
+        await tx
+          .update(trackAlbums)
+          .set({ position: perRow(trackAlbums.trackId, order.map((id, i) => [id, sql`${i + 1}::integer`])) })
+          .where(eq(trackAlbums.albumId, albumId));
+      }
+
+      await tx.update(albums).set({ title: album.title.trim() }).where(eq(albums.id, albumId));
+      await tx.delete(albumArtists).where(eq(albumArtists.albumId, albumId));
+      await creditAlbum(tx, albumId, albumArtistIds);
+    }
+  });
+}
+
+// Adds a new track to the end of a live album (after every track, live or
+// removed). Returns the track id. The action has already checked the
+// payload's shape and that its file was uploaded.
+export async function addAlbumTrack(viewer: Viewer, releaseId: string, track: AddTrackPayload): Promise<string> {
+  const grant = authorize(viewer, "tracks.add");
+  return asSystem(grant, "tracks.add", async (tx) => {
+    const rel = await lockRelease(tx, releaseId);
+    if (!rel) throw new DomainError("NOT_FOUND", "Release not found.");
+    const albumId = rel.albumId;
+    if (rel.kind !== "album" || albumId === null) throw invalid("Tracks can only be added to albums.");
+    if (rel.archivedAt !== null) throw invalid("This album is archived.");
+    if (blank(track.title)) throw invalid("Track needs a title.");
+    if (!track.artists.length) throw invalid("Track needs at least one artist.");
+
+    const [trackId] = await insertTracks(tx, [track], await resolveArtists(tx, [track.artists]));
+    const [last] = await tx
+      .select({ position: max(trackAlbums.position) })
+      .from(trackAlbums)
+      .where(eq(trackAlbums.albumId, albumId));
+    await tx.insert(trackAlbums).values({ trackId, albumId, position: (last?.position ?? 0) + 1 });
+    return trackId;
   });
 }
