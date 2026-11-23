@@ -15,6 +15,7 @@ import { getViewer } from "./viewer";
 // now runs through the service and must end exactly as recorded: the same
 // error (code and message) at each step and the same rows afterwards
 // (releases, tracks and r2_cleanup_queue, with ids and tags replaced by labels).
+// Never update the snapshot (vitest -u, or renaming a test): the SQL functions it was recorded from are gone, so it can't be recorded again.
 
 type Err = { code: string; message: string } | null;
 type Via = {

@@ -24,7 +24,9 @@ import type { Viewer } from "./viewer";
 // resolve_artist_refs), archive_release, restore_release, archive_track,
 // restore_track, replace_track_audio and move_release, with the same checks in
 // the same order and the same messages (for publish, edit and add-track: for
-// every request the actions let through). Two deliberate differences: restore
+// every request the actions let through). Publish, edit and add-track run all their checks
+// before any write, so a request that breaks two rules at once may report a different one of
+// the two first. Two deliberate differences: restore
 // finds the tracks to bring back by tracks.archived_with_release instead of
 // matching archived_at, and the shared-track checks are gone (the database
 // keeps every track on one release).
@@ -36,7 +38,7 @@ import type { Viewer } from "./viewer";
 type Release = typeof releases.$inferSelect;
 type QueueRow = typeof r2CleanupQueue.$inferInsert;
 
-// Empty, or only spaces (the SQL functions' coalesce(trim(x), '') = '').
+// Empty, or only whitespace (standard .trim(); the SQL functions trimmed spaces only).
 function blank(s: string): boolean {
   return s.trim() === "";
 }

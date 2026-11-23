@@ -377,6 +377,8 @@ describe("updateRelease vs update_release", () => {
     ["an extra unknown track", (ids: string[]) => [...ids, UNKNOWN]],
     ["a track listed twice", (ids: string[]) => [ids[0], ids[0], ids[1]]],
     ["a removed track listed", (ids: string[]) => ids],
+    ["a live track swapped for an unknown one (same length)", (ids: string[]) => [ids[0], UNKNOWN]],
+    ["a live track listed twice (same length)", (ids: string[]) => [ids[0], ids[0]]],
   ])("refuses a stale draft (%s) and changes nothing", async (_what, pick) => {
     const out = await both("label_member", async (via, tag) => {
       const a = await makeAlbum(tag, 3);
