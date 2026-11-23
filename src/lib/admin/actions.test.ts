@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
-const rpc = vi.fn();
+const VIEWER = { userId: "u1", role: "label_member" };
+const getViewer = vi.fn();
+const service = { publishRelease: vi.fn() };
 const limit = vi.fn();
 const order = vi.fn((_c?: string, _o?: unknown) => ({ limit }));
 const ilike = vi.fn((_c?: string, _p?: string) => ({ order }));
@@ -15,7 +18,11 @@ const redirect = vi.fn((_path?: string) => {
 });
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from, rpc })) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from })) }));
+vi.mock("@/lib/services/viewer", () => ({ getViewer: (...a: unknown[]) => getViewer(...a) }));
+vi.mock("@/lib/services/releases", () => ({
+  publishRelease: (...a: unknown[]) => service.publishRelease(...a),
+}));
 vi.mock("@/lib/storage/sign", () => ({
   signUploadUrl: (...a: [string, string]) => signUploadUrl(...a),
   headObject: (...a: [string]) => headObject(...a),
@@ -35,6 +42,7 @@ const single: ReleasePayload = {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
+  getViewer.mockResolvedValue(VIEWER);
 });
 
 describe("role gate", () => {
@@ -48,7 +56,7 @@ describe("role gate", () => {
     expect(await publishRelease(single)).toEqual({ error: "Only label members can do this." });
     expect(from).not.toHaveBeenCalled();
     expect(signUploadUrl).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
   });
 });
 
@@ -121,12 +129,12 @@ describe("createUploadUrls", () => {
 });
 
 describe("publishRelease", () => {
-  it("verifies uploads, calls publish_release, revalidates and redirects to /feed", async () => {
+  it("verifies uploads, calls publishRelease, revalidates and redirects to /feed", async () => {
     headObject.mockResolvedValue({ size: 123 });
-    rpc.mockResolvedValue({ data: "release-1", error: null });
+    service.publishRelease.mockResolvedValue("release-1");
     await expect(publishRelease(single)).rejects.toThrow("NEXT_REDIRECT");
     expect(headObject).toHaveBeenCalledWith(KEY);
-    expect(rpc).toHaveBeenCalledWith("publish_release", { payload: single });
+    expect(service.publishRelease).toHaveBeenCalledWith(VIEWER, single);
     expect(revalidatePath).toHaveBeenCalledWith("/feed");
     expect(redirect).toHaveBeenCalledWith("/feed");
   });
@@ -137,7 +145,7 @@ describe("publishRelease", () => {
       tracks: [{ ...single.tracks[0], audioKey: "NOVA. - SLOW BLOOM.mp3" }],
     });
     expect(res).toEqual({ error: "Invalid audio file reference." });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
   });
 
   it("refuses when an upload is missing or too large", async () => {
@@ -147,7 +155,7 @@ describe("publishRelease", () => {
     });
     headObject.mockResolvedValueOnce({ size: 50 * 1024 * 1024 + 1 });
     expect(await publishRelease(single)).toEqual({ error: "MP3s must be 50 MB or smaller." });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
   });
 
   it("rejects malformed payloads without touching storage or the DB", async () => {
@@ -161,7 +169,26 @@ describe("publishRelease", () => {
     const dup = { ...single, tracks: [single.tracks[0], single.tracks[0]] };
     expect(await publishRelease(dup)).toEqual({ error: "Invalid audio file reference." });
     expect(headObject).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
+  });
+
+  it("refuses a release shape the upload form never sends, without touching storage or the DB", async () => {
+    const track = single.tracks[0];
+    const bad = [
+      { ...single, kind: "ep" },
+      { ...single, kind: undefined },
+      { ...single, album: null },
+      { ...single, album: { title: 7, artists: [] } },
+      { ...single, album: { title: "A", artists: [{ id: "nope" }] } },
+      { ...single, tracks: [{ ...track, title: 7 }] },
+      { ...single, tracks: [{ ...track, artists: [{}] }] },
+      { ...single, tracks: [{ ...track, artists: null }] },
+    ];
+    for (const payload of bad) {
+      expect(await publishRelease(payload as unknown as ReleasePayload)).toEqual({ error: "Invalid release." });
+    }
+    expect(headObject).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
   });
 
   it("treats a zero-byte upload as unfinished", async () => {
@@ -169,17 +196,17 @@ describe("publishRelease", () => {
     expect(await publishRelease(single)).toEqual({
       error: "A file didn't finish uploading. Publish again to retry.",
     });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(service.publishRelease).not.toHaveBeenCalled();
   });
 
   it("maps database errors to messages and does not redirect", async () => {
     headObject.mockResolvedValue({ size: 1 });
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "22023", message: "Track 2 needs a title." } });
+    service.publishRelease.mockRejectedValueOnce(new DomainError("INVALID", "Track 2 needs a title."));
     expect(await publishRelease(single)).toEqual({ error: "Track 2 needs a title." });
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "x" } });
+    service.publishRelease.mockRejectedValueOnce(new DomainError("FORBIDDEN", "x"));
     expect(await publishRelease(single)).toEqual({ error: "Only label members can do this." });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    rpc.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "internal" } });
+    service.publishRelease.mockRejectedValueOnce(new DatabaseError("XX000", undefined));
     expect(await publishRelease(single)).toEqual({ error: "Couldn't publish. Nothing was saved — try again." });
     errorSpy.mockRestore();
     expect(redirect).not.toHaveBeenCalled();
