@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, cleanup, makeAlbum, makeSingle, newTag, signedIn } from "@/lib/supabase/release-admin-fixtures";
+import { admin, archivedAt, cleanup, makeAlbum, makeSingle, newTag, signedIn } from "@/lib/supabase/release-admin-fixtures";
 import { createTestUser } from "@/lib/supabase/test-helpers";
 import { DomainError } from "./errors";
 import * as service from "./releases";
@@ -11,7 +11,9 @@ import { getViewer } from "./viewer";
 // runs twice on fresh data, once through the SQL function and once through
 // the service, and both runs must end the same way: the same error (code and
 // message) at each step and the same rows afterwards (releases, tracks and
-// r2_cleanup_queue, with ids and tags replaced by labels).
+// r2_cleanup_queue, with ids and tags replaced by labels). Each outcome is also
+// saved as a snapshot (__snapshots__/releases.parity.data.test.ts.snap), so
+// the SQL functions' results stay on record after slice 4 drops them.
 
 type Err = { code: string; message: string } | null;
 type Via = {
@@ -77,7 +79,8 @@ async function clientFor(role: "label_member" | "listener" | "artist"): Promise<
 }
 
 // Runs a scenario through the SQL function, then through the service, each
-// with its own tag, and checks both outcomes match. Returns the outcome.
+// with its own tag, and checks both outcomes match and match the snapshot.
+// Returns the outcome.
 async function both<T>(role: "label_member" | "listener" | "artist", scenario: (via: Via, tag: string) => Promise<T>) {
   const client = await clientFor(role);
   const outcomes: T[] = [];
@@ -88,6 +91,7 @@ async function both<T>(role: "label_member" | "listener" | "artist", scenario: (
     await cleanup(tag);
   }
   expect(outcomes[1]).toEqual(outcomes[0]);
+  expect(outcomes[0]).toMatchSnapshot();
   return outcomes[1];
 }
 
@@ -165,11 +169,16 @@ describe("archiveRelease vs archive_release", () => {
     expect(out[1]).toMatchObject({ releases: [["release", "A"]], tracks: [["t1", "A", expect.any(String)], ["t2", "A", expect.any(String)], ["t3", "B", expect.any(String)]] });
   });
 
-  it("is a no-op the second time", async () => {
-    await both("label_member", async (via, tag) => {
+  it("is a no-op the second time (the timestamps stay the same)", async () => {
+    const out = await both("label_member", async (via, tag) => {
       const s = await single(tag);
-      return [await via.archiveRelease(s.releaseId), await via.archiveRelease(s.releaseId), await state(tag, s.labels)];
+      const stamps = async () => [...(await archivedAt("releases", [s.releaseId])), ...(await archivedAt("tracks", [s.trackId]))];
+      const first = await via.archiveRelease(s.releaseId);
+      const before = await stamps();
+      const second = await via.archiveRelease(s.releaseId);
+      return [first, second, JSON.stringify(await stamps()) === JSON.stringify(before), await state(tag, s.labels)];
     });
+    expect(out[2]).toBe(true);
   });
 
   it("reports an unknown release", async () => {
@@ -399,13 +408,11 @@ describe("replaceTrackAudio vs replace_track_audio", () => {
     });
   });
 
-  it("refuses the same key, a blank key and an archived track; a tab is not blank (Postgres trim)", async () => {
+  it("refuses the same key and an archived track", async () => {
     const out = await both("label_member", async (via, tag) => {
       const s = await single(tag);
       const steps = [
         await via.replaceTrackAudio(s.trackId, `tracks/${tag}-1.mp3`),
-        await via.replaceTrackAudio(s.trackId, "   "),
-        await via.replaceTrackAudio(s.trackId, "\t"),
         await via.archiveRelease(s.releaseId),
         await via.replaceTrackAudio(s.trackId, `tracks/${tag}-v2.mp3`),
       ];
@@ -413,8 +420,6 @@ describe("replaceTrackAudio vs replace_track_audio", () => {
     });
     expect(out[0]).toEqual([
       { code: "INVALID", message: "That file is already on this track." },
-      { code: "INVALID", message: "No audio file." },
-      null,
       null,
       { code: "INVALID", message: "Restore this track before replacing its file." },
     ]);
@@ -478,18 +483,18 @@ describe("moveRelease vs move_release", () => {
     ["well-separated releases (fast path)", 2907, [{ at: "2907-01-03T00:00:00Z" }, { at: "2907-01-02T00:00:00Z" }, { at: "2907-01-01T00:00:00Z" }], [[0, "down"]]],
     ["a tie next to a row already spaced apart", 2908, [{ at: "2908-01-02T00:00:00Z" }, { at: "2908-01-02T00:00:00Z" }, { at: "2907-06-01T00:00:00Z" }], [[1, "down"]]],
     ["the top of the unpinned group, under a pinned release", 2909, [{ at: "2000-01-01T00:00:00Z", pinned: true }, { at: "2909-01-01T00:00:00Z" }], [[1, "up"]]],
+    ["a third row is tied with the neighbour", 2911, [{ at: "2911-01-02T00:00:00Z" }, { at: "2911-01-02T00:00:00Z" }, { at: "2911-01-01T00:00:00Z" }], [[2, "up"]]],
     ["a tie inside the pinned group, next to an archived pinned release", 2910, [{ at: "2910-01-02T00:00:00Z", pinned: true }, { at: "2910-01-02T00:00:00Z", pinned: true }, { at: "2910-01-02T00:00:00Z", pinned: true, archived: true }, { at: "2910-01-01T00:00:00Z", pinned: true }], [[1, "down"], [0, "down"]]],
   ];
 
-  it.each(scenarios)("same sort_at values after moves: %s", async (_name, scenario, fixture, moves) => {
+  it.each(scenarios)("same sort_at values after each move: %s", async (_name, scenario, fixture, moves) => {
     await both("label_member", async (via, tag) => {
       const ids = fixture.map((_, n) => id(n, scenario));
       for (const [n, row] of fixture.entries()) await release(tag, ids[n], row.at, row.pinned ?? false, row.archived ?? false);
-      const errors: Err[] = [];
-      for (const [n, direction] of moves) errors.push(await via.moveRelease(ids[n], direction));
-      const after = await rows(ids);
+      const steps: Array<[Err, Awaited<ReturnType<typeof rows>>]> = [];
+      for (const [n, direction] of moves) steps.push([await via.moveRelease(ids[n], direction), await rows(ids)]);
       await admin.from("releases").delete().in("id", ids);
-      return [errors, after];
+      return steps;
     });
   });
 

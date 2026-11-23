@@ -1,0 +1,1328 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`archiveRelease vs archive_release > archives a single and its track together and queues audio + art 1`] = `
+[
+  null,
+  {
+    "queue": [
+      [
+        "art/TAG-1.jpg",
+        "archived",
+        "tracks",
+        "track",
+        false,
+      ],
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "track",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveRelease vs archive_release > archives an album's live tracks, queues album art, leaves an earlier-removed track alone 1`] = `
+[
+  null,
+  {
+    "queue": [
+      [
+        "art/TAG-album.jpg",
+        "archived",
+        "albums",
+        "album",
+        false,
+      ],
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+      [
+        "t3",
+        "B",
+        "tracks/TAG-3.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveRelease vs archive_release > is a no-op the second time (the timestamps stay the same) 1`] = `
+[
+  null,
+  null,
+  true,
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "track",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveRelease vs archive_release > refuses the artist role and changes nothing 1`] = `
+[
+  {
+    "code": "FORBIDDEN",
+    "message": "Only label members can archive releases.",
+  },
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveRelease vs archive_release > refuses the listener role and changes nothing 1`] = `
+[
+  {
+    "code": "FORBIDDEN",
+    "message": "Only label members can archive releases.",
+  },
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveRelease vs archive_release > reports an unknown release 1`] = `
+{
+  "code": "NOT_FOUND",
+  "message": "Release not found.",
+}
+`;
+
+exports[`archiveTrack vs archive_track > refuses a live track on an archived album 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "This album is archived.",
+  },
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > refuses a single's track 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "Archive the single instead.",
+  },
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > refuses the artist role 1`] = `
+[
+  {
+    "code": "FORBIDDEN",
+    "message": "Only label members can remove tracks.",
+  },
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > refuses the listener role 1`] = `
+[
+  {
+    "code": "FORBIDDEN",
+    "message": "Only label members can remove tracks.",
+  },
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > removes one album track and queues its files; the second call is a no-op 1`] = `
+[
+  null,
+  null,
+  {
+    "queue": [
+      [
+        "art/TAG-1.jpg",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > removing the last live track archives the album; restoring the album brings only that track back 1`] = `
+[
+  [
+    null,
+    null,
+  ],
+  {
+    "queue": [
+      [
+        "art/TAG-album.jpg",
+        "archived",
+        "albums",
+        "album",
+        false,
+      ],
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "B",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+  null,
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > removing the last live track twice is a no-op the second time 1`] = `
+[
+  [
+    null,
+    null,
+    null,
+  ],
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "B",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`archiveTrack vs archive_track > reports an unknown track and an orphan track 1`] = `
+[
+  {
+    "code": "NOT_FOUND",
+    "message": "Track not found.",
+  },
+  {
+    "code": "NOT_FOUND",
+    "message": "Track not found.",
+  },
+]
+`;
+
+exports[`moveRelease vs move_release > refuses an archived release, an unknown release and a bad direction 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "Archived releases cannot be moved.",
+  },
+  {
+    "code": "NOT_FOUND",
+    "message": "Release not found.",
+  },
+  {
+    "code": "INVALID",
+    "message": "direction must be up or down",
+  },
+]
+`;
+
+exports[`moveRelease vs move_release > refuses the artist role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can reorder releases.",
+}
+`;
+
+exports[`moveRelease vs move_release > refuses the listener role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can reorder releases.",
+}
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a sub-millisecond gap below a tied pair 1`] = `
+[
+  [
+    null,
+    {
+      "00002906-0000-4000-8000-000000000000": [
+        "2905-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002906-0000-4000-8000-000000000001": [
+        "2906-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002906-0000-4000-8000-000000000002": [
+        "2905-12-31T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002906-0000-4000-8000-000000000000": [
+        "2905-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002906-0000-4000-8000-000000000001": [
+        "2905-12-31T23:59:59.999+00:00",
+        false,
+      ],
+      "00002906-0000-4000-8000-000000000002": [
+        "2906-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a third row is tied with the current one 1`] = `
+[
+  [
+    null,
+    {
+      "00002904-0000-4000-8000-000000000000": [
+        "2904-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002904-0000-4000-8000-000000000001": [
+        "2904-01-02T00:00:00+00:00",
+        false,
+      ],
+      "00002904-0000-4000-8000-000000000002": [
+        "2904-01-01T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002904-0000-4000-8000-000000000000": [
+        "2904-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002904-0000-4000-8000-000000000001": [
+        "2904-01-01T23:59:59.999+00:00",
+        false,
+      ],
+      "00002904-0000-4000-8000-000000000002": [
+        "2904-01-02T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a third row is tied with the neighbour 1`] = `
+[
+  [
+    null,
+    {
+      "00002911-0000-4000-8000-000000000000": [
+        "2911-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002911-0000-4000-8000-000000000001": [
+        "2911-01-02T00:00:00+00:00",
+        false,
+      ],
+      "00002911-0000-4000-8000-000000000002": [
+        "2911-01-01T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a third row sits exactly 1 ms below a tied pair 1`] = `
+[
+  [
+    null,
+    {
+      "00002905-0000-4000-8000-000000000000": [
+        "2904-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002905-0000-4000-8000-000000000001": [
+        "2905-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002905-0000-4000-8000-000000000002": [
+        "2904-12-31T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002905-0000-4000-8000-000000000000": [
+        "2904-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002905-0000-4000-8000-000000000001": [
+        "2904-12-31T23:59:59.999+00:00",
+        false,
+      ],
+      "00002905-0000-4000-8000-000000000002": [
+        "2905-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a tie inside the pinned group, next to an archived pinned release 1`] = `
+[
+  [
+    null,
+    {
+      "00002910-0000-4000-8000-000000000000": [
+        "2910-01-02T00:00:00+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000001": [
+        "2910-01-01T23:59:59.999+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000002": [
+        "2910-01-02T00:00:00+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000003": [
+        "2910-01-01T00:00:00+00:00",
+        true,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002910-0000-4000-8000-000000000000": [
+        "2910-01-01T23:59:59.999+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000001": [
+        "2910-01-02T00:00:00+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000002": [
+        "2910-01-02T00:00:00+00:00",
+        true,
+      ],
+      "00002910-0000-4000-8000-000000000003": [
+        "2910-01-01T00:00:00+00:00",
+        true,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: a tie next to a row already spaced apart 1`] = `
+[
+  [
+    null,
+    {
+      "00002908-0000-4000-8000-000000000000": [
+        "2908-01-02T00:00:00+00:00",
+        false,
+      ],
+      "00002908-0000-4000-8000-000000000001": [
+        "2908-01-01T23:59:59.999+00:00",
+        false,
+      ],
+      "00002908-0000-4000-8000-000000000002": [
+        "2907-06-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: the neighbour has an identical sort_at 1`] = `
+[
+  [
+    null,
+    {
+      "00002902-0000-4000-8000-000000000000": [
+        "2902-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002902-0000-4000-8000-000000000001": [
+        "2901-12-31T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002902-0000-4000-8000-000000000000": [
+        "2901-12-31T23:59:59.999+00:00",
+        false,
+      ],
+      "00002902-0000-4000-8000-000000000001": [
+        "2902-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: the top of the unpinned group, under a pinned release 1`] = `
+[
+  [
+    null,
+    {
+      "00002909-0000-4000-8000-000000000000": [
+        "2000-01-01T00:00:00+00:00",
+        true,
+      ],
+      "00002909-0000-4000-8000-000000000001": [
+        "2909-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: three releases share a sort_at 1`] = `
+[
+  [
+    null,
+    {
+      "00002903-0000-4000-8000-000000000000": [
+        "2902-12-31T23:59:59.999+00:00",
+        false,
+      ],
+      "00002903-0000-4000-8000-000000000001": [
+        "2902-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002903-0000-4000-8000-000000000002": [
+        "2903-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002903-0000-4000-8000-000000000000": [
+        "2903-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002903-0000-4000-8000-000000000001": [
+        "2902-12-31T23:59:59.998+00:00",
+        false,
+      ],
+      "00002903-0000-4000-8000-000000000002": [
+        "2902-12-31T23:59:59.999+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: up and down one place 1`] = `
+[
+  [
+    null,
+    {
+      "00002901-0000-4000-8000-000000000000": [
+        "2901-03-01T00:00:00+00:00",
+        false,
+      ],
+      "00002901-0000-4000-8000-000000000001": [
+        "2901-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002901-0000-4000-8000-000000000002": [
+        "2901-02-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+  [
+    null,
+    {
+      "00002901-0000-4000-8000-000000000000": [
+        "2901-02-01T00:00:00+00:00",
+        false,
+      ],
+      "00002901-0000-4000-8000-000000000001": [
+        "2901-01-01T00:00:00+00:00",
+        false,
+      ],
+      "00002901-0000-4000-8000-000000000002": [
+        "2901-03-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`moveRelease vs move_release > same sort_at values after each move: well-separated releases (fast path) 1`] = `
+[
+  [
+    null,
+    {
+      "00002907-0000-4000-8000-000000000000": [
+        "2907-01-02T00:00:00+00:00",
+        false,
+      ],
+      "00002907-0000-4000-8000-000000000001": [
+        "2907-01-03T00:00:00+00:00",
+        false,
+      ],
+      "00002907-0000-4000-8000-000000000002": [
+        "2907-01-01T00:00:00+00:00",
+        false,
+      ],
+    },
+  ],
+]
+`;
+
+exports[`replaceTrackAudio vs replace_track_audio > refuses the artist role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can replace files.",
+}
+`;
+
+exports[`replaceTrackAudio vs replace_track_audio > refuses the listener role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can replace files.",
+}
+`;
+
+exports[`replaceTrackAudio vs replace_track_audio > refuses the same key and an archived track 1`] = `
+[
+  [
+    {
+      "code": "INVALID",
+      "message": "That file is already on this track.",
+    },
+    null,
+    {
+      "code": "INVALID",
+      "message": "Restore this track before replacing its file.",
+    },
+  ],
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "track",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`replaceTrackAudio vs replace_track_audio > reports an unknown track and an orphan track 1`] = `
+[
+  {
+    "code": "NOT_FOUND",
+    "message": "Track not found.",
+  },
+  {
+    "code": "NOT_FOUND",
+    "message": "Track not found.",
+  },
+  {
+    "queue": [],
+    "releases": [],
+    "tracks": [
+      [
+        "orphan",
+        null,
+        "tracks/TAG-orphan.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`replaceTrackAudio vs replace_track_audio > swaps the file and queues the old one as replaced 1`] = `
+[
+  null,
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "replaced",
+        "tracks",
+        "track",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-v2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreRelease vs restore_release > brings back the tracks archived with the album, not one removed before (Monday/Tuesday) 1`] = `
+[
+  [
+    null,
+    null,
+    null,
+  ],
+  {
+    "queue": [
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+      [
+        "t3",
+        null,
+        "tracks/TAG-3.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreRelease vs restore_release > is a no-op for a live release 1`] = `
+[
+  null,
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreRelease vs restore_release > refuses the artist role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can restore releases.",
+}
+`;
+
+exports[`restoreRelease vs restore_release > refuses the listener role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can restore releases.",
+}
+`;
+
+exports[`restoreRelease vs restore_release > refuses when a file was already deleted from storage 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "Some files for this release were already deleted from storage; it can't be restored.",
+  },
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "track",
+        true,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreRelease vs restore_release > refuses when the album art was already deleted from storage 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "Some files for this release were already deleted from storage; it can't be restored.",
+  },
+  {
+    "queue": [
+      [
+        "art/TAG-album.jpg",
+        "archived",
+        "albums",
+        "album",
+        true,
+      ],
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreRelease vs restore_release > reports an unknown release 1`] = `
+{
+  "code": "NOT_FOUND",
+  "message": "Release not found.",
+}
+`;
+
+exports[`restoreRelease vs restore_release > restores a single and drops its queue rows 1`] = `
+[
+  null,
+  null,
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "track",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreTrack vs restore_track > refuses a single's track 1`] = `
+{
+  "code": "INVALID",
+  "message": "Restore the single instead.",
+}
+`;
+
+exports[`restoreTrack vs restore_track > refuses the artist role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can restore tracks.",
+}
+`;
+
+exports[`restoreTrack vs restore_track > refuses the listener role 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Only label members can restore tracks.",
+}
+`;
+
+exports[`restoreTrack vs restore_track > refuses when the track's file was already deleted from storage 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "This track's file was already deleted from storage.",
+  },
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        true,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreTrack vs restore_track > refuses while the album is archived 1`] = `
+[
+  {
+    "code": "INVALID",
+    "message": "Restore the album first.",
+  },
+  {
+    "queue": [
+      [
+        "tracks/TAG-1.mp3",
+        "archived",
+        "tracks",
+        "t1",
+        false,
+      ],
+      [
+        "tracks/TAG-2.mp3",
+        "archived",
+        "tracks",
+        "t2",
+        false,
+      ],
+    ],
+    "releases": [
+      [
+        "release",
+        "A",
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        "A",
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        "A",
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;
+
+exports[`restoreTrack vs restore_track > reports an unknown track 1`] = `
+{
+  "code": "NOT_FOUND",
+  "message": "Track not found.",
+}
+`;
+
+exports[`restoreTrack vs restore_track > restores a removed track and drops its queue rows; a live track is a no-op 1`] = `
+[
+  [
+    null,
+    null,
+    null,
+  ],
+  {
+    "queue": [],
+    "releases": [
+      [
+        "release",
+        null,
+      ],
+    ],
+    "tracks": [
+      [
+        "t1",
+        null,
+        "tracks/TAG-1.mp3",
+      ],
+      [
+        "t2",
+        null,
+        "tracks/TAG-2.mp3",
+      ],
+    ],
+  },
+]
+`;

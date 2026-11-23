@@ -223,7 +223,8 @@ export async function restoreTrack(viewer: Viewer, trackId: string): Promise<voi
   });
 }
 
-// Points a track at a new MP3 and queues the old one as replaced.
+// Points a track at a new MP3 and queues the old one as replaced. The action
+// only sends a key shaped like tracks/<uuid>.mp3 whose upload it verified.
 export async function replaceTrackAudio(viewer: Viewer, trackId: string, audioKey: string): Promise<void> {
   const grant = authorize(viewer, "tracks.replaceAudio");
   await asSystem(grant, "tracks.replaceAudio", async (tx) => {
@@ -231,8 +232,6 @@ export async function replaceTrackAudio(viewer: Viewer, trackId: string, audioKe
     const trk = await lockTrack(tx, trackId);
     if (!trk) throw new DomainError("NOT_FOUND", "Track not found.");
     if (trk.archivedAt !== null) throw new DomainError("INVALID", "Restore this track before replacing its file.");
-    // Postgres trim(), which the SQL function used, strips spaces only.
-    if (audioKey.replace(/^ +| +$/g, "") === "") throw new DomainError("INVALID", "No audio file.");
     if (audioKey === trk.audioUrl) throw new DomainError("INVALID", "That file is already on this track.");
 
     await queue(tx, [{ objectKey: trk.audioUrl, reason: "replaced", sourceTable: "tracks", sourceId: trk.id }]);
