@@ -56,7 +56,7 @@ contradict track creation order, proving ordering comes from `releases`; every i
 track and `AlbumDetail` has a `catalogNumber > 0`; `getAlbum`
 positive + null (missing + non-UUID + archived) paths and position (not title) track order; feed pinned/`sort_at` order and archived items hidden; `feed-page-size.test.ts` (unit) for `FEED_PAGE_SIZE`; `feed-query.data.test.ts` for search (`q`), counts/`totalPages` and past-the-end totals; `feed-after-release.data.test.ts` for `getReleaseFeedPage`/`getFeedAfterRelease` (albums and singles, archived → null).
 Added with the Drizzle move (slice 1), unchanged older tests above still the main check:
-`feed-drizzle.parity.data.test.ts` (search matches and order equal the old `search_feed` path for
+`feed-drizzle.parity.data.test.ts` (search matches and order equal what the old `search_feed` path gave, written as explicit expected results since slice 4 dropped it, for
 `%`, `_`, `\`, case, archived tracks and album matches, as a listener and a label member;
 `createdAt` is PostgREST's exact string; past-the-end totals; signed out → `UNAUTHENTICATED`),
 `feed-row-cap.data.test.ts` (at most `MAX_ROWS` rows, exact total), `albums.drizzle.data.test.ts`

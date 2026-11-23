@@ -1,6 +1,6 @@
 ---
 name: content-lifecycle
-description: Use when archiving, restoring, or removing releases, tracks, or artists (the `archiveRelease` / `restoreRelease` / `archiveTrack` / `restoreTrack` / `replaceTrackAudio` services in `src/lib/services/releases.ts`, the old `archive_release` / `restore_release` / `archive_track` / `restore_track` / `replace_track_audio` SQL functions, `add_album_track`, `update_release`); replacing an uploaded MP3 or image; working with archived_at, `tracks.archived_with_release`, the one-track-one-place rule, r2_cleanup_queue, the artist-delete FK block, `moveRelease` / move_release / pinned / sort_at ordering, or a future R2 cleanup job, or the archived filter in the feed search (`searchMatches` in `feed-search.ts`). Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
+description: Use when archiving, restoring, or removing releases, tracks, or artists (the `archiveRelease` / `restoreRelease` / `archiveTrack` / `restoreTrack` / `replaceTrackAudio` / `addAlbumTrack` / `updateRelease` services in `src/lib/services/releases.ts`, which replaced the `archive_release` / `restore_release` / `archive_track` / `restore_track` / `replace_track_audio` SQL functions); replacing an uploaded MP3 or image; working with archived_at, `tracks.archived_with_release`, the one-track-one-place rule, r2_cleanup_queue, the artist-delete FK block, `moveRelease` / move_release / pinned / sort_at ordering, or a future R2 cleanup job, or the archived filter in the feed search (`searchMatches` in `feed-search.ts`). Also when an archived item still shows somewhere, a deleted artist errors with 23503, or someone asks whether a file can be deleted from R2.
 ---
 
 # Content Lifecycle (archive, order, cleanup)
@@ -11,9 +11,10 @@ artists can't be deleted while credited. The **schema and read-side guards are b
 (branch `feature/v1-schema`, 2026-10-10); the admin UI that drives them is built too (`/admin/releases`, branch `feature/admin-release`; see [[admin-upload]]). The atomic archive/restore/edit SQL functions were built
 on `feature/release-admin-functions`; since Drizzle slice 3 (`feature/ORM-phase-3`, 2026-11-15)
 archive, restore, remove/restore track, replace MP3 and reorder run as TypeScript services in
-`src/lib/services/releases.ts` ([[db-access]]). The old SQL functions stay in the database,
-unused by the app, until slice 4's migration drops them; edit and add-track still use
-`update_release` / `add_album_track`.
+`src/lib/services/releases.ts` ([[db-access]]), and since slice 4 edit and add-track too
+(`updateRelease`, `addAlbumTrack`). Slice 4's migration (`20261119120000`) dropped the slice 3
+SQL functions; `update_release` / `add_album_track` stay, unused by the app, until the final
+cleanup.
 
 ## The one thing to understand first
 
@@ -31,22 +32,22 @@ movable feed position (the `moveRelease` service swaps it).
 | Concern | Where |
 |---|---|
 | `pinned`, `sort_at`, `archived_at`, `keep_created_at`, live-only read policies | `supabase/migrations/20261010120000_feed_order_and_archive.sql` |
-| `move_release` (unused by the app since slice 3) | `…20261010120100_move_release.sql` |
-| `search_feed` (archived excluded; no app callers since Drizzle slice 1) | `…20261010120200_search_feed.sql` |
+| `move_release` (dropped in slice 4) | `…20261010120100_move_release.sql` |
+| `search_feed` (archived excluded; dropped in slice 4) | `…20261010120200_search_feed.sql` |
 | `r2_cleanup_queue` | `…20261010120300_r2_cleanup_queue.sql` |
 | Artist-side credit FKs `restrict` | `…20261010120400_artist_credit_fk_restrict.sql` |
-| `release_for_track` (internal), `archive_release`, `restore_release` (unused by the app since slice 3) | `…20261010140000_archive_restore_release.sql` |
-| `archive_track`, `restore_track` (unused by the app since slice 3) | `…20261010140100_archive_restore_track.sql` |
-| `add_album_track`, `replace_track_audio` (the second unused by the app since slice 3) | `…20261010140200_add_track_replace_audio.sql` |
-| `update_release` | `…20261010140300_update_release.sql` |
+| `release_for_track` (internal), `archive_release`, `restore_release` (dropped in slice 4) | `…20261010140000_archive_restore_release.sql` |
+| `archive_track`, `restore_track` (dropped in slice 4) | `…20261010140100_archive_restore_track.sql` |
+| `add_album_track`, `replace_track_audio` (the first unused by the app since slice 4, the second dropped in slice 4) | `…20261010140200_add_track_replace_audio.sql` |
+| `update_release` (unused by the app since slice 4) | `…20261010140300_update_release.sql` |
 | `tracks.archived_with_release` (restore reads it), one track in one place (unique index `track_albums_track_id_key`, trigger `track_in_one_place`) | `…20261115120000_track_one_place.sql` |
-| Archive, restore, remove/restore track, replace MP3, reorder: `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`, `moveRelease` | `src/lib/services/releases.ts` ([[db-access]]) |
+| Archive, restore, remove/restore track, replace MP3, reorder, edit, add track: `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`, `moveRelease`, `updateRelease`, `addAlbumTrack` | `src/lib/services/releases.ts` ([[db-access]]) |
 | `catalog_number` identity + `keep_catalog_number` (archive/restore/delete never reuse or change a number) | `…20261011170000_catalog_numbers.sql` ([[catalog-schema]]) |
 | Feed order + archived filter, `feedPageSize()` | `src/lib/supabase/feed.ts` (`getFeed`) |
 | Feed search (archived tracks never match) | `src/lib/supabase/feed-search.ts` (`searchMatches`) |
 | `null` for archived albums, archived tracks skipped | `src/lib/supabase/albums.ts` (`getAlbum`) |
 | Stream/download refuse archived tracks | `src/lib/storage/actions.ts` |
-| Tests | `src/lib/supabase/{archive-schema,move-release,search-feed,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `feed-drizzle.parity.data.test.ts`, `{archive-release,archive-track,add-track-replace-audio,update-release,track-one-place}.data.test.ts`, `src/lib/services/releases.parity.data.test.ts`, `src/lib/storage/actions.test.ts` |
+| Tests | `src/lib/supabase/{archive-schema,r2-cleanup-queue,artist-delete}.data.test.ts`, `feed.data.test.ts`, `albums.data.test.ts`, `feed-drizzle.parity.data.test.ts`, `{add-track-replace-audio,update-release,track-one-place}.data.test.ts`, `src/lib/services/{releases,releases-publish}.parity.data.test.ts`, `src/lib/storage/actions.test.ts` |
 
 ## References
 
@@ -74,6 +75,6 @@ reversible auth ban, read as `banned_until` by `listUsers`, not a delete), [[tim
 
 - **Admin UI** for pin/reorder/archive/restore/edit/replace/add-remove track is built
   (`src/lib/admin/release-actions.ts`, `/admin/releases`; [[admin-upload]]); artist admin is
-  `/admin/artists`. The feed search (`/feed?q=`) is `searchMatches` inside `getFeed`; the
-  `search_feed` SQL function has no app callers since Drizzle slice 1.
+  `/admin/artists`. The feed search (`/feed?q=`) is `searchMatches` inside `getFeed`; it replaced the
+  `search_feed` SQL function in Drizzle slice 1 (dropped in slice 4).
 - **The cleanup job itself** is not built; nothing deletes from R2.

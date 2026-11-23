@@ -29,9 +29,11 @@ Files: `src/components/Upload/upload-engine.ts` (browser), `src/lib/admin/action
    see [[waveform]] Known gaps). `uploadOne` behaves the same: it returns the key only after
    `storePeaks`.
 7. `publishRelease(buildPayload(state, keys))`. Server: role check; runtime shape check;
-   ≤ 50 tracks; every `audioKey` a string matching `AUDIO_KEY_RE`, no duplicates; `HEAD`
+   ≤ 50 tracks; `releaseShapeValid` (known kind, `albumValid` album, string track titles,
+   `artistRefsValid` refs; else "Invalid release."); every `audioKey` a string matching `AUDIO_KEY_RE`, no duplicates; `HEAD`
    each key (missing or size ≤ 0 → "didn't finish uploading"; > 50 MB → rejected);
-   `rpc("publish_release")`; `revalidatePath("/feed")`; `redirect("/feed")`.
+   the `publishRelease` service with `getViewer`'s Viewer; `revalidatePath("/feed")`;
+   `redirect("/feed")`.
 
 ## Peaks (stored waveform)
 
@@ -62,8 +64,9 @@ The peaks key is derived from the audio key, never stored: no DB column, no migr
 `tracks/<uuid v4>.mp3`, minted only by `createUploadUrls`. `AUDIO_KEY_RE` in
 `rules.ts` makes `publishRelease` refuse any other key, so a crafted payload can't point a
 track at an arbitrary bucket object. (It checks *shape* only; keys aren't recorded when
-minted. The DB function doesn't check key shape — a label member calling the RPC directly
-could bypass it.)
+minted. Neither the `publishRelease` service nor the `publish_release` SQL function checks key
+shape — a label member calling that function's RPC directly, possible until the final cleanup
+drops it, could bypass it.)
 
 ## Presigned PUT
 
@@ -90,7 +93,7 @@ can make publish slow before it fails.
 - Upload failure: successful siblings keep `status:"done"` + key; Publish again uploads only
   the rest (fresh keys/URLs for them).
 - DB failure: every track is `done`, so Publish again skips uploads and re-sends the same
-  keys; the HEADs pass and the RPC runs again.
+  keys; the HEADs pass and the service runs again.
 - Replacing a file resets that track's upload to idle (it re-uploads under a new key; the
   old object is orphaned).
 
@@ -106,7 +109,7 @@ can make publish slow before it fails.
 | A PUT fails (CORS, signature, offline, 4xx/5xx) | red progress + "Upload failed." on that track; banner "Some files didn't upload. Publish again to retry." | nothing | uploaded siblings stay |
 | Bad/duplicate key, > 50 tracks, malformed payload | "Invalid audio file reference." / "Too many tracks." / "Invalid release." | nothing | objects stay |
 | HEAD missing / zero / too big / throws | see HEAD section | nothing | objects stay |
-| `publish_release` raises | 42501 / 22023 text / generic (see releases-model.md) | rolled back | objects stay (orphans) |
+| the `publishRelease` service throws | `FORBIDDEN` / `INVALID` text / generic (see releases-model.md) | rolled back | objects stay (orphans) |
 | Success | redirect to `/feed` | release written | objects referenced |
 
 A thrown `NEXT_REDIRECT` (from `redirect()`) is rethrown by `failUnreachable` so the

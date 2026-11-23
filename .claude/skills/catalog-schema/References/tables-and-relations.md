@@ -27,7 +27,7 @@ Enums: `user_role = listener | artist | label_member`; `release_kind = single | 
 | `track_albums` | `(track_id, album_id)` | track number on the album | A track sits on at most one album (unique index `track_albums_track_id_key`, see "One track in one place"). |
 
 `position` (integer, `not null`) was added by the releases migration and backfilled from
-title/name order. It is **not** unique-constrained — the writer (`publish_release`) assigns
+title/name order. It is **not** unique-constrained — the writers (`publishRelease`, `updateRelease`, `addAlbumTrack`) assign
 1..n. Order in JS with `byPosition` (`src/lib/supabase/artist-names.ts`): nested PostgREST embeds
 can't be ordered by a link-table column, and the Drizzle reads reuse it for the same rule.
 
@@ -61,7 +61,7 @@ All FKs cascade on delete, except `artists.user_id` → set null and the **artis
 - Feed order is `pinned desc, sort_at desc, id desc`. `sort_at` starts equal to `created_at`;
   the `moveRelease` service swaps it. A column default can't read another column, so the
   `releases_default_sort_at` before-insert trigger fills `sort_at := created_at` when omitted
-  (`publish_release` omits it). Generated `releases.Insert` types still **require** `sort_at`.
+  (`publishRelease` omits it). Generated `releases.Insert` types still **require** `sort_at`.
 - `created_at` is the real upload date and never changes: `keep_created_at` before-update
   triggers on `releases`, `tracks` and `albums` restore the old value. Inserts may still set it
   (tests, backfills). Reorder with `sort_at`, never `created_at`.
@@ -84,7 +84,7 @@ got on deploy, forever.
   The DB stores only the integer; `src/components/CatalogId/CatalogId.tsx` adds the prefix and
   zero-pads to three digits (`HS007`, `HSS012`; four digits once past 999). Nothing in SQL or in
   the data layer formats it — `getFeed`/`getAlbum` expose it as `catalogNumber: number` (required).
-- **Assigned on insert, by Postgres.** `publish_release`, `add_album_track`, the seed and the test
+- **Assigned on insert, by Postgres.** `publishRelease`, `addAlbumTrack`, the seed and the test
   fixtures insert without naming the column and get the next number. Supplying a value is an error
   (`428C9`, "cannot insert a non-DEFAULT value into column \"catalog_number\""); the generated
   types enforce the same with `catalog_number?: never` ([clients-and-types.md](clients-and-types.md)).
