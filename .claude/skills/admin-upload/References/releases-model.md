@@ -93,7 +93,9 @@ back every insert.
 query (any missing → `INVALID` "Unknown artist."); each distinct `{newName}` (trimmed) goes
 through `artistIdByName`: `insert … on conflict do nothing` (the `artists_name_ci_key` target) +
 `select` by `lower(trim(name))` — so an existing name in any case is reused and the same new name
-twice yields one row. Each list's ids are de-duplicated preserving first occurrence.
+twice yields one row. Each list's ids are de-duplicated preserving first occurrence. The lists go in track order with
+the album's list last, so when the same new name is typed in two cases the first track's spelling
+is saved, as `publish_release` / `update_release` did.
 
 SQL-function-only refusals (the actions make them unreachable, so the service has none): "Track n
 has no audio file." (the action accepts only verified `tracks/<uuid>.mp3` keys) and "Artist name

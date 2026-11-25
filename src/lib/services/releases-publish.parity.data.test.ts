@@ -204,6 +204,18 @@ describe("publishRelease vs publish_release", () => {
     });
   });
 
+  it("keeps a new artist's spelling from the first track when the album types it in another case", async () => {
+    const out = await both("label_member", async (via, tag) => {
+      const done = await via.publish({
+        kind: "album",
+        album: { title: `${tag} LP`, artists: [{ newName: `${tag} DJ NOVA` }] },
+        tracks: [1, 2].map((n) => ({ title: `${tag} T${n}`, audioKey: KEY(tag, n), artists: [{ newName: `${tag} dj nova` }] })),
+      });
+      return [done.err, await state(tag, done.id)];
+    });
+    expect(out[1]).toMatchObject({ albums: [{ artists: ["TAG dj nova"] }], artists: ["TAG dj nova"] });
+  });
+
   it("publishes an album with no album artists", async () => {
     await both("label_member", async (via, tag) => {
       const tracks = [1, 2].map((n) => ({ title: `${tag} T${n}`, audioKey: KEY(tag, n), artists: [{ newName: `${tag} A` }] }));
@@ -321,6 +333,18 @@ describe("updateRelease vs update_release", () => {
       });
       return [done.err, await state(tag)];
     });
+  });
+
+  it("keeps a new artist's spelling from the first track when the album types it in another case", async () => {
+    const out = await both("label_member", async (via, tag) => {
+      const a = await makeAlbum(tag, 2);
+      const done = await via.update(a.releaseId, {
+        album: { title: `${tag} LP`, artists: [{ newName: `${tag} DJ NOVA` }] },
+        tracks: draftOf(tag, a.trackIds).map((t) => ({ ...t, artists: [{ newName: `${tag} dj nova` }] })),
+      });
+      return [done.err, await state(tag)];
+    });
+    expect(out[1]).toMatchObject({ albums: [{ artists: ["TAG dj nova"] }] });
   });
 
   it("clears the album artists when the draft lists none", async () => {

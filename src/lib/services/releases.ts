@@ -397,7 +397,9 @@ async function publishAlbum(tx: Tx, { album, tracks: items }: ReleasePayload): P
   if (items.length < 2) throw invalid("An album needs at least 2 tracks.");
   if (!album || blank(album.title)) throw invalid("Album title is required.");
   checkTracks(items);
-  const [albumArtistIds, ...trackArtistIds] = await resolveArtists(tx, [album.artists, ...items.map((t) => t.artists)]);
+  // Tracks first, album last: the first spelling of a new name wins, as in the SQL functions.
+  const trackArtistIds = await resolveArtists(tx, [...items.map((t) => t.artists), album.artists]);
+  const albumArtistIds = trackArtistIds.pop()!;
   const trackIds = await insertTracks(tx, items, trackArtistIds);
   const [row] = await tx.insert(albums).values({ title: album.title.trim() }).returning({ id: albums.id });
   await creditAlbum(tx, row.id, albumArtistIds);
@@ -457,7 +459,9 @@ export async function updateRelease(viewer: Viewer, releaseId: string, draft: Re
     if (!matches) throw invalid("This release changed since you opened it. Reload the page.");
     checkTracks(items);
 
-    const [albumArtistIds, ...trackArtistIds] = await resolveArtists(tx, [album?.artists ?? [], ...items.map((t) => t.artists)]);
+    // Tracks first, album last: the first spelling of a new name wins, as in the SQL functions.
+    const trackArtistIds = await resolveArtists(tx, [...items.map((t) => t.artists), album?.artists ?? []]);
+    const albumArtistIds = trackArtistIds.pop()!;
     if (given.length) {
       await tx
         .update(tracks)
