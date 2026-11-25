@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUDIO_KEY_RE, MAX_AUDIO_BYTES, audioFileError } from "./rules";
+import { AUDIO_KEY_RE, MAX_AUDIO_BYTES, artistRefsValid, audioFileError } from "./rules";
 
 describe("audioFileError", () => {
   it("accepts .mp3 by extension regardless of case or browser MIME", () => {
@@ -20,5 +20,13 @@ describe("AUDIO_KEY_RE", () => {
     expect(AUDIO_KEY_RE.test("tracks/0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f.mp3")).toBe(true);
     expect(AUDIO_KEY_RE.test("NOVA. - SLOW BLOOM.mp3")).toBe(false);
     expect(AUDIO_KEY_RE.test("tracks/../secret.mp3")).toBe(false);
+  });
+});
+
+describe("artistRefsValid", () => {
+  it("refuses a ref whose id key isn't a uuid, even when it also has a newName", () => {
+    expect(artistRefsValid([{ id: undefined, newName: "Nova" }])).toBe(false);
+    expect(artistRefsValid([{ id: null, newName: "Nova" }])).toBe(false);
+    expect(artistRefsValid([{ newName: "Nova" }, { id: "0b8c1f3e-8f2a-4d5b-9c1e-2a3b4c5d6e7f" }])).toBe(true);
   });
 });

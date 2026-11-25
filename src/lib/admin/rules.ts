@@ -30,7 +30,8 @@ export function isUuid(value: unknown): value is string {
 }
 
 // Artist refs as the upload and edit forms send them: each an object with a
-// UUID `id` OR a non-blank string `newName`. Server actions refuse anything
+// UUID `id` OR a non-blank string `newName`. A ref with an `id` key is judged
+// by it alone, the way the services read it. Server actions refuse anything
 // else before calling a release service.
 export function artistRefsValid(refs: unknown): refs is ArtistRef[] {
   return (
@@ -38,7 +39,7 @@ export function artistRefsValid(refs: unknown): refs is ArtistRef[] {
     refs.every((r) => {
       if (!r || typeof r !== "object") return false;
       const { id, newName } = r as { id?: unknown; newName?: unknown };
-      if (id !== undefined) return isUuid(id);
+      if ("id" in r) return isUuid(id);
       return typeof newName === "string" && newName.trim().length > 0;
     })
   );
