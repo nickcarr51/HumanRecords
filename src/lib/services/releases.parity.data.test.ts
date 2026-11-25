@@ -79,7 +79,7 @@ async function recorded<T>(role: "label_member" | "listener" | "artist", scenari
   counts.set(name, n);
   const key = `${name} ${n}`;
   expect(Object.keys(recordedOutcomes)).toContain(key);
-  expect(outcome).toEqual(recordedOutcomes[key as keyof typeof recordedOutcomes]);
+  expect(outcome).toStrictEqual(recordedOutcomes[key as keyof typeof recordedOutcomes]);
   return outcome;
 }
 

@@ -216,6 +216,24 @@ describe("publishRelease vs publish_release", () => {
     expect(out[1]).toMatchObject({ albums: [{ artists: ["TAG dj nova"] }], artists: ["TAG dj nova"] });
   });
 
+  it("keeps track 1's spelling when a later track types the same new artist in another case", async () => {
+    const out = await both("label_member", async (via, tag) => {
+      const done = await via.publish({
+        kind: "album",
+        album: { title: `${tag} LP`, artists: [] },
+        tracks: [
+          { title: `${tag} T1`, audioKey: KEY(tag, 1), artists: [{ newName: `${tag} dj nova` }] },
+          { title: `${tag} T2`, audioKey: KEY(tag, 2), artists: [{ newName: `${tag} DJ NOVA` }] },
+        ],
+      });
+      return [done.err, await state(tag, done.id)];
+    });
+    expect(out[1]).toMatchObject({
+      tracks: [{ artists: ["TAG dj nova"] }, { artists: ["TAG dj nova"] }],
+      artists: ["TAG dj nova"],
+    });
+  });
+
   it("publishes an album with no album artists", async () => {
     await both("label_member", async (via, tag) => {
       const tracks = [1, 2].map((n) => ({ title: `${tag} T${n}`, audioKey: KEY(tag, n), artists: [{ newName: `${tag} A` }] }));
