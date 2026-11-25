@@ -5,7 +5,7 @@ Drizzle slice 3 the app reorders through the `moveRelease` service
 (`src/lib/services/releases.ts`, [[db-access]]); slice 4's migration dropped `move_release`.
 Tests: `archive-schema.data.test.ts`, `feed.data.test.ts`, and the `moveRelease` cases in
 `src/lib/services/releases.parity.data.test.ts` (the same `sort_at` values after each move as
-`move_release` gave, recorded as a snapshot).
+`move_release` gave, recorded in `src/lib/services/releases.parity.recorded.json`).
 
 ## The three columns
 

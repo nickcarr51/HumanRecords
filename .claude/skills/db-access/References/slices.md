@@ -35,8 +35,8 @@ Why the drops trail the code: `deploy.yml` applies migrations before it deploys 
 function can only be dropped once the code live in production no longer calls it. **Slice 3 must
 be live in production (develop → main) before slice 4 deploys** (done: #41, 2026-11-16). Slice 4
 also removed or rewrote the tests that called the dropped functions, keeping everything they
-checked: the parity tests now run the services alone, the release ones against snapshots recorded
-from the SQL functions ([testing.md](testing.md)).
+checked: the parity tests now run the services alone, the release ones against recorded results
+(`src/lib/services/releases.parity.recorded.json`) from the SQL functions ([testing.md](testing.md)).
 
 Stay in SQL permanently: the triggers `handle_new_user`, `sync_user_role_from_app_metadata`,
 `keep_created_at`, `keep_catalog_number`, `releases_default_sort_at`, `track_in_one_place`

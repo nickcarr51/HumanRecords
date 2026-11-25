@@ -6,16 +6,20 @@ import { createTestUser } from "@/lib/supabase/test-helpers";
 import { DomainError } from "./errors";
 import * as service from "./releases";
 import { getViewer } from "./viewer";
+import recordedOutcomes from "./releases.parity.recorded.json";
 
 // The release services against the SQL functions they replaced
 // (archive_release, restore_release, archive_track, restore_track,
 // replace_track_audio, move_release). Until slice 4 dropped those functions,
-// every scenario ran through both and saved the SQL function's outcome as a
-// snapshot (__snapshots__/releases.parity.data.test.ts.snap). Each scenario
-// now runs through the service and must end exactly as recorded: the same
-// error (code and message) at each step and the same rows afterwards
+// every scenario ran through both and recorded the SQL function's outcome.
+// Each scenario now runs through the service and must end exactly as recorded:
+// the same error (code and message) at each step and the same rows afterwards
 // (releases, tracks and r2_cleanup_queue, with ids and tags replaced by labels).
-// Never update the snapshot (vitest -u, or renaming a test): the SQL functions it was recorded from are gone, so it can't be recorded again.
+// The outcomes live in releases.parity.recorded.json, which no tool
+// regenerates. Never edit it by hand or rename a test: the key is the test's
+// name, and the SQL functions it was recorded from are gone.
+
+const counts = new Map<string, number>();
 
 type Err = { code: string; message: string } | null;
 type Via = {
@@ -63,14 +67,19 @@ async function clientFor(role: "label_member" | "listener" | "artist"): Promise<
 }
 
 // Runs a scenario through the service with its own tag and checks the outcome
-// matches the snapshot recorded from the SQL function. Returns the outcome.
+// matches the result recorded from the SQL function. Returns the outcome.
 async function recorded<T>(role: "label_member" | "listener" | "artist", scenario: (via: Via, tag: string) => Promise<T>) {
   const via = await viaService(await clientFor(role));
   const tag = newTag("PAR");
   tags.push(tag);
   const outcome = await scenario(via, tag);
   await cleanup(tag);
-  expect(outcome).toMatchSnapshot();
+  const name = expect.getState().currentTestName!;
+  const n = (counts.get(name) ?? 0) + 1;
+  counts.set(name, n);
+  const key = `${name} ${n}`;
+  expect(Object.keys(recordedOutcomes)).toContain(key);
+  expect(outcome).toEqual(recordedOutcomes[key as keyof typeof recordedOutcomes]);
   return outcome;
 }
 
