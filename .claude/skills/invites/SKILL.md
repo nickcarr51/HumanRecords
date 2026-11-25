@@ -1,6 +1,6 @@
 ---
 name: invites
-description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, the user list read (`listAdminUsers`/`getAdminUser` → `listUsers` in `src/lib/services/users.ts`, `UserRow`/`AdminListRow`, `getViewer`, `authorize("users.list")`, `asSystem`), the role change (`changeUserRole` in `src/lib/services/users.ts`, `authorize("users.setRole")`), `admin_list_users`/`admin_set_user_role`, `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
+description: Use when working on the `/admin/users` page and `/admin/users/[id]` (`NewUserForm`, `UsersTable`, `RoleSelect`, `InviteCell`, `UserForm`, `ActiveToggle`), `createUser`/`issueInvite`/`setUserRole`/`updateUserProfile`/`setUserActive` (`src/lib/admin/users-actions.ts`), `src/lib/invites/*` (`generateInviteToken`, `inviteUrl`, store functions), `getInviteGreeting`/`redeemInvite`, `InviteWelcome`, the `invites` table, the user list read (`listAdminUsers`/`getAdminUser` → `listUsers` in `src/lib/services/users.ts`, `UserRow`/`AdminListRow`, `getViewer`, `authorize("users.list")`, `asSystem`), the role change (`changeUserRole` in `src/lib/services/users.ts`, `authorize("users.setRole")`; replaced `admin_list_users`/`admin_set_user_role`), `SITE_URL`, or NFC cards. Also when an invite link shows the plain login form instead of the welcome, a token is "already used" unexpectedly, a card points at the wrong domain, or an invite link's chat preview (iMessage/Slack/WhatsApp) shows no title or image.
 ---
 
 # Invites: admin-created users + single-use sign-in links
@@ -34,7 +34,7 @@ link-preview images as well as invite URLs. Check with `curl -s '<SITE_URL>/logi
 | Concern | Where |
 |---|---|
 | `users.name`, role from `app_metadata`, two role triggers | `supabase/migrations/20261002120000_users_name_and_app_metadata_role.sql` |
-| `invites` table, `admin_list_users`, `admin_set_user_role` | `supabase/migrations/20261002120100_create_invites.sql` |
+| `invites` table, `admin_list_users`, `admin_set_user_role` (both dropped in slice 4) | `supabase/migrations/20261002120100_create_invites.sql` |
 | Token generator, `INVITE_TOKEN_RE` (`server-only`) | `src/lib/invites/token.ts` |
 | Link builder (`siteUrl` is a required argument) | `src/lib/invites/url.ts` (`inviteUrl`) |
 | Store: `upsertInvite`, `findUnusedInvite`, `claimInvite`, `restoreInvite` | `src/lib/invites/store.ts` |
@@ -134,6 +134,5 @@ Decided (owner, 2026-10-10): no instant kick on deactivate (admin server actions
 - **`RoleSelect` doesn't re-sync from props** after another admin changes the role; reload.
 - **`app_metadata.role` can go stale** (see token-lifecycle); nothing reads it after creation.
 - `UserRow` (`src/lib/services/users.ts`) types `name`, `invite_token`, `invite_used_at` and
-  `banned_until` as nullable, as they are in the data. (The generated types for the unused
-  `admin_list_users` function still mark the first three non-null.)
+  `banned_until` as nullable, as they are in the data.
 - Switching accounts when a signed-in phone taps someone else's card; NTAG 424 / Web NFC.

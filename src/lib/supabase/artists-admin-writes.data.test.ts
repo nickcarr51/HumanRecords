@@ -5,8 +5,6 @@ import { createAdminClient, createTestUser } from "./test-helpers";
 
 const admin = createAdminClient();
 const artistIds: string[] = [];
-const trackIds: string[] = [];
-const albumIds: string[] = [];
 
 let label: Awaited<ReturnType<typeof createTestUser>>;
 let listener: Awaited<ReturnType<typeof createTestUser>>;
@@ -31,8 +29,6 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
-  if (trackIds.length) await admin.from("tracks").delete().in("id", trackIds.splice(0));
-  if (albumIds.length) await admin.from("albums").delete().in("id", albumIds.splice(0));
   if (artistIds.length) {
     const ids = artistIds.splice(0);
     await admin.from("r2_cleanup_queue").delete().in("source_id", ids);
@@ -127,73 +123,15 @@ describe("artists write policies", () => {
   });
 });
 
-describe("admin_delete_artist", () => {
-  it("refuses non-label-members", async () => {
-    const a = await seedArtist();
-    const { error } = await listenerClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error?.code).toBe("42501");
-  });
-
-  it("refuses the artist role", async () => {
-    const a = await seedArtist();
-    const { error } = await artistClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error?.code).toBe("42501");
-  });
-
-  it("leaves a direct table delete with no effect (deletes must go through the function)", async () => {
+// Deleting an artist goes through removeArtist (src/lib/services/artists.ts);
+// a signed-in user's direct delete changes nothing.
+describe("artist delete", () => {
+  it("leaves a direct table delete with no effect (deletes go through removeArtist)", async () => {
     const a = await seedArtist({ profile_photo_url: "artists/direct.jpg" });
     const del = await labelClient.from("artists").delete().eq("id", a.id).select("id");
     expect(del.error).toBeNull();
     expect(del.data).toHaveLength(0);
     const { data } = await admin.from("artists").select("id").eq("id", a.id);
     expect(data).toHaveLength(1);
-  });
-
-  it("raises P0002 for an unknown artist", async () => {
-    const { error } = await labelClient.rpc("admin_delete_artist", { target: randomUUID() });
-    expect(error?.code).toBe("P0002");
-  });
-
-  it("fails with 23503 and keeps the row while credited on a track", async () => {
-    const a = await seedArtist();
-    const { data: t } = await admin.from("tracks").insert({ title: "AAW track", audio_url: "tracks/x.mp3" }).select("id").single();
-    trackIds.push(t!.id);
-    await admin.from("track_artists").insert({ track_id: t!.id, artist_id: a.id, position: 1 });
-    const { error } = await labelClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error?.code).toBe("23503");
-    const { data } = await admin.from("artists").select("id").eq("id", a.id);
-    expect(data).toHaveLength(1);
-  });
-
-  it("fails with 23503 and keeps the row while credited on an album", async () => {
-    const a = await seedArtist();
-    const { data: al } = await admin.from("albums").insert({ title: "AAW album" }).select("id").single();
-    albumIds.push(al!.id);
-    await admin.from("album_artists").insert({ album_id: al!.id, artist_id: a.id, position: 1 });
-    const { error } = await labelClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error?.code).toBe("23503");
-    const { data } = await admin.from("artists").select("id").eq("id", a.id);
-    expect(data).toHaveLength(1);
-  });
-
-  it("deletes an uncredited artist and queues their photo key", async () => {
-    const a = await seedArtist({ profile_photo_url: "artists/aaw.jpg" });
-    const { error } = await labelClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error).toBeNull();
-    const { data: gone } = await admin.from("artists").select("id").eq("id", a.id);
-    expect(gone).toHaveLength(0);
-    const { data: queued } = await admin
-      .from("r2_cleanup_queue")
-      .select("object_key, reason, source_table")
-      .eq("source_id", a.id);
-    expect(queued).toEqual([{ object_key: "artists/aaw.jpg", reason: "archived", source_table: "artists" }]);
-  });
-
-  it("deletes an uncredited artist without a photo and queues nothing", async () => {
-    const a = await seedArtist();
-    const { error } = await labelClient.rpc("admin_delete_artist", { target: a.id });
-    expect(error).toBeNull();
-    const { data: queued } = await admin.from("r2_cleanup_queue").select("id").eq("source_id", a.id);
-    expect(queued).toHaveLength(0);
   });
 });

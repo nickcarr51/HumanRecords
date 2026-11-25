@@ -65,7 +65,7 @@ pending, selected)` (`artist-options.ts`):
    selected chip.
 
 So a new artist typed in Track 1 is offered in Track 2 as an option instead of a second
-Create. Even if two "new" chips with the same name reach the DB, `publish_release`
+Create. Even if two "new" chips with the same name reach the DB, `publishRelease`
 creates one row.
 
 ## Combobox behavior (`ArtistCombobox.tsx`)

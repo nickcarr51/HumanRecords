@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DatabaseError, DomainError } from "@/lib/services/errors";
 
 const getCurrentRole = vi.fn();
-const rpc = vi.fn();
 const svcSelect = vi.fn();
 const svcIs = vi.fn<(c: string, v: unknown) => { select: typeof svcSelect }>(() => ({ select: svcSelect }));
 const svcEq = vi.fn<(c: string, v: unknown) => { is: typeof svcIs }>(() => ({ is: svcIs }));
@@ -19,10 +18,12 @@ const service = {
   archiveTrack: vi.fn(),
   restoreTrack: vi.fn(),
   replaceTrackAudio: vi.fn(),
+  updateRelease: vi.fn(),
+  addAlbumTrack: vi.fn(),
 };
 
 vi.mock("@/lib/auth/role", () => ({ getCurrentRole: () => getCurrentRole() }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ rpc })) }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from: svcFrom }) }));
 vi.mock("@/lib/storage/sign", () => ({ headObject: (...a: [string]) => headObject(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
@@ -34,6 +35,8 @@ vi.mock("@/lib/services/releases", () => ({
   archiveTrack: (...a: unknown[]) => service.archiveTrack(...a),
   restoreTrack: (...a: unknown[]) => service.restoreTrack(...a),
   replaceTrackAudio: (...a: unknown[]) => service.replaceTrackAudio(...a),
+  updateRelease: (...a: unknown[]) => service.updateRelease(...a),
+  addAlbumTrack: (...a: unknown[]) => service.addAlbumTrack(...a),
 }));
 
 import {
@@ -59,7 +62,6 @@ function expectNoServiceCall() {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRole.mockResolvedValue("label_member");
-  rpc.mockResolvedValue({ data: null, error: null });
   getViewer.mockResolvedValue(VIEWER);
   svcSelect.mockResolvedValue({ data: [{ id: ID }], error: null });
 });
@@ -77,7 +79,6 @@ describe("role gate", () => {
     ]) {
       expect(await call()).toEqual({ error: FORBIDDEN });
     }
-    expect(rpc).not.toHaveBeenCalled();
     expect(svcFrom).not.toHaveBeenCalled();
     expectNoServiceCall();
   });
@@ -89,7 +90,6 @@ describe("input checks", () => {
     expect(await setPinned(ID, "yes" as unknown as boolean)).toEqual({ error: "Invalid request." });
     expect(await moveRelease(ID, "sideways" as "up")).toEqual({ error: "Invalid request." });
     expect(await archiveRelease("1; drop table")).toEqual({ error: "Invalid request." });
-    expect(rpc).not.toHaveBeenCalled();
     expect(svcFrom).not.toHaveBeenCalled();
     expectNoServiceCall();
   });
@@ -182,16 +182,15 @@ describe("content actions: role gate", () => {
     expect(await saveRelease(ID, draft)).toEqual({ error: FORBIDDEN });
     expect(await addAlbumTrack(ID, { title: "t", audioKey: KEY, artists: [{ newName: "N" }] })).toEqual({ error: FORBIDDEN });
     expect(await replaceTrackAudio(ID, KEY)).toEqual({ error: FORBIDDEN });
-    expect(rpc).not.toHaveBeenCalled();
     expectNoServiceCall();
     expect(headObject).not.toHaveBeenCalled();
   });
 });
 
 describe("saveRelease", () => {
-  it("calls update_release with the draft", async () => {
+  it("calls updateRelease with the draft", async () => {
     expect(await saveRelease(ID, draft)).toEqual({ error: null });
-    expect(rpc).toHaveBeenCalledWith("update_release", { p_release_id: ID, payload: draft });
+    expect(service.updateRelease).toHaveBeenCalledWith(VIEWER, ID, draft);
   });
 
   it("refuses malformed drafts without a DB call", async () => {
@@ -199,14 +198,14 @@ describe("saveRelease", () => {
     expect(await saveRelease(ID, { tracks: [{ id: "x", title: "t", artists: [] }] })).toEqual({ error: "Invalid request." });
     const many = { tracks: Array.from({ length: 51 }, () => draft.tracks[0]) };
     expect(await saveRelease(ID, many)).toEqual({ error: "Too many tracks." });
-    expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 
   it("refuses malformed artist id refs (album and track) but lets newName through", async () => {
     const bad = { id: "not-a-uuid" };
     expect(await saveRelease(ID, { album: { title: "A", artists: [bad] }, tracks: draft.tracks })).toEqual({ error: "Invalid request." });
     expect(await saveRelease(ID, { tracks: [{ id: ID, title: "t", artists: [bad] }] })).toEqual({ error: "Invalid request." });
-    expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
     const ok = { album: { title: "A", artists: [{ id: ID }, { newName: "Nova" }] }, tracks: [{ id: ID, title: "t", artists: [{ id: ID }] }] };
     expect(await saveRelease(ID, ok)).toEqual({ error: null });
   });
@@ -215,11 +214,19 @@ describe("saveRelease", () => {
     for (const bad of [{}, { newName: 123 }, { newName: "  " }, null]) {
       expect(await saveRelease(ID, { tracks: [{ id: ID, title: "t", artists: [bad] }] } as unknown as ReleaseEditPayload)).toEqual({ error: "Invalid request." });
     }
-    expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
+  });
+
+  it("refuses non-string titles (track or album) without a service call", async () => {
+    const track = { tracks: [{ id: ID, title: 7, artists: [{ newName: "N" }] }] };
+    expect(await saveRelease(ID, track as unknown as ReleaseEditPayload)).toEqual({ error: "Invalid request." });
+    const album = { album: { title: null, artists: [] }, tracks: draft.tracks };
+    expect(await saveRelease(ID, album as unknown as ReleaseEditPayload)).toEqual({ error: "Invalid request." });
+    expectNoServiceCall();
   });
 
   it("passes the stale-draft message through", async () => {
-    rpc.mockResolvedValueOnce({ error: { code: "22023", message: "This release changed since you opened it. Reload the page." } });
+    service.updateRelease.mockRejectedValueOnce(new DomainError("INVALID", "This release changed since you opened it. Reload the page."));
     expect(await saveRelease(ID, draft)).toEqual({ error: "This release changed since you opened it. Reload the page." });
   });
 });
@@ -231,7 +238,7 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
     headObject.mockResolvedValue({ size: 100 });
     expect(await addAlbumTrack(ID, add)).toEqual({ error: null });
     expect(headObject).toHaveBeenCalledWith(KEY);
-    expect(rpc).toHaveBeenCalledWith("add_album_track", { p_release_id: ID, payload: add });
+    expect(service.addAlbumTrack).toHaveBeenCalledWith(VIEWER, ID, add);
     expect(await replaceTrackAudio(ID, KEY)).toEqual({ error: null });
     expect(service.replaceTrackAudio).toHaveBeenCalledWith(VIEWER, ID, KEY);
   });
@@ -245,7 +252,7 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
   it("refuses malformed artist id refs in addAlbumTrack without storage or DB calls", async () => {
     expect(await addAlbumTrack(ID, { ...add, artists: [{ id: "nope" }] })).toEqual({ error: "Invalid request." });
     expect(headObject).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 
   it("refuses artist refs with neither a uuid id nor a non-blank newName in addAlbumTrack", async () => {
@@ -253,7 +260,13 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
       expect(await addAlbumTrack(ID, { ...add, artists: [bad] } as never)).toEqual({ error: "Invalid request." });
     }
     expect(headObject).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expectNoServiceCall();
+  });
+
+  it("refuses a non-string title in addAlbumTrack without storage or service calls", async () => {
+    expect(await addAlbumTrack(ID, { ...add, title: 7 } as never)).toEqual({ error: "Invalid request." });
+    expect(headObject).not.toHaveBeenCalled();
+    expectNoServiceCall();
   });
 
   it("reports missing, oversized, and unverifiable uploads without calling the DB", async () => {
@@ -265,7 +278,6 @@ describe("addAlbumTrack / replaceTrackAudio", () => {
     headObject.mockRejectedValueOnce(new Error("network"));
     expect(await addAlbumTrack(ID, add)).toEqual({ error: "Couldn't verify the uploaded file. Try again." });
     spy.mockRestore();
-    expect(rpc).not.toHaveBeenCalled();
     expectNoServiceCall();
   });
 });

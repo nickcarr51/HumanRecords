@@ -36,19 +36,18 @@ and `revalidatePath('/admin/users')` on success.
 
 ## SQL (migration `20261002120100`)
 
-Both functions are `security definer`, `set search_path = public`, execute revoked from
-`public`/`anon`, granted to `authenticated`.
+Both functions were `security definer`, `set search_path = public`, execute revoked from
+`public`/`anon`, granted to `authenticated`. Slice 4's migration (`20261119120000`) dropped both.
 - `admin_list_users()` → `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`
   (`users` joined to `auth.users`, plus each user's `invites` row if there is one, newest
-  first). Raises `42501` unless `label_member`. No app callers since Drizzle slice 1:
-  `listUsers` returns the same columns in the same order (proved by `users.parity.data.test.ts`).
+  first). Raised `42501` unless `label_member`. Replaced in Drizzle slice 1 by `listUsers`, which
+  returns the same columns in the same order (`users.parity.data.test.ts` checks each kind of
+  user's exact row).
   `banned_until` (added in `20261010120500`) is what `toAdminUserRow` turns into `deactivated` (a
   ban that hasn't expired yet).
 - `admin_set_user_role(target uuid, new_role user_role)` → void. `42501` unless label member,
-  `22023` if `target = auth.uid()`, `P0002` if no row. Updates `public.users.role` only. No app
-  callers since Drizzle slice 2: `changeUserRole` does the same (proved by
-  `users-role.parity.data.test.ts`). Both functions stay in the database until slice 4's migration
-  drops them ([[db-access]] `References/slices.md`).
+  `22023` if `target = auth.uid()`, `P0002` if no row. Updated `public.users.role` only. Replaced
+  in Drizzle slice 2 by `changeUserRole`, which does the same (`users-role.parity.data.test.ts`).
 
 So for `setUserRole`, the role and self-guard checks exist in the action **and** in the users
 service (`authorize(viewer, "users.setRole")`, then the own-id check against `viewer.userId`),

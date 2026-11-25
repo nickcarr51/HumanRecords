@@ -8,9 +8,12 @@ export type Action =
   | "releases.archive"
   | "releases.restore"
   | "releases.move"
+  | "releases.publish"
+  | "releases.update"
   | "tracks.archive"
   | "tracks.restore"
-  | "tracks.replaceAudio";
+  | "tracks.replaceAudio"
+  | "tracks.add";
 
 // A type-only marker: no value carries it, so code outside authorize() can't
 // write a Grant without a cast (yarn typecheck catches that).
@@ -26,9 +29,12 @@ const RULES: Record<Action, { allow: (v: Viewer) => boolean; message: string }> 
   "releases.archive": { allow: (v) => v.role === "label_member", message: "Only label members can archive releases." },
   "releases.restore": { allow: (v) => v.role === "label_member", message: "Only label members can restore releases." },
   "releases.move": { allow: (v) => v.role === "label_member", message: "Only label members can reorder releases." },
+  "releases.publish": { allow: (v) => v.role === "label_member", message: "Only label members can publish releases." },
+  "releases.update": { allow: (v) => v.role === "label_member", message: "Only label members can edit releases." },
   "tracks.archive": { allow: (v) => v.role === "label_member", message: "Only label members can remove tracks." },
   "tracks.restore": { allow: (v) => v.role === "label_member", message: "Only label members can restore tracks." },
   "tracks.replaceAudio": { allow: (v) => v.role === "label_member", message: "Only label members can replace files." },
+  "tracks.add": { allow: (v) => v.role === "label_member", message: "Only label members can add tracks." },
 };
 
 const issued = new WeakSet<object>();

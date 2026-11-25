@@ -2,11 +2,10 @@
 
 Migrations `20261010120000` (columns, trigger) and `20261010120100` (`move_release`). Since
 Drizzle slice 3 the app reorders through the `moveRelease` service
-(`src/lib/services/releases.ts`, [[db-access]]); `move_release` stays in the database, unused by
-the app, until slice 4's migration drops it. Tests: `archive-schema.data.test.ts`,
-`move-release.data.test.ts`, `feed.data.test.ts`, and the `moveRelease` cases in
-`src/lib/services/releases.parity.data.test.ts` (same `sort_at` values as `move_release` after
-each move).
+(`src/lib/services/releases.ts`, [[db-access]]); slice 4's migration dropped `move_release`.
+Tests: `archive-schema.data.test.ts`, `feed.data.test.ts`, and the `moveRelease` cases in
+`src/lib/services/releases.parity.data.test.ts` (the same `sort_at` values after each move as
+`move_release` gave, recorded in `src/lib/services/releases.parity.recorded.json`).
 
 ## The three columns
 
@@ -17,7 +16,7 @@ each move).
   `releases`, `tracks`, `albums` reset it on update. Inserts may set it (tests, backfills).
 
 `sort_at` is filled by the `releases_default_sort_at` before-insert trigger (`:= created_at`
-when omitted; a column default can't read another column). `publish_release` omits it. So a
+when omitted; a column default can't read another column). `publishRelease` omits it. So a
 new upload lands at the top of the **unpinned** group and stays there only until the next
 upload ("top until next upload"); **pin to stay above later uploads.**
 Generated `releases.Insert` types still require `sort_at`.
@@ -58,5 +57,4 @@ Search shares the feed's filter (rows and count): `getFeed` adds `searchMatches(
 (`src/lib/supabase/feed-search.ts`) to its filter and keeps the same
 `pinned desc, sort_at desc, id desc` order and count, so search results are always in feed order.
 A blank `q` adds no filter. (Before Drizzle slice 1 the `search_feed` SQL function returned
-unordered rows and `getFeed` chained the order onto it; that function still exists with no app
-callers.)
+unordered rows and `getFeed` chained the order onto it; slice 4 dropped that function.)

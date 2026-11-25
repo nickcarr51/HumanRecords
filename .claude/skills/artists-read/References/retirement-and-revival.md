@@ -21,7 +21,7 @@ Retired when the listener timeline became the home (`/feed`, PR #7).
 ## Revival checklist
 
 `getArtists` / `getArtist` read more than one table, but they change nothing, so under the rule
-(owner, 2026-10-28) they stay on supabase-js; nothing moves them to Drizzle. The owner handles
+([[db-access]] `References/data-access-rule.md`) they stay on supabase-js; nothing moves them to Drizzle. The owner handles
 `src/lib/supabase/artists.ts` after all Drizzle slices ([[db-access]]). Steps 4, 5 and 8 below
 describe what those reads must return, whichever way they are built.
 

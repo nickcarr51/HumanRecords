@@ -3,7 +3,7 @@
 Follows the data-function convention: `SupabaseClient<Database>` is the first argument; the
 caller creates the client ([[catalog-schema]] `References/clients-and-types.md`). Both reads use
 supabase-js embeds across tables; they change nothing, so under the rule they stay on supabase-js
-([[db-access]] `References/slices.md`). The owner handles this file after all Drizzle slices.
+([[db-access]] `References/data-access-rule.md`). The owner handles this file after all Drizzle slices.
 Nothing live calls them today.
 
 ## Types

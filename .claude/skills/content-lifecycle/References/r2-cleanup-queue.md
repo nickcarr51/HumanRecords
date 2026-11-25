@@ -26,8 +26,8 @@ The release services (`archiveRelease`, `archiveTrack`, `replaceTrackAudio` in
 `src/lib/services/releases.ts`) insert rows through `asSystem`, `restoreRelease` and
 `restoreTrack` read and delete them there, and the `removeArtist` service inserts one when an
 artist with a photo is deleted. The old security-definer functions (`archive_release`,
-`archive_track`, `replace_track_audio`, the restore functions) do the same and stay in the
-database, unused by the app, until slice 4 ([[catalog-schema]] `References/rls-model.md`).
+`archive_track`, `replace_track_audio`, the restore functions) did the same until slice 4's
+migration dropped them ([[catalog-schema]] `References/rls-model.md`).
 
 ## When rows are written
 
