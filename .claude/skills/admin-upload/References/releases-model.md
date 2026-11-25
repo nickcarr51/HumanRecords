@@ -80,7 +80,7 @@ back every insert.
 3. `checkTracks`, before any write, in track order (`n` = 1-based index for messages): non-blank
    `title` ("Track n needs a title."), at least one artist ref ("Track n needs at least one
    artist.").
-4. `resolveArtists` turns the album's and every track's refs into artist ids (below).
+4. `resolveArtists` turns every track's refs, then the album's, into artist ids (below).
 5. `insertTracks`: insert `tracks` one at a time, in order, so their HSS numbers follow track
    order (`title` trimmed, `audio_url = audioKey`), then every `track_artists` row in one insert
    (`position` = order within the track).
