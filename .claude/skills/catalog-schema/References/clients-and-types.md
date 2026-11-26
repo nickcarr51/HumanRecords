@@ -81,11 +81,8 @@ That is why a database without the migration breaks those pages with Postgres er
 
 ## Drizzle (since slice 1, 2026-10)
 
-Rule (owner's, 2026-10-28): a SQL function goes away. One simple read or write on one table uses
-supabase-js; several changes that must all succeed or all fail (a transaction), or a job
-supabase-js can't do safely, use Drizzle; reads that change nothing stay on supabase-js, even
-across several tables. Drizzle sits next to supabase-js, not instead of it. The full guide is the
-[[db-access]] skill; the short version:
+Which to use for a query: [[db-access]] `References/data-access-rule.md`. Drizzle sits next to
+supabase-js, not instead of it. The full guide is the [[db-access]] skill; the short version:
 
 - `getDb()` (`src/lib/db/client.ts`) connects with `DATABASE_URL` (server-only; local stack URL in
   `.env.local`, each hosted project's transaction pooler URL in Vercel). Only `src/lib/db` may
@@ -106,9 +103,10 @@ across several tables. Drizzle sits next to supabase-js, not instead of it. The 
     `getAdminUser` (`src/lib/admin/users.ts`) and by `linkedUsersFor` (`src/lib/admin/artists.ts`);
     `changeUserRole` (`src/lib/services/users.ts`), called by `setUserRole`; `removeArtist`
     (`src/lib/services/artists.ts`), called by `deleteArtist`; and the release services
-    `archiveRelease`, `restoreRelease`, `archiveTrack`, `restoreTrack`, `replaceTrackAudio`,
-    `moveRelease` (`src/lib/services/releases.ts`), called by the release admin actions in
-    `src/lib/admin/release-actions.ts`.
+    `publishRelease`, `updateRelease`, `addAlbumTrack`, `archiveRelease`, `restoreRelease`,
+    `archiveTrack`, `restoreTrack`, `replaceTrackAudio`, `moveRelease`
+    (`src/lib/services/releases.ts`), called by `publishRelease` (`src/lib/admin/actions.ts`) and
+    the release admin actions in `src/lib/admin/release-actions.ts`.
   - The feed's query shapes are in `catalog-selects.ts` (`ARTIST_NAMES`, `TRACK_WITH`,
     `toFeedTrack`);
     the artist-name mapper `artistNamesOf` is in `artist-names.ts`.
@@ -117,5 +115,6 @@ across several tables. Drizzle sits next to supabase-js, not instead of it. The 
 - A Drizzle nested read (`tx.query.*`) reads every column of a table it joins one-to-one, so
   revoking a column from `authenticated` breaks `asUser` reads with "permission denied"; change a
   grant only together with the matching Drizzle query.
-- Reads that embed more than one table stay on supabase-js under the rule; the SQL functions
-  still to move each have an assigned slice ([[db-access]] `References/slices.md`).
+- Reads that embed more than one table stay on supabase-js under the rule. Every SQL function the
+  app called, except the RLS helper `current_user_role`, has moved to Drizzle (slices 1–4); what is left for the final cleanup: [[db-access]]
+  `References/slices.md`.

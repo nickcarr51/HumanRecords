@@ -7,11 +7,14 @@ check constraint, one release per track, cascade on track delete, readable by si
 users; case/space-insensitive artist uniqueness; `position` required on link rows;
 `current_user_role()` returns the caller's own role and isn't executable by anon.
 
-**`publish_release`** — `src/lib/supabase/publish-release.data.test.ts` (local Supabase):
-single with ordered artists + new artist creation; album with track order and album
-artists; case-insensitive reuse and one row for a repeated new name; album with no album
-artists; listener/artist refused with `42501` and nothing written; a later invalid track
-rolls back everything.
+**`publishRelease`** — `src/lib/services/releases-publish.parity.data.test.ts` (local
+Supabase): the service next to `publish_release` (and `updateRelease` / `addAlbumTrack` next to
+`update_release` / `add_album_track`), same errors and rows for every payload shape the actions
+let through ([[db-access]] `References/testing.md`). `src/lib/supabase/publish-release.data.test.ts` still tests the SQL
+function until the final cleanup: single with ordered artists + new artist creation; album with
+track order and album artists; case-insensitive reuse and one row for a repeated new name; album
+with no album artists; listener/artist refused with `42501` and nothing written; a later invalid
+track rolls back everything.
 
 **Feed / album** — `feed.data.test.ts`, `albums.data.test.ts` (local Supabase): releases
 pinned first then `sort_at`, with tracks + credits in position order; tracks without a release excluded;
@@ -36,10 +39,13 @@ members).
 
 **Server actions** — `src/lib/admin/actions.test.ts` (R2 + Supabase mocked): role gate on
 all three; search escaping/order/cap, error logging, non-string/blank queries; key minting,
-invalid files, empty/oversized requests; publish happy path (HEAD → rpc → revalidate →
-redirect), unminted keys, missing/oversized/zero-byte uploads, malformed payloads touch
-nothing, SQLSTATE mapping without redirect. `rules.test.ts`: `audioFileError`,
-`AUDIO_KEY_RE`.
+invalid files, empty/oversized requests; publish happy path (HEAD → `publishRelease` service with the Viewer →
+revalidate → redirect), unminted keys, missing/oversized/zero-byte uploads, malformed payloads
+touch nothing (a release shape the upload form never sends, such as an unknown kind,
+`album: null`, a non-string title or a malformed artist ref, is "Invalid release."), service
+error mapping without redirect. `rules.test.ts`: `audioFileError`,
+`AUDIO_KEY_RE`, `artistRefsValid` (a ref with an `id` key is judged by the id alone, so
+`{ id: undefined | null, newName }` is refused).
 
 **Form logic** — `upload-reducer.test.ts` (toggle rules, tracks, auto-title, file reset,
 chips, pending artists, publishing flags, validate, buildPayload),
@@ -51,7 +57,7 @@ missing, upload failure, action errors, rejected calls, redirect rethrow, mismat
 targets), `UploadForm.test.tsx` (initial single, album fields, toggle confirm, empty publish
 errors, auto-title + wav error, Clear all, Cancel confirm, form locked while publishing).
 
-**Release admin** — `src/lib/admin/release-actions.test.ts` (role gate before any DB call, UUID/artist-ref/key validation, `headObject` before add/replace, service error mapping with `getViewer` and the release services mocked: `FORBIDDEN` / `INVALID` / `NOT_FOUND` / `RETRY` in `moveRelease` / anything else, and a throwing `getViewer`; RPC error mapping for `saveRelease` / `addAlbumTrack`; revalidation), `src/lib/admin/releases.data.test.ts` (local Supabase: `getAdminReleases`/`getAdminRelease`), `src/lib/supabase/{archive-release,move-release,update-release}.data.test.ts` plus the Part 1 archive-track / add-track tests (the SQL functions; the shared-track cases are now tests that the database refuses a shared link), `src/lib/services/releases.parity.data.test.ts` (each release service next to its SQL function, same errors and rows), `src/lib/supabase/track-one-place.data.test.ts` (one track in one place, the `archived_with_release` default), the six release rules in `src/lib/services/policy-writes.data.test.ts`, `src/components/AdminReleases/{edit-reducer.test.ts, upload-one.test.ts, ReleasesTable.test.tsx, ArchiveControl.test.tsx, EditReleaseForm.test.tsx, instant-actions.test.tsx}` (draft reducer and `draftKey`, dirty lock, instant actions, inline errors), `src/app/(app)/admin/releases/page.test.tsx` and `[id]/page.test.tsx` (each page gates itself).
+**Release admin** — `src/lib/admin/release-actions.test.ts` (role gate before any DB call, UUID/artist-ref/key validation, non-string track or album titles refused in `saveRelease` and `addAlbumTrack`, `headObject` before add/replace, service error mapping with `getViewer` and the release services mocked: `FORBIDDEN` / `INVALID` / `NOT_FOUND` / `RETRY` in `moveRelease` / anything else, and a throwing `getViewer`; revalidation), `src/lib/admin/releases.data.test.ts` (local Supabase: `getAdminReleases`/`getAdminRelease`), `src/lib/supabase/{update-release,add-track-replace-audio}.data.test.ts` (the `update_release` and `add_album_track` SQL functions, until the final cleanup), `src/lib/services/releases.parity.data.test.ts` (each slice 3 release service against the results recorded from its SQL function in `src/lib/services/releases.parity.recorded.json`, same errors and rows), `src/lib/services/releases-publish.parity.data.test.ts` (`updateRelease` and `addAlbumTrack` next to their SQL functions, with the payload shapes the actions let through), `src/lib/supabase/track-one-place.data.test.ts` (one track in one place, the `archived_with_release` default), the nine release rules in `src/lib/services/policy-writes.data.test.ts`, `src/components/AdminReleases/{edit-reducer.test.ts, upload-one.test.ts, ReleasesTable.test.tsx, ArchiveControl.test.tsx, EditReleaseForm.test.tsx, instant-actions.test.tsx}` (draft reducer and `draftKey`, dirty lock, instant actions, inline errors), `src/app/(app)/admin/releases/page.test.tsx` and `[id]/page.test.tsx` (each page gates itself).
 
 ## Running
 

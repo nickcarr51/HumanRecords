@@ -2,10 +2,9 @@
 
 // Release admin write path: pin, reorder, edit, archive/restore, replace,
 // add/remove album tracks. Every action re-checks the caller's role (server
-// actions can be invoked directly). Reorder, archive/restore, remove/restore
-// track and replace go through the release services (src/lib/services/
-// releases.ts); edit and add-track through SQL functions. Both check the role
-// again and do each multi-table change in one transaction.
+// actions can be invoked directly). Everything but pin goes through the
+// release services (src/lib/services/releases.ts), which check the role again
+// and do each multi-table change in one transaction.
 
 import { revalidatePath } from "next/cache";
 import { getCurrentRole } from "@/lib/auth/role";
@@ -15,22 +14,15 @@ import { DomainError } from "@/lib/services/errors";
 import * as releaseService from "@/lib/services/releases";
 import { getViewer, type Viewer } from "@/lib/services/viewer";
 import { headObject } from "@/lib/storage/sign";
-import type { Json } from "@/lib/supabase/database.types";
-import { AUDIO_KEY_RE, MAX_AUDIO_BYTES, MAX_TRACKS, UUID_RE } from "./rules";
-import type { AddTrackPayload, AdminResult, ArtistRef, MoveDirection, ReleaseEditPayload } from "./types";
+import { AUDIO_KEY_RE, MAX_AUDIO_BYTES, MAX_TRACKS, albumValid, artistRefsValid, isUuid } from "./rules";
+import type { AddTrackPayload, AdminResult, MoveDirection, ReleaseEditPayload } from "./types";
 
 const FORBIDDEN = "Only label members can do this.";
 const INVALID = "Invalid request.";
 const FALLBACK = "Couldn't save — try again.";
 
-type DbError = { code?: string; message: string };
-
 async function isLabelMember(): Promise<boolean> {
   return (await getCurrentRole()) === "label_member";
-}
-
-function isUuid(value: unknown): value is string {
-  return typeof value === "string" && UUID_RE.test(value);
 }
 
 function refresh(): void {
@@ -40,22 +32,16 @@ function refresh(): void {
   revalidatePath("/albums/[id]", "page");
 }
 
-// 22023/P0002 messages are written for the UI in the SQL functions.
-function finish(error: DbError | null): AdminResult {
-  if (!error) {
-    refresh();
-    return { error: null };
-  }
-  if (error.code === "42501") return { error: FORBIDDEN };
-  if (error.code === "22023" || error.code === "P0002") return { error: error.message };
-  console.error("Release admin call failed", error);
-  return { error: FALLBACK };
+// Refreshes the pages a release write changes and reports success.
+function saved(): AdminResult {
+  refresh();
+  return { error: null };
 }
 
-// Runs a release service as the signed-in user and maps its error to the
-// message finish() gives for the same SQL function error. `retry` is shown for
-// a deadlock (RETRY) instead of the logged fallback.
-async function runService(call: (viewer: Viewer) => Promise<void>, retry?: string): Promise<AdminResult> {
+// Runs a release service as the signed-in user and turns its error into the
+// message the page shows: the service's own message for a refusal, or the
+// logged fallback. `retry` is shown for a deadlock (RETRY) instead.
+async function runService(call: (viewer: Viewer) => Promise<unknown>, retry?: string): Promise<AdminResult> {
   try {
     await call(await getViewer(await createClient()));
   } catch (err) {
@@ -67,7 +53,7 @@ async function runService(call: (viewer: Viewer) => Promise<void>, retry?: strin
     console.error("Release admin call failed", err);
     return { error: FALLBACK };
   }
-  return finish(null);
+  return saved();
 }
 
 // releases has no user update policy, so pin/unpin goes through the service
@@ -82,9 +68,12 @@ export async function setPinned(releaseId: string, pinned: boolean): Promise<Adm
     .eq("id", releaseId)
     .is("archived_at", null)
     .select("id");
-  if (error) return finish(error);
+  if (error) {
+    console.error("Release admin call failed", error);
+    return { error: FALLBACK };
+  }
   if (!data?.length) return { error: "Release not found." };
-  return finish(null);
+  return saved();
 }
 
 export async function moveRelease(releaseId: string, direction: MoveDirection): Promise<AdminResult> {
@@ -122,21 +111,6 @@ export async function restoreTrack(trackId: string): Promise<AdminResult> {
   return runService((viewer) => releaseService.restoreTrack(viewer, trackId));
 }
 
-// Each ref must be an object with a UUID `id` OR a non-blank string `newName`.
-// resolve_artist_refs would raise a raw 22P02 on a malformed { id } (and
-// misbehave on a ref with neither), so check here.
-function artistRefsValid(refs: unknown): refs is ArtistRef[] {
-  return (
-    Array.isArray(refs) &&
-    refs.every((r) => {
-      if (!r || typeof r !== "object") return false;
-      const { id, newName } = r as { id?: unknown; newName?: unknown };
-      if (id !== undefined) return isUuid(id);
-      return typeof newName === "string" && newName.trim().length > 0;
-    })
-  );
-}
-
 // The browser PUT the file straight to R2; make sure it actually landed.
 async function verifyUpload(key: string): Promise<string | null> {
   try {
@@ -156,14 +130,12 @@ export async function saveRelease(releaseId: string, payload: ReleaseEditPayload
     return { error: INVALID };
   }
   if (payload.tracks.length > MAX_TRACKS) return { error: "Too many tracks." };
-  if (payload.tracks.some((t) => !isUuid(t?.id) || !artistRefsValid(t.artists))) return { error: INVALID };
-  if (payload.album !== undefined && !artistRefsValid(payload.album?.artists)) return { error: INVALID };
+  if (payload.tracks.some((t) => !isUuid(t?.id) || typeof t.title !== "string" || !artistRefsValid(t.artists))) {
+    return { error: INVALID };
+  }
+  if (payload.album !== undefined && !albumValid(payload.album)) return { error: INVALID };
 
-  const { error } = await (await createClient()).rpc("update_release", {
-    p_release_id: releaseId,
-    payload: payload as unknown as Json,
-  });
-  return finish(error);
+  return runService((viewer) => releaseService.updateRelease(viewer, releaseId, payload));
 }
 
 export async function addAlbumTrack(releaseId: string, payload: AddTrackPayload): Promise<AdminResult> {
@@ -172,15 +144,11 @@ export async function addAlbumTrack(releaseId: string, payload: AddTrackPayload)
   if (typeof payload.audioKey !== "string" || !AUDIO_KEY_RE.test(payload.audioKey)) {
     return { error: "Invalid audio file reference." };
   }
-  if (!artistRefsValid(payload.artists)) return { error: INVALID };
+  if (typeof payload.title !== "string" || !artistRefsValid(payload.artists)) return { error: INVALID };
   const problem = await verifyUpload(payload.audioKey);
   if (problem) return { error: problem };
 
-  const { error } = await (await createClient()).rpc("add_album_track", {
-    p_release_id: releaseId,
-    payload: payload as unknown as Json,
-  });
-  return finish(error);
+  return runService((viewer) => releaseService.addAlbumTrack(viewer, releaseId, payload));
 }
 
 export async function replaceTrackAudio(trackId: string, audioKey: string): Promise<AdminResult> {

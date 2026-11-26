@@ -2,7 +2,8 @@
 
 // The admin write path. Every action re-checks the caller's role: the
 // /admin layout does not protect server actions, which can be invoked
-// directly. publish_release checks the role again inside the database.
+// directly. The publishRelease service (src/lib/services/releases.ts) checks
+// the role again and saves the whole release in one transaction.
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
@@ -11,7 +12,9 @@ import { getCurrentRole } from "@/lib/auth/role";
 import { PEAKS_CONTENT_TYPE, peaksKeyFor } from "@/lib/peaks/format";
 import { createClient } from "@/lib/supabase/server";
 import { escapeLike } from "@/lib/supabase/artists";
-import type { Json } from "@/lib/supabase/database.types";
+import { DomainError } from "@/lib/services/errors";
+import * as releaseService from "@/lib/services/releases";
+import { getViewer } from "@/lib/services/viewer";
 import { headObject, signUploadUrl } from "@/lib/storage/sign";
 import {
   ARTIST_SEARCH_LIMIT,
@@ -19,6 +22,8 @@ import {
   AUDIO_KEY_RE,
   MAX_AUDIO_BYTES,
   MAX_TRACKS,
+  albumValid,
+  artistRefsValid,
   audioFileError,
 } from "./rules";
 import type {
@@ -86,6 +91,17 @@ export async function createUploadUrls(files: UploadRequest[]): Promise<UploadUr
   }
 }
 
+// The shape the upload form sends and the publishRelease service takes: a
+// known kind, album details (if any) and tracks with string titles and valid
+// artist refs. Audio keys are checked separately below.
+function releaseShapeValid(payload: ReleasePayload): boolean {
+  return (
+    (payload.kind === "single" || payload.kind === "album") &&
+    (payload.album === undefined || albumValid(payload.album)) &&
+    payload.tracks.every((t) => !!t && typeof t === "object" && typeof t.title === "string" && artistRefsValid(t.artists))
+  );
+}
+
 export async function publishRelease(payload: ReleasePayload): Promise<PublishResult> {
   if (!(await isLabelMember())) return { error: FORBIDDEN };
 
@@ -93,6 +109,7 @@ export async function publishRelease(payload: ReleasePayload): Promise<PublishRe
     return { error: "Invalid release." };
   }
   if (payload.tracks.length > MAX_TRACKS) return { error: "Too many tracks." };
+  if (!releaseShapeValid(payload)) return { error: "Invalid release." };
 
   const keys: unknown[] = payload.tracks.map((t) => t?.audioKey);
   if (
@@ -113,14 +130,14 @@ export async function publishRelease(payload: ReleasePayload): Promise<PublishRe
     return { error: "Couldn't verify the uploaded files. Try again." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("publish_release", {
-    payload: payload as unknown as Json,
-  });
-  if (error) {
-    if (error.code === "42501") return { error: FORBIDDEN };
-    if (error.code === "22023") return { error: error.message };
-    console.error("publish_release failed", error);
+  try {
+    await releaseService.publishRelease(await getViewer(await createClient()), payload);
+  } catch (err) {
+    if (err instanceof DomainError) {
+      if (err.code === "FORBIDDEN") return { error: FORBIDDEN };
+      if (err.code === "INVALID") return { error: err.message };
+    }
+    console.error("Publish failed", err);
     return { error: "Couldn't publish. Nothing was saved — try again." };
   }
 

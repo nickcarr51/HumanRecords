@@ -396,66 +396,13 @@ export type Database = {
         Args: { p_release_id: string; payload: Json }
         Returns: string
       }
-      admin_delete_artist: { Args: { target: string }; Returns: undefined }
-      admin_list_users: {
-        Args: never
-        Returns: {
-          banned_until: string
-          created_at: string
-          email: string
-          id: string
-          invite_token: string
-          invite_used_at: string
-          name: string
-          role: Database["public"]["Enums"]["user_role"]
-        }[]
-      }
-      admin_set_user_role: {
-        Args: {
-          new_role: Database["public"]["Enums"]["user_role"]
-          target: string
-        }
-        Returns: undefined
-      }
-      archive_release: { Args: { p_release_id: string }; Returns: undefined }
-      archive_track: { Args: { p_track_id: string }; Returns: undefined }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       increment_play_count: { Args: { p_track_id: string }; Returns: undefined }
-      move_release: {
-        Args: { direction: string; target: string }
-        Returns: undefined
-      }
       publish_release: { Args: { payload: Json }; Returns: string }
-      release_for_track: { Args: { p_track_id: string }; Returns: string }
-      replace_track_audio: {
-        Args: { p_audio_key: string; p_track_id: string }
-        Returns: undefined
-      }
       resolve_artist_refs: { Args: { refs: Json }; Returns: string[] }
-      restore_release: { Args: { p_release_id: string }; Returns: undefined }
-      restore_track: { Args: { p_track_id: string }; Returns: undefined }
-      search_feed: {
-        Args: { q: string }
-        Returns: {
-          album_id: string | null
-          archived_at: string | null
-          created_at: string
-          id: string
-          kind: Database["public"]["Enums"]["release_kind"]
-          pinned: boolean
-          sort_at: string
-          track_id: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "releases"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       update_release: {
         Args: { p_release_id: string; payload: Json }
         Returns: undefined

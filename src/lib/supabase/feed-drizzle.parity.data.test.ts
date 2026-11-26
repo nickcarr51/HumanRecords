@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getFeed } from "./feed";
+import { getFeed, type FeedItem } from "./feed";
 import { createAdminClient, createAnonClient, createTestUser } from "./test-helpers";
 
 const admin = createAdminClient();
@@ -11,6 +11,9 @@ let labelUser: Awaited<ReturnType<typeof createTestUser>>;
 let client: SupabaseClient;
 let labelClient: SupabaseClient;
 let singleRelease: string;
+// The feed ids of the four fixture releases (a single's is its track id, an
+// album's its album id), oldest first.
+const ids = { single: "", plain: "", titled: "", credited: "" };
 
 // Delete in an order the database allows: deleting a track or an album also
 // deletes its link rows, and artists go last because the database refuses to
@@ -36,9 +39,13 @@ beforeAll(async () => {
   const a = await row("artists", { name: `${tag} MiXeD Artist` });
   await insert("track_artists", { track_id: t, artist_id: a, position: 1 });
   singleRelease = await row("releases", { kind: "single", track_id: t });
-  // An album that matches only through a live track, plus an archived track that must not match.
+  ids.single = t;
+  // An album that matches only through a live track (its title or its artist),
+  // plus an archived track that must not match.
   const al = await row("albums", { title: "Plain Album" });
+  ids.plain = al;
   const live = await row("tracks", { title: `${tag} inner live`, audio_url: "tracks/b.mp3" });
+  await insert("track_artists", { track_id: live, artist_id: await row("artists", { name: `${tag} Inner Artist` }), position: 1 });
   const archived = await row("tracks", { title: `${tag} ghost`, audio_url: "tracks/c.mp3", archived_at: new Date().toISOString() });
   await insert("track_albums", [
     { album_id: al, track_id: live, position: 1 },
@@ -47,10 +54,12 @@ beforeAll(async () => {
   await row("releases", { kind: "album", album_id: al });
   // An album that matches through its own title, and one through its album artist credit.
   const titled = await row("albums", { title: `${tag} Titled LP` });
+  ids.titled = titled;
   const titledTrack = await row("tracks", { title: "Titled track", audio_url: "tracks/d.mp3" });
   await insert("track_albums", { album_id: titled, track_id: titledTrack, position: 1 });
   await row("releases", { kind: "album", album_id: titled });
   const credited = await row("albums", { title: "Credited Album" });
+  ids.credited = credited;
   const creditArtist = await row("artists", { name: `${tag} Album Credit` });
   await insert("album_artists", { album_id: credited, artist_id: creditArtist, position: 1 });
   const creditedTrack = await row("tracks", { title: "Credited track", audio_url: "tracks/e.mp3" });
@@ -78,61 +87,55 @@ afterAll(async () => {
   }
 });
 
-type RpcRow = {
-  kind: string;
-  album_id: string;
-  track_id: string;
-  track: { archived_at: string | null } | null;
-  album: { track_albums: Array<{ tracks: { archived_at: string | null } | null }> } | null;
-};
-
-// The old getFeed ran search_feed, then dropped (in toFeedItem) a single whose
-// track is archived or hidden, an album with no live tracks, and a release
-// whose track or album is hidden. The new getFeed drops the same rows. So the
-// same drop is applied here to search_feed's rows: that keeps every case,
-// including % and _ (which match across the whole local catalog), a true
-// comparison of the old getFeed with the new one.
-function shownByOldFeed(r: RpcRow): boolean {
-  if (r.kind === "single") return r.track !== null && !r.track.archived_at;
-  if (r.kind === "album") return r.album !== null && r.album.track_albums.some((ta) => ta.tracks !== null && !ta.tracks.archived_at);
-  return false;
-}
-
-async function rpcIds(c: SupabaseClient, q: string): Promise<string[]> {
-  const { data, error } = await c
-    .rpc("search_feed", { q })
-    .select("kind, album_id, track_id, pinned, sort_at, id, track:tracks(archived_at), album:albums(track_albums(tracks(archived_at)))")
-    .is("archived_at", null)
-    .order("pinned", { ascending: false })
-    .order("sort_at", { ascending: false })
-    .order("id", { ascending: false });
-  if (error) throw error;
-  return (data as unknown as RpcRow[]).filter(shownByOldFeed).map((r) => (r.kind === "album" ? r.album_id : r.track_id));
-}
-
-const SEARCH_CASES = [
-  tag,
-  `${tag} 100%`,
-  `under_score`,
-  `back\\slash`,
-  `${tag.toLowerCase()} mixed artist`,
-  `${tag} ghost`,
-  `${tag} inner`,
-  `${tag} Titled`,
-  `${tag} Album Credit`,
-  `%`,
-  `_`,
+// What search_feed (the SQL function getFeed replaced, dropped in slice 4)
+// returned for each search, newest first. Every term but the last four only
+// matches the fixture.
+const SEARCHES: Array<[string, () => string[]]> = [
+  [tag, () => [ids.credited, ids.titled, ids.plain, ids.single]],
+  [`${tag} 100%`, () => [ids.single]],
+  [`${tag.toLowerCase()} mixed artist`, () => [ids.single]],
+  [`${tag} ghost`, () => []],
+  [`${tag} inner`, () => [ids.plain]],
+  [`${tag} inner artist`, () => [ids.plain]],
+  [`${tag} Titled`, () => [ids.titled]],
+  [`${tag} Album Credit`, () => [ids.credited]],
 ];
 
-describe("getFeed on Drizzle: parity with search_feed", () => {
-  it.each(SEARCH_CASES)("same matches and order as search_feed for %j (listener)", async (q) => {
-    const { items } = await getFeed(client, { q, pageSize: 500 });
-    expect(items.map((i) => i.id)).toEqual(await rpcIds(client, q));
+// %, _ and \ are plain characters in a search, never wildcards. These terms
+// match across the whole local catalog: of the fixture, only the single
+// matches, and every result must really contain the term.
+const CATALOG_WIDE = [`under_score`, `back\\slash`, `%`, `_`];
+
+// The text a search looks at: the title and artists, plus (for an album) its
+// live tracks' titles and artists.
+function searchedText(item: FeedItem): string[] {
+  const own = [item.title, ...item.artistNames];
+  return item.kind === "album" ? [...own, ...item.tracks.flatMap((t) => [t.title, ...t.artistNames])] : own;
+}
+
+describe("getFeed on Drizzle: search results (as search_feed gave them)", () => {
+  describe.each([
+    ["listener", () => client],
+    ["label_member", () => labelClient],
+  ])("as a %s", (_role, as) => {
+    it.each(SEARCHES)("finds exactly the matching releases for %j, newest first", async (q, expected) => {
+      const { items } = await getFeed(as(), { q, pageSize: 500 });
+      expect(items.map((i) => i.id)).toEqual(expected());
+    });
+
+    it.each(CATALOG_WIDE)("treats %j as plain text", async (q) => {
+      const { items } = await getFeed(as(), { q, pageSize: 500 });
+      const fixture = Object.values(ids);
+      expect(items.map((i) => i.id).filter((id) => fixture.includes(id))).toEqual([ids.single]);
+      for (const item of items) {
+        expect(searchedText(item).some((text) => text.toLowerCase().includes(q.toLowerCase()))).toBe(true);
+      }
+    });
   });
 
-  it.each(SEARCH_CASES)("same matches and order as search_feed for %j (label_member)", async (q) => {
-    const { items } = await getFeed(labelClient, { q, pageSize: 500 });
-    expect(items.map((i) => i.id)).toEqual(await rpcIds(labelClient, q));
+  it("returns a hit's kind and title", async () => {
+    const { items } = await getFeed(client, { q: `${tag} 100%`, pageSize: 5 });
+    expect(items[0]).toMatchObject({ kind: "track", id: ids.single, title: `${tag} 100% under_score back\\slash` });
   });
 
   it("createdAt is byte-identical to PostgREST's string", async () => {

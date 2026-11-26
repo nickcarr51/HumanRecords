@@ -76,14 +76,16 @@ in slice 2; it still calls `getClaims` first, so a signed-out caller gets `UNAUT
 - `authorize(viewer, action)` (`src/lib/services/policy.ts`) is the check:
   - it throws `DomainError("FORBIDDEN", "Not authorized.")` for a Viewer that `getViewer` didn't
     return (a hand-built or copied object);
-  - then applies the rule for `action` (`RULES`). Today there are nine actions, all label
+  - then applies the rule for `action` (`RULES`). Today there are twelve actions, all label
     members only; anyone else gets `FORBIDDEN` with the action's message: `users.list` "Only
     label members can list users.", `users.setRole` "Only label members can change roles.",
     `artists.delete` "Only label members can delete artists.", `releases.archive` "Only label
     members can archive releases.", `releases.restore` "Only label members can restore
-    releases.", `releases.move` "Only label members can reorder releases.", `tracks.archive`
-    "Only label members can remove tracks.", `tracks.restore` "Only label members can restore
-    tracks.", `tracks.replaceAudio` "Only label members can replace files.";
+    releases.", `releases.move` "Only label members can reorder releases.", `releases.publish`
+    "Only label members can publish releases.", `releases.update` "Only label members can edit
+    releases.", `tracks.archive` "Only label members can remove tracks.", `tracks.restore` "Only
+    label members can restore tracks.", `tracks.replaceAudio` "Only label members can replace
+    files.", `tracks.add` "Only label members can add tracks.";
   - on success it returns a frozen `Grant` (`Object.freeze`) and remembers it in a private list
     (a `WeakSet`) that `isIssuedGrant` checks.
     `Grant` also has a type-only marker, so a hand-built one fails typecheck.
@@ -126,8 +128,9 @@ Both callers keep their `activeLabelMemberId()` check first (`setUserRole` calls
 function's error code gave. The role check runs in its own transaction (`getViewer`) just before
 the write's transaction, not inside it as in the SQL functions (owner-accepted).
 
-The release services (`src/lib/services/releases.ts`, slice 3) replaced six SQL functions, with
-the same checks in the same order and the same messages:
+The release services (`src/lib/services/releases.ts`, slices 3 and 4) replaced nine SQL
+functions, with the same checks and the same messages (for the slice 4 ones, every check a real
+form's payload can reach; see below):
 
 | Service | Action | Replaced |
 |---|---|---|
@@ -137,6 +140,9 @@ the same checks in the same order and the same messages:
 | `restoreTrack(viewer, trackId)` | `tracks.restore` | `restore_track` |
 | `replaceTrackAudio(viewer, trackId, audioKey)` | `tracks.replaceAudio` | `replace_track_audio` |
 | `moveRelease(viewer, releaseId, direction)` | `releases.move` | `move_release` |
+| `publishRelease(viewer, release: ReleasePayload)` → release id (slice 4) | `releases.publish` | `publish_release` |
+| `updateRelease(viewer, releaseId, draft: ReleaseEditPayload)` (slice 4) | `releases.update` | `update_release` |
+| `addAlbumTrack(viewer, releaseId, track: AddTrackPayload)` → track id (slice 4) | `tracks.add` | `add_album_track` |
 
 Each calls `authorize`, then runs one `asSystem` transaction (signed-in users can only read
 `releases` and `tracks`, and can't touch `r2_cleanup_queue`). Rows are locked with Drizzle's
@@ -144,19 +150,41 @@ Each calls `authorize`, then runs one `asSystem` transaction (signed-in users ca
 owns it, which replaced the `release_for_track` helper), then the track, or the target then its
 neighbour. Timestamps are set with the transaction's `` sql`now()` `` and never pass
 through a JavaScript `Date`. `moveRelease` sends the SQL function's `sort_at` spreading statement
-unchanged through `` tx.execute(sql`...`) ``. Two deliberate differences from the SQL functions:
-restore finds its tracks by `tracks.archived_with_release`, and the shared-track checks are gone
-(the database keeps each track on one release). What each one does: [[content-lifecycle]].
-Callers: the six actions in `src/lib/admin/release-actions.ts` ([[admin-upload]]). Each keeps its
-`isLabelMember()` check and input checks first, then calls `runService`, which gets the Viewer with
-`getViewer(await createClient())` and maps `FORBIDDEN` to "Only label members can do
-this.", `INVALID` / `NOT_FOUND` to the error's own message, `RETRY` in `moveRelease` to "Couldn't
-reorder — try again", and anything else to a logged "Couldn't save — try again.". `finish()` stays
-for the actions still on SQL functions (`saveRelease`, `addAlbumTrack`) and for `setPinned`.
+unchanged through `` tx.execute(sql`...`) ``. The slice 4 services take the typed payloads from
+`src/lib/admin/types.ts`; the actions first refuse any shape their forms never send (kind,
+string titles, artist refs and album details, with `isUuid` / `artistRefsValid` / `albumValid`
+from `src/lib/admin/rules.ts`), so the SQL functions' messages that only a malformed shape could
+trigger ("Release kind is required.", "Tracks must be a list.", "artists must be a list", "Artist
+must have an id or a newName.", the `22P02` for a bad kind or artist id) have no service
+counterpart. Nor do the refusals the actions make unreachable: "Track n has no audio file." /
+"Track has no audio file." (the actions accept only verified `tracks/<uuid>.mp3` keys), "Artist
+name is empty." (the actions refuse a blank new name), and slice 3's blank-key check in
+`replaceTrackAudio`. Titles and names are trimmed with JavaScript's standard `.trim()`. The slice
+4 services batch their database work: `checkTracks` runs every track's title and artist checks,
+in track order, before any write; `resolveArtists` checks all picked artist ids in one query
+("Unknown artist.") and resolves each typed name with `artistIdByName` (it replaced
+`resolve_artist_refs`); `insertTracks` inserts tracks one at a time (HSS numbers follow track
+order), then all credits in one insert; `updateRelease` sets every title in one `UPDATE`, every
+album position in one `UPDATE` (a `case` built by `perRow`), and replaces credits with one delete
+and one insert. Publish is split into `publishSingle` / `publishAlbum` / `insertRelease`. When a
+request breaks two rules at once, the one reported can differ from the SQL function's; nothing is
+saved either way. Two more deliberate differences from the SQL functions: restore finds its
+tracks by `tracks.archived_with_release`, and the shared-track checks are gone (the database
+keeps each track on one release). What each one does: [[content-lifecycle]].
+Callers: the eight actions in `src/lib/admin/release-actions.ts` (`saveRelease` calls
+`updateRelease`) and `publishRelease` in `src/lib/admin/actions.ts` ([[admin-upload]]). Each keeps
+its `isLabelMember()` check and input checks first. The release-actions ones then call
+`runService`, which gets the Viewer with `getViewer(await createClient())` and maps `FORBIDDEN` to
+"Only label members can do this.", `INVALID` / `NOT_FOUND` to the error's own message, `RETRY` in
+`moveRelease` to "Couldn't reorder — try again", and anything else to a logged "Couldn't save —
+try again.". `publishRelease` does the same in its own `try`/`catch`, with "Couldn't publish.
+Nothing was saved — try again." as the logged fallback. `setPinned` (one supabase-js update with
+the service client) logs a failed update and shows the same "Couldn't save — try again.". On
+success the release-actions ones return `saved()`, which refreshes the release pages.
 
 ## Adding a new read or service
 
-First check the rule ([slices.md](slices.md)): a read that changes nothing stays on supabase-js
+First check the rule ([data-access-rule.md](data-access-rule.md)): a read that changes nothing stays on supabase-js
 unless supabase-js can't do it safely (like the feed search).
 
 - **A user reading their own view** (feed-like): in the data function, `const claims = await

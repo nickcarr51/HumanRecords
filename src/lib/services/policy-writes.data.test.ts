@@ -4,7 +4,7 @@ import { createAdminClient, createTestUser } from "@/lib/supabase/test-helpers";
 import { authorize } from "./policy";
 import { getViewer } from "./viewer";
 
-// The rules for the slice 2 and 3 writes, with Viewers from getViewer() for real
+// The rules for the slice 2, 3 and 4 writes, with Viewers from getViewer() for real
 // signed-in users: label members only, each refusal with its own message.
 const admin = createAdminClient();
 const cleanups: Array<() => Promise<void>> = [];
@@ -24,9 +24,12 @@ const RULES = [
   ["releases.archive", "Only label members can archive releases."],
   ["releases.restore", "Only label members can restore releases."],
   ["releases.move", "Only label members can reorder releases."],
+  ["releases.publish", "Only label members can publish releases."],
+  ["releases.update", "Only label members can edit releases."],
   ["tracks.archive", "Only label members can remove tracks."],
   ["tracks.restore", "Only label members can restore tracks."],
   ["tracks.replaceAudio", "Only label members can replace files."],
+  ["tracks.add", "Only label members can add tracks."],
 ] as const;
 
 describe.each(RULES)("authorize %s (real signed-in users)", (action, message) => {

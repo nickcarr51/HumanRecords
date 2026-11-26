@@ -11,8 +11,8 @@ unique` (nullable), `used_at timestamptz` (nullable), `created_by → auth.users
 The token is **plaintext** (32 random bytes, base64url, 43 chars; `INVITE_TOKEN_RE`) so the admin
 page can re-show the URL any time. The no-grants rule is what protects it: a signed-in user
 can't read anyone's token. `listUsers` (`src/lib/services/users.ts`, label members only) is the one
-place that lists tokens to show them (`admin_list_users()`, which did the same, has no app callers
-now); the store functions below look a token up only to check or claim it.
+place that lists tokens to show them (`admin_list_users()`, which did the same, was dropped in
+slice 4); the store functions below look a token up only to check or claim it.
 
 ## States
 

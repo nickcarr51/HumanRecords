@@ -33,11 +33,11 @@ Foundational (no dependencies):
 Platform:
 
 - **db-access** — the Drizzle data layer for transactions and jobs supabase-js can't do safely
-  (the SQL functions move here in slices): `src/lib/db` (`getDb`, `DATABASE_URL` + verified TLS,
+  (the app's SQL functions moved here in slices 1–4): `src/lib/db` (`getDb`, `DATABASE_URL` + verified TLS,
   `asUser` / `asSystem`, 10s timeouts, the health check) and `src/lib/services` (`getViewer`,
   `authorize`, safe errors, `listUsers`, `changeUserRole`, `removeArtist`, the release services
-  `archiveRelease` / `restoreRelease` / `archiveTrack` / `restoreTrack` / `replaceTrackAudio` /
-  `moveRelease`), the rule, the lint and
+  `publishRelease` / `updateRelease` / `addAlbumTrack` / `archiveRelease` / `restoreRelease` /
+  `archiveTrack` / `restoreTrack` / `replaceTrackAudio` / `moveRelease`), the rule, the lint and
   hook rules, the slice map, and its tests. Builds on catalog-schema.
 - **auth** — invite-only OTP/magic-link sign-in, middleware + route guard, `/feed` redirect
   model, session/role helpers, email templates, inviting users.

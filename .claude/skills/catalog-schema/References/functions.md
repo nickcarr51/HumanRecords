@@ -6,7 +6,8 @@ which is invoker but only reachable from inside `publish_release`, and the plain
 functions at the end. One of those, `keep_catalog_number`, pins `search_path = ''` (the stricter
 Supabase-linter form) while every older function uses `= public`. Both pin the path, so the
 inconsistency is acceptable; don't churn old migrations to align them, and either form is fine
-for new functions as long as `''` functions schema-qualify every reference.
+for new functions as long as `''` functions schema-qualify every reference. Slice 4's migration
+`20261119120000` dropped the functions slices 1–3 replaced; see "Dropped in slice 4" at the end.
 
 ## `handle_new_user()` → trigger
 
@@ -19,41 +20,18 @@ for new functions as long as `''` functions schema-qualify every reference.
   `sync_user_role_from_app_metadata()`: after update of `raw_app_meta_data`, only when
   `app_metadata.role` is non-null and changed. Needed because GoTrue's admin `createUser`
   applies `app_metadata` in a later UPDATE. Changing `app_metadata.role` via the admin API
-  therefore overrides `public.users.role`; `changeUserRole` (like `admin_set_user_role`) doesn't
+  therefore overrides `public.users.role`; `changeUserRole` (like `admin_set_user_role` before it) doesn't
   touch `app_metadata`, so it can go stale (nothing reads it after creation).
 - Fed by `admin.createUser` (`app_metadata: { role }`, `user_metadata: { name }`) from the
   seed, `test-helpers` and `createUser` in `/admin/users`.
-
-## `admin_list_users()` → table
-
-- Migration `20261002120100_create_invites.sql`. Definer, `stable`. Raises `42501` unless
-  `current_user_role() = 'label_member'`.
-- Returns `id, email, name, role, created_at, invite_token, invite_used_at, banned_until`, newest
-  first. `banned_until` (from `auth.users`) was added in `20261010120500` (drop + recreate, since
-  the return type changed). The app reads it today through `listUsers`, and `toAdminUserRow`
-  derives the user list's "deactivated" state from it ([[invites]]).
-  Generated types mark `name`/`invite_token`/`invite_used_at` non-null though they can be null.
-- Grants: revoked from `public`/`anon`, granted to `authenticated`. Former caller (before Drizzle
-  slice 1): [[invites]].
-- No app callers since Drizzle slice 1 (`listUsers` in `services/users.ts`, same columns and
-  order, [[db-access]]); kept in the DB until slice 4's migration drops it. The parity test
-  `users.parity.data.test.ts` and `invites.data.test.ts` still call it.
-
-## `admin_set_user_role(target uuid, new_role user_role)` → void
-
-- Same migration and grants. Errors: `42501` not a label member; `22023` target is the caller;
-  `P0002` no such user. Updates `public.users.role` only.
-- No app callers since Drizzle slice 2 (2026-10-28): `setUserRole` calls `changeUserRole` in
-  `services/users.ts` instead (same checks, `DomainError` codes in place of the SQLSTATEs,
-  [[db-access]]). Kept in the DB until slice 4's migration drops it. The parity test
-  `users-role.parity.data.test.ts` and `invites.data.test.ts` still call it.
 
 ## `increment_play_count(p_track_id uuid)` → void
 
 - Migration: `20260915005111_create_albums_and_tracks.sql`; grants hardened in
   `20260915013116_…` (revoked from `public` and `anon`).
 - The only way to change `play_count` (no update policy on `tracks`).
-- Call: `supabase.rpc('increment_play_count', { p_track_id })`. Not yet called by app code.
+- Call: `supabase.rpc('increment_play_count', { p_track_id })`. Never called by app code; the final
+  cleanup drops it ([[db-access]] `References/slices.md`).
 
 ## `current_user_role()` → `user_role`
 
@@ -73,10 +51,19 @@ for new functions as long as `''` functions schema-qualify every reference.
 - `newName` → `insert … on conflict ((lower(trim(name)))) do nothing`, then select by
   case-insensitive name — so an existing artist is reused, never duplicated.
 - Raises `22023` for unknown id / empty name / malformed ref.
+- Unused by the app since slice 4 (the services' internal `resolveArtists` does the same for
+  the refs the actions let through, checking picked ids in one query; a malformed ref is refused in the action, [[db-access]]);
+  dropped in the final cleanup.
 
 ## `publish_release(payload jsonb)` → `uuid` (release id)
 
-- Migration: `20260929120100_publish_release.sql`. The single catalog write path.
+- Migration: `20260929120100_publish_release.sql`. The single catalog write path until slice 4,
+  when the `publishRelease` service (`src/lib/services/releases.ts`, same checks, messages and rows
+  for every payload shape the action lets through, [[db-access]]) replaced it. It never reports
+  "Track n has no audio file." or "Artist name is empty.", which only this function can raise
+  (the action refuses those payloads). Unused by the app; dropped in the final cleanup.
+  `publish-release.data.test.ts` and the parity test `releases-publish.parity.data.test.ts` still
+  call it.
 - Gate: `current_user_role() is distinct from 'label_member'` → raise `42501`.
 - Validates shape (single = exactly 1 track and no album; album ≥ 2 tracks + title; each
   track has title, `audioKey`, ≥1 artist) → raise `22023` with a human message.
@@ -85,61 +72,6 @@ for new functions as long as `''` functions schema-qualify every reference.
   raise rolls back everything.
 - Full contract, payload shape, and SQLSTATE → UI mapping: [[admin-upload]]
   (`References/releases-model.md`).
-
-## `move_release(target uuid, direction text)` → void
-
-- Migration `20261010120100_move_release.sql`. Definer, `search_path = public`; revoked from
-  `public`/`anon`, granted to `authenticated`.
-- Errors: `42501` not a label member; `22023` direction not `up`/`down`, or the release is archived;
-  `P0002` no such release. Already at the edge of its pinned group: silent no-op.
-- Locks the target and its neighbour (`for update`), finds the neighbour in the **same pinned group**
-  (live only) by `(sort_at, id)`, then swaps their `sort_at`.
-  Fast path: one indexed EXISTS looks for any other live row in the group sharing the target's or
-  neighbour's `sort_at` (or the two tie with each other); if none, it is a plain swap writing only
-  those 2 rows. Otherwise it first normalizes the whole pinned group (live rows): with rows
-  numbered `i` in feed order, `v_i = min over j<=i of (s_j + j*1ms) - i*1ms`, writing only rows
-  where `v_i <> s_i`. Values only move down, are strictly 1 ms+ apart, and keep feed order, so
-  nothing collides and the neighbour stays adjacent; then it swaps. 1 ms because JS `Date` keeps
-  only milliseconds. One click always moves exactly one spot.
-- Two concurrent opposite moves can deadlock (`40P01`): callers should show a "try again" message.
-- Former caller (before Drizzle slice 3, 2026-11-15): the release admin's `moveRelease` action,
-  which now calls the `moveRelease` service in `services/releases.ts` (same steps, the
-  normalization sent as the same SQL statement, [[db-access]]; [[content-lifecycle]]
-  `References/ordering.md`). Kept in the DB, unused by the app, until slice 4's migration drops it.
-  Test: `src/lib/supabase/move-release.data.test.ts`; the parity test
-  `src/lib/services/releases.parity.data.test.ts` still calls it.
-
-## `admin_delete_artist(target uuid)` → void
-
-- Migration `20261010130000_artists_admin_writes.sql`. Definer, `search_path = public`; revoked from
-  `public`/`anon`, granted to `authenticated`.
-- Errors: `42501` not a label member; `P0002` no such artist; `23503` the artist is still credited
-  on a track or album (the `restrict` FKs from `20261010120400` — propagated unchanged, nothing deleted).
-- Deletes the row and, if it had a `profile_photo_url`, inserts that key into `r2_cleanup_queue`
-  (`reason='archived'`, `source_table='artists'`, `source_id=target`) in the same transaction.
-- Former caller (before Drizzle slice 2, 2026-10-28): the `/admin/artists` delete action
-  ([[admin-upload]]), which now calls `removeArtist` in `services/artists.ts` (same delete and
-  queue row in one transaction, `DomainError` codes in place of the SQLSTATEs, [[db-access]]).
-  Kept in the DB until slice 4's migration drops it. Create/edit use the `artists` RLS write
-  policies instead (see `rls-model.md`).
-- Tests: `src/lib/supabase/artists-admin-writes.data.test.ts`; the parity test
-  `src/lib/services/artists.parity.data.test.ts` still calls it.
-
-## `search_feed(q text)` → `setof releases`
-
-- Migration `20261010120200_search_feed.sql`. `sql`, `stable`, **security invoker**; `authenticated` only.
-- Case-insensitive substring match on track titles, album titles and credited artist names (an album
-  also matches through its live tracks); `%`, `_` and `\` in `q` are escaped, so `100%` is literal.
-  Excludes archived releases and archived tracks.
-- **An empty `q` matches everything**; a caller would skip the function for an empty query.
-- Returns plain `releases` rows, unordered. (Before slice 1, `getFeed` chained its embedded select,
-  order and range onto the call; PostgREST orders a function result only by columns in the select,
-  so that select had to include `pinned, sort_at`.)
-- Former caller (before Drizzle slice 1): `getFeed` in `src/lib/supabase/feed.ts` (the `/feed`
-  search box).
-- No app callers since Drizzle slice 1: `searchMatches` (`src/lib/supabase/feed-search.ts`) is the
-  same match, built in Drizzle ([[db-access]]). Kept in the DB until slice 4's migration drops it;
-  `search-feed.data.test.ts` and the parity test `feed-drizzle.parity.data.test.ts` still call it.
 
 ## Triggers `releases_default_sort_at()`, `keep_created_at()`, `keep_catalog_number()` and `track_in_one_place()`
 
@@ -169,65 +101,60 @@ for new functions as long as `''` functions schema-qualify every reference.
   (`tables-and-relations.md`). An integrity trigger: it stays in SQL permanently, like
   `keep_created_at`. Test: `src/lib/supabase/track-one-place.data.test.ts`.
 
-## Release admin functions (archive, restore, edit, add/replace track)
+## Release admin functions (edit, add track)
 
-Migrations `20261010140000`..`20261010140300`. All are definer with `search_path = public`; the
-seven public ones are revoked from `public`/`anon` and granted to `authenticated`. Each checks
-`current_user_role()` first (`42501`), then locks the owning `releases` row `for update` before
-other reads/writes. Rule violations are `22023` with the UI message; missing rows `P0002`.
-Callers: the release-admin server actions call `update_release` and `add_album_track`
-([[content-lifecycle]]). Since Drizzle slice 3 (2026-11-15) `archive_release`, `restore_release`,
-`archive_track`, `restore_track`, `replace_track_audio` and the helper `release_for_track` are
-**unused by the app**: the actions call the services in `src/lib/services/releases.ts` instead
-(same checks, order and messages; [[db-access]]). They stay in the DB until slice 4's migration
-drops them; their data tests and `src/lib/services/releases.parity.data.test.ts` still call them.
-The shared-track errors in the table below can no longer fire: since migration `20261115120000`
-the database refuses a track on two releases (the services dropped those checks). Tests:
-`src/lib/supabase/{archive-release,archive-track,add-track-replace-audio,update-release}.data.test.ts`
-(fixtures in `release-admin-fixtures.ts`).
+Migrations `20261010140200` (`add_album_track`) and `20261010140300` (`update_release`). Both
+are definer with `search_path = public`, revoked from `public`/`anon` and granted to
+`authenticated`. Each checks `current_user_role()` first (`42501`), then locks the `releases` row
+`for update` before other reads/writes. Rule violations are `22023` with the UI message; missing
+rows `P0002`. Since slice 4 both are **unused by the app**: `saveRelease` and `addAlbumTrack`
+call the `updateRelease` and `addAlbumTrack` services in `src/lib/services/releases.ts` (same
+checks and messages for every payload shape the actions let through, except the SQL-only "Track
+has no audio file." and "Artist name is empty.", which the actions make unreachable; [[db-access]]). They stay in the DB until the final cleanup. Tests:
+`src/lib/supabase/{add-track-replace-audio,update-release}.data.test.ts` (fixtures in
+`release-admin-fixtures.ts`) and the parity test `releases-publish.parity.data.test.ts`. The
+other functions from those migrations (archive/restore, replace, `release_for_track`) were
+dropped in slice 4.
 
 | Function | Returns | Errors (besides `42501` / `P0002`) |
 |---|---|---|
-| `archive_release(p_release_id uuid)` | void | `22023` a track on the release also belongs to another release ("A track on this release also belongs to another release."); already archived is a silent no-op (checked before the shared-track guard) |
-| `restore_release(p_release_id uuid)` | void | `22023` a same-timestamp track/album key was already `cleaned_at`; not archived is a no-op (checked before the shared-track guard); `22023` shared track ("A track on this release also belongs to another release.") |
-| `archive_track(p_track_id uuid)` | void | `22023` track is on a single ("Archive the single instead.") or the album is archived (checked after the track's own state); `22023` track belongs to more than one release ("This track belongs to more than one release.", from `release_for_track`); already archived is a no-op, even if the album was archived with it |
-| `restore_track(p_track_id uuid)` | void | `22023` single, album archived ("Restore the album first."), its key was already `cleaned_at`, or the track belongs to more than one release ("This track belongs to more than one release."); not archived is a no-op |
 | `add_album_track(p_release_id uuid, payload jsonb)` | uuid (new track id) | `22023` not an album, album archived, missing title / `audioKey` / artists; from `resolve_artist_refs`: "Unknown artist.", "Artist name is empty.", "artists must be a list". A malformed artist `{id}` raises raw `22P02`, so callers must pre-validate UUIDs |
-| `replace_track_audio(p_track_id uuid, p_audio_key text)` | void | `P0002` track not found or has no release; `22023` track archived, empty key, same key as current, or track belongs to more than one release |
 | `update_release(p_release_id uuid, payload jsonb)` | void | `22023` release archived, `tracks` not a list, single given `album`, blank album/track title, track without artist, stale draft; plus the same `resolve_artist_refs` `22023` messages as `add_album_track`. A malformed artist `{id}` or track id raises raw `22P02`, so callers must pre-validate UUIDs |
 
-- `archive_release` sets `releases.archived_at` and archives the release's live tracks with the
-  **same timestamp**, queuing track audio/art keys and the album art key (`archived`).
-  `restore_release` restores only tracks carrying that same timestamp and deletes their uncleaned
-  `archived` queue rows. (The `archiveRelease` / `restoreRelease` services use the
-  `tracks.archived_with_release` flag instead of the timestamp match; the old functions don't set
-  it. [[content-lifecycle]] `References/archive-and-restore.md`.)
-- `archive_track` queues that track's keys; if it was the album's last live track it archives the
-  release too (same timestamp, queues album art). `restore_track` clears one track and its uncleaned rows.
 - `add_album_track` payload `{ title, audioKey, artists: [{id}|{newName}] }`; the position is
   `max(position) + 1` over every track on the album (live or removed), so it lands last. Key format
   and object existence are checked in the server action, not here. The new track's
   `catalog_number` comes from the identity sequence — neither this function nor `publish_release`
   names the column (see `tables-and-relations.md` "Catalog numbers").
-- `replace_track_audio` queues the old key (`replaced`) and swaps `audio_url`.
 - `update_release` payload `{ album?: { title, artists }, tracks: [{ id, title, artists }] }`. `tracks`
   must list exactly the release's live tracks (else `22023` "This release changed since you opened it.
   Reload the page."); array order becomes positions 1..n, removed (archived) tracks keep their
   relative order after the live ones. Artists go through `resolve_artist_refs`, so a "new" name that
   exists in another case reuses the artist.
-- **`release_for_track(p_track_id uuid)` is internal** (`plpgsql`, `stable`; execute revoked from
-  `public`, `anon` and `authenticated`, so it is not an RPC). It returns the release that owns a
-  track, `null` if none (callers raise `P0002`), and raises `22023` ("This track belongs to more than
-  one release.") if the track is on several releases. Since migration `20261115120000` the
-  database refuses that state (unique index `track_albums_track_id_key` and the
-  `track_in_one_place` triggers), so that error and the same check in `archive_release` /
-  `restore_release` ("A track on this release also belongs to another release.") can no longer
-  fire. The services replaced this helper with an internal `lockReleaseForTrack`.
 - **Positions:** `track_albums` has no unique `(album_id, position)`. Every writer of positions
-  locks the release row first (`add_album_track`, `update_release`), so don't write them without it.
+  locks the release row first (`addAlbumTrack`, `updateRelease`, like the SQL functions), so don't
+  write them without it.
+
+## Dropped in slice 4 (migration `20261119120000`)
+
+The app stopped calling each in the slice named; the services keep the same checks, order and
+messages, except that `replaceTrackAudio` has no blank-key check (the action accepts only a
+verified `tracks/<uuid>.mp3` key) ([[db-access]] `References/running-queries.md`).
+
+| Function | Created in | Replaced by |
+|---|---|---|
+| `search_feed(q)` | `20261010120200` | `searchMatches` in `src/lib/supabase/feed-search.ts` (slice 1) |
+| `admin_list_users()` | `20261002120100`, `banned_until` added in `20261010120500` | `listUsers` (slice 1) |
+| `admin_set_user_role(target, new_role)` | `20261002120100` | `changeUserRole` (slice 2) |
+| `admin_delete_artist(target)` | `20261010130000` | `removeArtist` (slice 2) |
+| `move_release(target, direction)` | `20261010120100` | `moveRelease` (slice 3; the algorithm: [[content-lifecycle]] `References/ordering.md`) |
+| `archive_release`, `restore_release`, `release_for_track` (internal) | `20261010140000` | `archiveRelease`, `restoreRelease`, the internal `lockReleaseForTrack` (slice 3) |
+| `archive_track`, `restore_track` | `20261010140100` | `archiveTrack`, `restoreTrack` (slice 3) |
+| `replace_track_audio` | `20261010140200` | `replaceTrackAudio` (slice 3) |
 
 ## Writing a new function
 
+New SQL functions are limited to the kinds in [[db-access]] `References/data-access-rule.md`.
 Follow the template in [rls-model.md](rls-model.md) ("Adding a new write path"). Use
 `errcode = '22023'` (invalid parameter) for validation and `'42501'` (insufficient
 privilege) for authorization so the app can map them. Regenerate types afterwards — new

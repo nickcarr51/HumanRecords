@@ -49,11 +49,12 @@ turn codes into the old messages: `deleteArtist` maps `CONFLICT` (a credited art
 the credit-count message, `NOT_FOUND` to "That artist no longer exists." and `FORBIDDEN` to "Only
 label members can do this."; `setUserRole` maps `FORBIDDEN`, `INVALID` ("You can't change your own
 role.") and `NOT_FOUND` ("That user no longer exists."); anything else is logged and shows
-"Couldn't delete. Try again." / "Couldn't save the role. Try again.". The slice 3 release
+"Couldn't delete. Try again." / "Couldn't save the role. Try again.". The slice 3 and 4 release
 services throw `INVALID` and `NOT_FOUND` with the SQL functions' own messages, and `runService`
 in `release-actions.ts` shows those messages as they are, `FORBIDDEN` as "Only label members can
 do this.", `RETRY` in `moveRelease` as "Couldn't reorder — try again", and anything else, logged,
-as "Couldn't save — try again.". Callers on the current read
+as "Couldn't save — try again.". `publishRelease` in `actions.ts` maps `FORBIDDEN` and `INVALID` the same way, with
+"Couldn't publish. Nothing was saved — try again." as its logged fallback. Callers on the current read
 paths don't look at codes: the feed server actions show
 "Could not load more tracks.", `/admin/users` "Couldn't load users.", `/admin/artists` "Couldn't
 load artists.", and pages without a `try` reach the `(app)/error.tsx` boundary. Errors thrown while

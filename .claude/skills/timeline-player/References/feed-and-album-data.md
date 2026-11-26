@@ -87,8 +87,9 @@ case-insensitively, track titles, album titles and credited artist names: a sing
 live track (title or track artist); an album through its title, an album artist, or any live
 track. Archived tracks never match.
 `%`, `_` and `\` in `q` are literal (`escapeLike`). It is a translation of the `search_feed` SQL
-function, which still exists but has no app callers ([[catalog-schema]] `References/functions.md`);
-`feed-drizzle.parity.data.test.ts` proves both match the same releases in the same order.
+function, dropped in slice 4 ([[catalog-schema]] `References/functions.md`);
+`feed-drizzle.parity.data.test.ts` checks it returns the releases, in the order, that
+`search_feed` gave.
 
 `pageSize` defaults to `feedPageSize()`: the optional `FEED_PAGE_SIZE` env var if it is a positive
 integer, else `DEFAULT_PAGE_SIZE` (20). Unset in develop/prod; set small locally to test paging

@@ -1,5 +1,7 @@
 // Client-safe upload rules, enforced in the form AND re-checked on the server.
 
+import type { ArtistRef } from "./types";
+
 export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 export const AUDIO_CONTENT_TYPE = "audio/mpeg";
 export const MIN_ALBUM_TRACKS = 2;
@@ -22,3 +24,30 @@ export function audioFileError(file: { name: string; size: number }): string | n
 // Catalog ids are UUIDs; server actions refuse anything else before
 // touching the database.
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+// Artist refs as the upload and edit forms send them: each an object with a
+// UUID `id` OR a non-blank string `newName`. A ref with an `id` key is judged
+// by it alone, the way the services read it. Server actions refuse anything
+// else before calling a release service.
+export function artistRefsValid(refs: unknown): refs is ArtistRef[] {
+  return (
+    Array.isArray(refs) &&
+    refs.every((r) => {
+      if (!r || typeof r !== "object") return false;
+      const { id, newName } = r as { id?: unknown; newName?: unknown };
+      if ("id" in r) return isUuid(id);
+      return typeof newName === "string" && newName.trim().length > 0;
+    })
+  );
+}
+
+// An album's details as the forms send them: a string title and valid artist refs.
+export function albumValid(album: unknown): boolean {
+  if (!album || typeof album !== "object") return false;
+  const { title, artists } = album as { title?: unknown; artists?: unknown };
+  return typeof title === "string" && artistRefsValid(artists);
+}
